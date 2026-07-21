@@ -102,10 +102,23 @@ This keeps the DB small and the admin panel simple.
 
 A scheduled job (Vercel Cron) periodically expires `pending` bookings past `holdExpiresAt` (status → `expired`), freeing the slot. This same cron can double as the Supabase keep-alive during the free-tier phase.
 
+## Auth & roles
+
+Supabase Auth owns credentials; the app owns the role.
+
+- **Profile rows.** A trigger on `auth.users` (`on_auth_user_created`) inserts the matching `public."User"` row with `role = 'user'`. The app never creates it during signup, so it cannot be skipped. A matching delete trigger keeps the two in sync.
+- **Where the role lives.** In the `User` table only — never in JWT user metadata, which the client can edit.
+- **Three Supabase clients** in `/lib/supabase`: `client.ts` (browser, anon key), `server.ts` (server components/actions/handlers, anon key + cookies, so RLS applies as the logged-in user), `admin.ts` (service-role, bypasses RLS, guarded by `import "server-only"`).
+- **Checks live in `/lib/auth.ts`**: `getCurrentUser`, `isAdmin`, `requireUser`, `requireAdmin` (pages/actions), `requireAdminApi` (route handlers → 401/403). Every protected route calls one directly.
+- **`proxy.ts` refreshes the session and nothing else.** It makes no authorization decisions — this layer is bypassable via a forged `x-middleware-subrequest` header (CVE-2025-29927).
+
 ## Security
 
-- Authorization enforced in server actions/handlers **and** Postgres RLS. Never trust middleware alone (CVE-2025-29927).
+- Authorization enforced in server actions/handlers **and** Postgres RLS. Never trust middleware/proxy alone (CVE-2025-29927).
 - RLS: users read/write only their own bookings; only admins manage courts, types, templates, and see all bookings.
+- Policies use a `public.is_admin()` `SECURITY DEFINER` helper — required so the `User` table's own policies don't recurse.
+- **Prisma bypasses RLS** (it connects as `postgres`). RLS constrains the anon-key path — i.e. anything a browser could call directly. Both layers are needed; neither alone is sufficient. RLS is deliberately not `FORCE`d, or Prisma queries would fail with a NULL `auth.uid()`.
+- Users have **no write policy on `User`**, so nobody can promote themselves through the anon key. Promotion happens with the service-role key (`npm run make-admin -- <email>`) or by an existing admin.
 - Merchant secret and service-role key are server-only env vars.
 
 ## Connections (Prisma + Supabase)

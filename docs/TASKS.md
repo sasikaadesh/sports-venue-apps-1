@@ -27,10 +27,11 @@ Build one phase at a time. Finish and verify a phase (its "Done when") before st
 - **Done when:** tables exist and the unique constraint is enforced.
 
 ## Phase 4 — Auth & roles
-- [ ] Supabase Auth: signup/login
-- [ ] user vs admin role; server-side role checks
-- [ ] RLS policies (own bookings for users; full access for admins)
+- [x] Supabase Auth: signup/login
+- [x] user vs admin role; server-side role checks
+- [x] RLS policies (own bookings for users; full access for admins)
 - **Done when:** you can register, log in, and role gates work (verified, not just UI-hidden).
+- Promote an account: `npm run make-admin -- you@example.com`
 
 ## Phase 5 — Admin panel
 - [ ] CRUD: courts (with image upload to Supabase Storage), court types + player options

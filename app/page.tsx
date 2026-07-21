@@ -1,65 +1,107 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, ShieldCheck, Zap } from "lucide-react";
 
-export default function Home() {
+import { LinkButton } from "@/components/link-button";
+import { getCurrentUser } from "@/lib/auth";
+
+export default async function Home() {
+  const user = await getCurrentUser();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <>
+      <header className="border-b">
+        <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 sm:px-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight"
           >
+            <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <Zap className="size-4" />
+            </span>
+            Courtside
+          </Link>
+
+          <div className="flex items-center gap-2">
+            {user ? (
+              <>
+                {user.role === "admin" && (
+                  <LinkButton
+                    href="/admin"
+                    variant="ghost"
+                    size="lg"
+                    className="h-9"
+                  >
+                    <ShieldCheck />
+                    Admin
+                  </LinkButton>
+                )}
+                <LinkButton href="/account" size="lg" className="h-9">
+                  Your account
+                </LinkButton>
+              </>
+            ) : (
+              <>
+                <LinkButton
+                  href="/login"
+                  variant="ghost"
+                  size="lg"
+                  className="h-9"
+                >
+                  Log in
+                </LinkButton>
+                <LinkButton href="/signup" size="lg" className="h-9">
+                  Sign up
+                </LinkButton>
+              </>
+            )}
+          </div>
+        </nav>
+      </header>
+
+      {/* Low, simple hero — the booking dropdown lands here in Phase 7. */}
+      <main className="flex-1">
+        <section className="mx-auto grid w-full max-w-6xl gap-12 px-6 py-16 sm:px-8 lg:grid-cols-2 lg:items-center lg:py-24">
+          <div className="flex flex-col items-start gap-6">
+            <h1 className="max-w-lg text-5xl leading-[1.02] sm:text-6xl">
+              Your court.
+              <br />
+              Your slot.
+              <br />
+              <span className="text-primary">Sorted.</span>
+            </h1>
+            <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
+              Cricket nets, tennis, table tennis and more. See what&apos;s free,
+              grab the slot, and pay online — no phone calls, no clipboard.
+            </p>
+            <LinkButton
+              href={user ? "/account" : "/signup"}
+              size="lg"
+              className="h-11 px-5"
+            >
+              {user ? "Go to your account" : "Get started"}
+              <ArrowRight />
+            </LinkButton>
+          </div>
+
+          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border bg-muted">
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=1400&q=80"
+              alt="Tennis player resting on a blue hard court surrounded by balls"
+              fill
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover"
+              priority
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          </div>
+        </section>
       </main>
-    </div>
+
+      <footer className="border-t">
+        <div className="mx-auto w-full max-w-6xl px-6 py-8 text-xs text-muted-foreground sm:px-8">
+          &copy; {new Date().getFullYear()} Courtside — school sports facilities.
+        </div>
+      </footer>
+    </>
   );
 }
