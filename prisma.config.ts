@@ -13,6 +13,10 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"),
+    // Migration/introspection connection. MUST be the DIRECT (session-mode)
+    // connection, not the transaction pooler — migrations need session-level
+    // features the transaction pooler (port 6543) does not support. Runtime
+    // still uses DATABASE_URL (pooled) via the schema's datasource `url`.
+    url: env("DIRECT_URL"),
   },
 });

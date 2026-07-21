@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
@@ -11,6 +8,117 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  url       = env("DATABASE_URL") // pooled (runtime)
+  directUrl = env("DIRECT_URL") // direct (migrations)
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  user
+  admin
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+  blocked
+  expired
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+  cancelled
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+/// Profile row mirroring a Supabase Auth user. `id` equals `auth.users.id`.
+model User {
+  id        String    @id @db.Uuid
+  email     String    @unique
+  role      Role      @default(user)
+  createdAt DateTime  @default(now())
+  bookings  Booking[]
+}
+
+/// Category of court (Tennis, Cricket, ...). Drives the player-count dropdown.
+model CourtType {
+  id            String  @id @default(uuid()) @db.Uuid
+  name          String  @unique
+  playerOptions Int[] // e.g. [2, 4] for singles / doubles
+  courts        Court[]
+}
+
+model Court {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String
+  courtTypeId String         @db.Uuid
+  courtType   CourtType      @relation(fields: [courtTypeId], references: [id])
+  description String?
+  images      String[] // Supabase Storage URLs (Unsplash placeholders for now)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  slots       SlotTemplate[]
+  bookings    Booking[]
+
+  @@index([courtTypeId])
+}
+
+/// Per-court recurring schedule. A slot is a template, not a per-day row.
+model SlotTemplate {
+  id        String    @id @default(uuid()) @db.Uuid
+  courtId   String    @db.Uuid
+  court     Court     @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  dayOfWeek Int // 0..6 (Sun..Sat)
+  startTime DateTime  @db.Time(6) // time-of-day, e.g. 09:00
+  endTime   DateTime  @db.Time(6) // time-of-day, e.g. 10:00
+  price     Decimal   @db.Decimal(10, 2) // LKR
+  isActive  Boolean   @default(true)
+  bookings  Booking[]
+
+  @@index([courtId, dayOfWeek])
+}
+
+model Booking {
+  id            String        @id @default(uuid()) @db.Uuid
+  courtId       String        @db.Uuid
+  court         Court         @relation(fields: [courtId], references: [id])
+  bookingDate   DateTime      @db.Date
+  slotId        String        @db.Uuid
+  slot          SlotTemplate  @relation(fields: [slotId], references: [id])
+  userId        String?       @db.Uuid // null when status = blocked (admin block)
+  user          User?         @relation(fields: [userId], references: [id])
+  playerCount   Int
+  status        BookingStatus @default(pending)
+  holdExpiresAt DateTime? // expiry for a pending hold
+  createdAt     DateTime      @default(now())
+  payments      Payment[]
+
+  // Anti double-booking guarantee: one booking per court + date + slot.
+  @@unique([courtId, bookingDate, slotId])
+  @@index([courtId, bookingDate])
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id         String        @id @default(uuid()) @db.Uuid
+  bookingId  String        @db.Uuid
+  booking    Booking       @relation(fields: [bookingId], references: [id])
+  orderId    String        @unique // merchant order id sent to PayHere
+  amount     Decimal       @db.Decimal(10, 2)
+  currency   String        @default("LKR")
+  status     PaymentStatus @default(pending)
+  payhereRef String? // payment_id from PayHere
+  createdAt  DateTime      @default(now())
+
+  @@index([bookingId])
 }
