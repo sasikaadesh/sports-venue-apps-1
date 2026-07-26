@@ -2,7 +2,8 @@
  * Promote (or demote) a user by email.
  *
  *   npm run make-admin -- you@example.com
- *   npm run make-admin -- you@example.com user     # demote back
+ *   npm run make-admin -- you@example.com super_admin  # can manage admins
+ *   npm run make-admin -- you@example.com user         # demote back
  *
  * Uses the service-role key, which bypasses RLS — that is why this is a local
  * CLI script and not an app route. Never expose this logic over HTTP without a
@@ -15,13 +16,15 @@ config({ path: ".env.local" });
 
 const [email, role = "admin"] = process.argv.slice(2);
 
+const ROLES = ["user", "admin", "super_admin"];
+
 if (!email) {
-  console.error("Usage: npm run make-admin -- <email> [admin|user]");
+  console.error(`Usage: npm run make-admin -- <email> [${ROLES.join("|")}]`);
   process.exit(1);
 }
 
-if (role !== "admin" && role !== "user") {
-  console.error(`Invalid role "${role}". Use "admin" or "user".`);
+if (!ROLES.includes(role)) {
+  console.error(`Invalid role "${role}". Use one of: ${ROLES.join(", ")}.`);
   process.exit(1);
 }
 

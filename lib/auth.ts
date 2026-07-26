@@ -20,8 +20,32 @@ import type { Role } from "@/lib/generated/prisma/enums";
 export type CurrentUser = {
   id: string;
   email: string;
+  name: string | null;
+  phone: string | null;
+  address: string | null;
   role: Role;
 };
+
+/** Columns that make up a `CurrentUser`. Kept in one place so every read agrees. */
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  address: true,
+  role: true,
+} as const;
+
+/**
+ * Roles that may enter the admin panel. `super_admin` is a strict superset of
+ * `admin`, so every existing admin gate accepts it — the extra powers are
+ * gated separately by `requireSuperAdmin`.
+ */
+const ADMIN_ROLES: readonly Role[] = ["admin", "super_admin"];
+
+export function roleIsAdmin(role: Role): boolean {
+  return ADMIN_ROLES.includes(role);
+}
 
 /**
  * The logged-in user, or null.
@@ -46,7 +70,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   // metadata — client-supplied claims must not decide authorization.
   const profile = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { id: true, email: true, role: true },
+    select: PROFILE_SELECT,
   });
 
   if (profile) return profile;
@@ -57,18 +81,50 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   // Upsert, not create — two concurrent requests would otherwise race and one
   // would blow up on the primary key. Note `update: {}`: an existing row is
   // left exactly as-is, so this can never reset an admin back to 'user'.
+  // The Google sign-in path lands here too: the trigger fills `name` from the
+  // OIDC claim, but never phone or address, so `metadata` is only a fallback.
+  const metadata = user.user_metadata ?? {};
+  const fromMetadata = (key: string): string | undefined => {
+    const value = metadata[key];
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  };
+
   return prisma.user.upsert({
     where: { id: user.id },
-    create: { id: user.id, email: user.email! },
+    create: {
+      id: user.id,
+      email: user.email!,
+      name: fromMetadata("name") ?? fromMetadata("full_name") ?? null,
+      phone: fromMetadata("phone") ?? null,
+      address: fromMetadata("address") ?? null,
+    },
     update: {},
-    select: { id: true, email: true, role: true },
+    select: PROFILE_SELECT,
   });
 });
 
-/** True when the current request comes from an admin. */
+/** True when the current request comes from an admin or a super admin. */
 export async function isAdmin(): Promise<boolean> {
   const user = await getCurrentUser();
-  return user?.role === "admin";
+  return !!user && roleIsAdmin(user.role);
+}
+
+/** True only for a super admin — the role that may manage other admins. */
+export async function isSuperAdmin(): Promise<boolean> {
+  const user = await getCurrentUser();
+  return user?.role === "super_admin";
+}
+
+/**
+ * A profile is complete once we have a phone number and an address.
+ *
+ * Email/password signup collects both up front. Google does not supply either,
+ * so an OAuth user arrives incomplete and is routed to /complete-profile.
+ */
+export function profileIsComplete(
+  user: Pick<CurrentUser, "phone" | "address">
+): boolean {
+  return !!user.phone?.trim() && !!user.address?.trim();
 }
 
 /**
@@ -94,8 +150,43 @@ export async function requireUser(returnTo?: string): Promise<CurrentUser> {
  */
 export async function requireAdmin(returnTo?: string): Promise<CurrentUser> {
   const user = await requireUser(returnTo);
-  if (user.role !== "admin") {
+  if (!roleIsAdmin(user.role)) {
     redirect("/account?denied=admin");
+  }
+  return user;
+}
+
+/**
+ * Require a super admin — the gate on managing other admins.
+ *
+ * A plain admin who reaches one of these is bounced to the admin panel with a
+ * message, not to /account: they *are* an admin, just not this kind.
+ */
+export async function requireSuperAdmin(
+  returnTo?: string
+): Promise<CurrentUser> {
+  const user = await requireUser(returnTo);
+  if (user.role !== "super_admin") {
+    redirect(
+      roleIsAdmin(user.role)
+        ? "/admin/users?denied=super_admin"
+        : "/account?denied=admin"
+    );
+  }
+  return user;
+}
+
+/**
+ * Require a complete profile — for pages a half-registered Google user should
+ * not reach yet. Sends them to /complete-profile and back afterwards.
+ */
+export async function requireCompleteProfile(
+  returnTo?: string
+): Promise<CurrentUser> {
+  const user = await requireUser(returnTo);
+  if (!profileIsComplete(user)) {
+    const next = returnTo ? `?next=${encodeURIComponent(returnTo)}` : "";
+    redirect(`/complete-profile${next}`);
   }
   return user;
 }
@@ -115,7 +206,7 @@ export async function requireAdminApi(): Promise<
       error: Response.json({ error: "Not authenticated" }, { status: 401 }),
     };
   }
-  if (user.role !== "admin") {
+  if (!roleIsAdmin(user.role)) {
     return {
       user: null,
       error: Response.json({ error: "Admin access required" }, { status: 403 }),

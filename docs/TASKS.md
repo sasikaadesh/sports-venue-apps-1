@@ -34,22 +34,35 @@ Build one phase at a time. Finish and verify a phase (its "Done when") before st
 - Promote an account: `npm run make-admin -- you@example.com`
 
 ## Phase 5 — Admin panel
-- [ ] CRUD: courts (with image upload to Supabase Storage), court types + player options
-- [ ] Slot templates per court
-- [ ] Block slots; view/manage all bookings
+- [x] CRUD: courts (with image upload to Supabase Storage), court types + player options
+- [x] Slot templates per court
+- [x] Block slots; view/manage all bookings
 - **Done when:** an admin can create a real court + slots with zero code.
+- Storage bucket `court-images` is created by migration — no manual dashboard setup.
 
 ## Phase 6 — Public site
-- [ ] Landing page + low clean hero (per DESIGN.md)
-- [ ] Court thumbnail grid + court details pages
-- [ ] Availability view (court + date → open slots)
+- [x] Landing page + low clean hero (per DESIGN.md)
+- [x] Court thumbnail grid + court details pages
+- [x] Availability view (court + date → open slots)
 - **Done when:** visitors can browse admin-created courts and see availability.
+- Hero booking bar is court + date for now; Phase 7 adds slot + players into the same container.
 
 ## Phase 7 — Booking flow
-- [ ] Hero booking dropdown (court → date → slot → players)
-- [ ] Player options driven by CourtType
-- [ ] Booking service creates `pending` hold; unique constraint blocks double-booking
+- [x] Hero booking dropdown (court → date → slot → duration → players)
+- [x] Player options driven by CourtType
+- [x] Booking service creates `pending` hold; unique constraint blocks double-booking
 - **Done when:** a user can reserve a slot; two users cannot grab the same one.
+- Multi-hour bookings landed here: migration `20260722120000_multi_hour_bookings` split `Booking` / `BookingSlot`. Payment is NOT wired up — a booking stops at `pending`.
+
+## Phase 7.5 — Accounts, roles & contact
+- [x] Profile fields (`name`, `phone`, `address`) on signup, account page and a `/complete-profile` step
+- [x] Google (Gmail) sign-in via Supabase Auth OAuth
+- [x] Log out in the account area and the admin header
+- [x] Public `/contact` page → `ContactMessage` → admin Messages tab
+- [x] Admin Users tab: list, remove (confirmed), promote/demote
+- [x] `super_admin` role above `admin`, enforced in server actions **and** RLS **and** a trigger
+- **Done when:** a Google user is asked for phone/address before continuing; a plain admin cannot touch another admin from the panel *or* through the anon key.
+- Google OAuth credentials are configured outside the codebase — see ARCHITECTURE.md → Google sign-in. Contact details in `lib/contact-details.ts` are **placeholders**.
 
 ## Phase 8 — PayHere  ← *(consider adding a security-reviewer subagent here)*
 - [ ] Server-side hash generation (secret stays server-only)

@@ -10,6 +10,8 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // Demo courts + their hourly schedules. Idempotent — see prisma/seed.mts.
+    seed: "tsx prisma/seed.mts",
   },
   engine: "classic",
   datasource: {
