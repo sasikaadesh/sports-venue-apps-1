@@ -10,7 +10,11 @@ export const CONTACT_DETAILS = {
   organisation: "Courtside — School Sports Facilities",
   addressLines: ["Courtside Sports Complex", "12 Galle Road", "Colombo 03", "Sri Lanka"],
   phone: "+94 11 234 5678",
-  /** Where booking questions should go. Not yet wired to any mail sending. */
+  /**
+   * The address shown to visitors. Purely display — where contact-form
+   * notifications are actually delivered is `ADMIN_CONTACT_EMAIL`, so the
+   * public address can differ from the inbox that receives them.
+   */
   email: "sports@school.lk",
   openingHours: [
     { days: "Monday – Friday", hours: "06:00 – 22:00" },

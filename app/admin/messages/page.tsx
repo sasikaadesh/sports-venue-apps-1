@@ -41,7 +41,7 @@ export default async function AdminMessagesPage() {
         description={
           messages.length === 0
             ? "Submissions from the public Contact us page land here."
-            : `${messages.length} message${messages.length === 1 ? "" : "s"}, ${unread} unread. Nothing is emailed yet — this is the inbox.`
+            : `${messages.length} message${messages.length === 1 ? "" : "s"}, ${unread} unread. Each one is also emailed to the sports office — replying to that email answers the sender.`
         }
       />
 

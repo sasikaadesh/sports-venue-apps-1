@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/link-button";
 import { ProfileForm } from "@/components/profile-form";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/app/(auth)/actions";
 import { profileIsComplete, requireUser, roleIsAdmin } from "@/lib/auth";
 
@@ -44,13 +45,17 @@ export default async function AccountPage({
         </div>
 
         {/* Log out is always reachable from the account area, not buried in a
-            menu — same control the admin header carries. */}
-        <form action={signOut}>
-          <Button type="submit" variant="outline" size="lg" className="h-10">
-            <LogOut />
-            Log out
-          </Button>
-        </form>
+            menu — same control the admin header carries. The theme control sits
+            beside it because this page renders outside the site header. */}
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <form action={signOut}>
+            <Button type="submit" variant="outline" size="lg" className="h-10">
+              <LogOut />
+              Log out
+            </Button>
+          </form>
+        </div>
       </div>
 
       {denied === "admin" && (

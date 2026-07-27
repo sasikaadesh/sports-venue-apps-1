@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { sendContactEmails } from "@/lib/email/contact";
 import {
   actionError,
   contactMessageSchema,
@@ -21,7 +22,11 @@ import {
  * - A hidden honeypot field catches the naive bots; anything that fills it gets
  *   the same success response it would have got anyway, and nothing is stored.
  *
- * No email is sent yet (per the brief) — the admin panel is the inbox.
+ * After the row is written it notifies the venue and confirms to the sender by
+ * email (Resend). That step is best-effort and cannot fail the submission: the
+ * database row is the record of the enquiry, the admin panel is still the
+ * inbox, and a mail outage must not lose someone's message or tell them it did
+ * not arrive when it did.
  */
 export async function submitContactMessage(
   input: unknown
@@ -49,6 +54,12 @@ export async function submitContactMessage(
       message: parsed.data.message,
     },
   });
+
+  // Best-effort, and awaited rather than fired and forgotten: a serverless
+  // function can be frozen the moment it responds, so a floating promise here
+  // would be killed mid-flight. `sendContactEmails` swallows and logs its own
+  // failures, so this cannot turn a saved message into an error for the user.
+  await sendContactEmails(parsed.data);
 
   return { ok: true };
 }

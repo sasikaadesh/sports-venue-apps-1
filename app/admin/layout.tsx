@@ -4,6 +4,7 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/app/(auth)/actions";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -62,6 +63,8 @@ export default async function AdminLayout({
             >
               {admin.email}
             </Link>
+
+            <ThemeToggle />
 
             <form action={signOut}>
               <Button

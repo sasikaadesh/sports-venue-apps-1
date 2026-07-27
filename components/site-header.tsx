@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ShieldCheck, Zap } from "lucide-react";
 
 import { LinkButton } from "@/components/link-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getCurrentUser, roleIsAdmin } from "@/lib/auth";
 
 export async function SiteHeader() {
@@ -37,6 +38,7 @@ export async function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle className="mr-1" />
           {user ? (
             <>
               {roleIsAdmin(user.role) && (

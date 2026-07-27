@@ -235,8 +235,28 @@ Supabase Auth owns credentials; the app owns the role.
 
 - Public page at `/contact`: a form (name, email, message) beside static venue details from `lib/contact-details.ts` (one module, so the page and footer cannot disagree — and swapping them for the next club is a one-file change). **The shipped details are placeholders.**
 - `submitContactMessage` is the app's one **unauthenticated write** — the person most likely to be asking a question is exactly the one without an account. It is kept narrow accordingly: only the three validated fields are written, `readAt` is not settable from it, there is no id so it can only ever insert, lengths are bounded by Zod, and a hidden honeypot field silently drops naive bots (answering `ok`, so they get no signal to retry).
-- Admins read the inbox at `/admin/messages` (mark read/unread, delete), with an unread count on the nav tab. **Admin-level, not super-admin-level** — answering enquiries is ordinary staff work. No email is sent yet; the panel *is* the inbox.
+- Admins read the inbox at `/admin/messages` (mark read/unread, delete), with an unread count on the nav tab. **Admin-level, not super-admin-level** — answering enquiries is ordinary staff work. The panel remains the system of record; email is a notification layer on top of it (below).
 - RLS on `ContactMessage`: insert for `anon` + `authenticated`, select/update/delete admin-only. There is deliberately no public SELECT policy — a sender cannot read the inbox back, not even their own message.
+
+### Transactional email (Resend + React Email)
+
+**Provider: [Resend](https://resend.com), templates in [React Email](https://react.email).** Resend is the only mail dependency; React Email supplies the components the templates are written with. Nothing here runs in the browser.
+
+Flow, on a successful `submitContactMessage`:
+
+1. The `ContactMessage` row is written — **first, and always**. This is the record of the enquiry.
+2. `sendContactEmails()` (`lib/email/contact.ts`) then sends two messages via Resend:
+   - **To `ADMIN_CONTACT_EMAIL`** — subject `New contact message from {name}`, carrying the sender's name, email and message, with **`replyTo` set to the sender** so answering is one keystroke.
+   - **To the address the visitor typed** — a short confirmation echoing their message back.
+3. The action returns `{ ok: true }` and the form shows "Message sent".
+
+- **Email can never fail the submission.** `sendContactEmails` throws nothing and returns nothing the caller acts on. Both failure modes are caught and `console.error`-ed: a thrown error (network, bad key) *and* Resend's returned `error` object, which does not throw and would otherwise pass for success. A missing `RESEND_API_KEY` or `ADMIN_CONTACT_EMAIL` logs a warning and skips that send, so the app runs unconfigured. The consequence of an outage is a row in the panel that nobody was pinged about — never a lost message or a false error shown to a visitor who in fact got through.
+- **It is `await`ed, not fired and forgotten.** A serverless function can be frozen the instant it responds, which would kill a floating promise mid-flight.
+- **The two sends are sequential.** Resend's free tier allows 2 requests/second; firing both at once sits exactly on the limit. The admin notification goes first — if only one gets through, it should be the one carrying information nobody else has.
+- **Server-only by construction.** `lib/email/client.ts` carries `import "server-only"`, so `RESEND_API_KEY` cannot reach a client bundle — importing it from a client component is a build error, not a runtime leak.
+- **Templates** live in `lib/email/templates.tsx`: inline style objects, single column, the project palette (`#0A0A0A` ink, `#16DB65` green) written out literally — email clients strip `<style>` blocks and understand nothing of Tailwind or CSS custom properties. Each email also ships a plain-text alternative, which text-only clients render and which lowers the spam score.
+- **Sender: Resend's shared test address (`onboarding@resend.dev`) for now.** It needs no DNS setup but **only delivers to the email address that owns the Resend account** — so the visitor confirmation will not arrive for anyone else. **A verified domain is required before production**: add the venue's domain in Resend → Domains, publish the DKIM/SPF (and, once trusted, DMARC) records it prints, then set `CONTACT_FROM_EMAIL` to an address on that domain. Until that is done, treat the confirmation email as untested for real users.
+- **Env vars** (all server-only, none `NEXT_PUBLIC_`): `RESEND_API_KEY`, `ADMIN_CONTACT_EMAIL`, `CONTACT_FROM_EMAIL` (optional; defaults to the shared test sender).
 
 ## Admin panel (Phase 5)
 
