@@ -37,7 +37,9 @@ export default async function HomePage() {
     <>
       {/* Low, simple hero — a clean band, not a full-screen takeover. */}
       <section className="border-b">
-        {/* Headline band: photo carousel behind, white text over a dark overlay. */}
+        {/* Headline band: photo carousel behind, white text over a dark overlay.
+            The white here is intentionally literal and identical in both
+            themes — it sits on photography, not on a themed surface. */}
         <div className="relative isolate overflow-hidden">
           <HeroCarousel />
           <div className="mx-auto w-full max-w-6xl px-6 py-20 sm:px-8 lg:py-28">

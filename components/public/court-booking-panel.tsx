@@ -257,10 +257,13 @@ export function CourtBookingPanel({
                 onBlur={() => setHovered((h) => (h === index ? null : h))}
                 aria-pressed={inRange}
                 className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition-colors ${
+                  // A 5% tint is legible on white but vanishes against a
+                  // near-black surface, so the dark theme gets a stronger one.
+                  // The border and ring carry the state in both.
                   bad
-                    ? "cursor-not-allowed border-destructive bg-destructive/5 ring-1 ring-destructive"
+                    ? "cursor-not-allowed border-destructive bg-destructive/5 ring-1 ring-destructive dark:bg-destructive/15"
                     : good
-                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary dark:bg-primary/15"
                       : "bg-card hover:border-primary"
                 }`}
               >

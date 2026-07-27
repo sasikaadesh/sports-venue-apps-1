@@ -61,7 +61,9 @@ export function ContactForm({
   if (sent) {
     return (
       <div className="flex flex-col items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 px-6 py-8">
-        <span className="grid size-10 place-items-center rounded-lg bg-primary/20 text-primary">
+        {/* Solid green chip rather than `bg-primary/20 text-primary`: green on
+            pale green is ~2:1 in light mode. Ink on solid green is 9:1 in both. */}
+        <span className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
           <CheckCircle2 className="size-5" />
         </span>
         <div className="flex flex-col gap-1">
