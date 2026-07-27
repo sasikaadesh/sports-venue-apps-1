@@ -4,6 +4,10 @@
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
+  // "native" keeps local dev working (Windows/macOS); "rhel-openssl-3.0.x" is
+  // the query engine Vercel's Node.js runtime needs. Without it the deployed
+  // app builds fine but throws "could not locate the Query Engine" at runtime.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
