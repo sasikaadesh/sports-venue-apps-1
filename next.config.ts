@@ -7,11 +7,13 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
 const nextConfig: NextConfig = {
   // The Prisma client is generated to a custom path (lib/generated/prisma), so
   // Next's dependency tracing does not reliably pick up the native query-engine
-  // binary it loads at runtime. Include it explicitly for every route,
-  // otherwise the Vercel deployment 500s with "could not locate the Query
-  // Engine for runtime rhel-openssl-3.0.x".
+  // binary it loads at runtime. Include the whole generated directory for every
+  // route, otherwise the deployed function has no engine to load at all.
+  //
+  // This is only half the fix: shipping the file is not enough, because Prisma
+  // never *searches* here (see the engine pin in lib/prisma.ts).
   outputFileTracingIncludes: {
-    "/**": ["lib/generated/prisma/*.so.node"],
+    "/**": ["lib/generated/prisma/**"],
   },
   experimental: {
     serverActions: {
