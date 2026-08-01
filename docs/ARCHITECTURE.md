@@ -165,6 +165,26 @@ The atomicity in step 4 is the reason the insert must be a single transaction ra
 
 **Dev note:** `notify_url` must be publicly reachable, so test against the deployed Vercel URL or a tunnel (ngrok/cloudflared), not `localhost`. Merchant Secret is domain-specific.
 
+### As built (Phase 8)
+
+Three modules, split by who is allowed to call them:
+
+- **`lib/payhere.ts`** — config plus the two digests. `payhereConfig()` returns `null` when unconfigured (the button reports it rather than the page crashing) and treats anything that is not literally `live` as sandbox, so a typo cannot start taking real money. `verifyNotificationSignature` compares in constant time. MD5 is PayHere's specification, not a choice.
+- **`lib/payment-service.ts`** — the only writer of `Payment`. `startCheckout()` for a signed-in owner; `applyPayHereNotification()` for the webhook.
+- **`lib/booking-service.ts`** gained the three booking transitions payment needs — `extendHoldForPayment`, `confirmPaidBooking`, `releaseUnpaidBooking` — because every `Booking` write goes through that one module (CLAUDE.md).
+
+**Routes.** `POST /api/payhere/notify` (server-to-server) and `/payments/return?booking=<id>` (the browser). The return page reads booking + payment status and renders it; it has no write path at all, and "the webhook has not landed yet" is a first-class state there, polled by `router.refresh()` for up to a minute.
+
+- **`Payment.orderId` is a uuid** and is uniquely indexed, so the webhook resolves an order with one lookup and cannot match two rows. A repeated Pay click reuses the existing `pending` payment at the same amount rather than littering a row per click.
+- **The amount is `Booking.totalPrice`**, read on the server. It is never a parameter, so the "pay for one hour, reserve six" attack has no input to attack.
+- **The webhook's checks are ordered and total**: our merchant id → `md5sig` → known order → amount *and* currency match what we stored → only then does `status_code` mean anything. Failing one of the first two answers 403 (that request is not from PayHere); anything merely unknown answers 200, because PayHere retries non-2xx and retrying will not make an unknown order known.
+- **Confirmation is a compare-and-set.** `confirmPaidBooking` uses `updateMany` matching `status: 'pending'`, so it races safely against the expiry sweep and is idempotent under PayHere's retries — which is also what stops the confirmation email going out twice.
+- **The hold is extended to 20 minutes when checkout opens** (`PAYMENT_HOLD_MINUTES`), because card entry, OTP and the bank redirect all happen inside it.
+- **Paid-but-unconfirmable is handled explicitly.** If the hold lapsed and the sweep released the hours before the notification arrived, the payment is still recorded `success` but the booking is **not** confirmed — the hours may already belong to someone else. It logs `PAID BUT UNCONFIRMABLE … Refund required`, and both the booking page and the status page tell the user plainly that the office will contact them. Confirming anyway would sell one hour twice.
+- **A chargeback (`-3`) is recorded, not acted on.** It arrives against a booking that is usually already `confirmed`, and releasing paid hours automatically is exactly the decision that belongs to an admin with a refund trail (see the paid/unpaid divide above).
+- **Email** on confirmation goes through `lib/email/booking.ts`, which — like the contact emails — never throws and never reports failure upward. A Resend outage must not make the webhook return non-2xx, or PayHere would retry a notification we have already acted on.
+- **Verified without PayHere.** A harness POSTed signed notifications at the running webhook: success, retry/replay, forged `md5sig`, a tampered amount, a correctly-signed underpayment, cancel, fail, foreign merchant id, unknown order, and the lapsed-hold case. Only the correctly signed success confirmed anything, and the replay was a no-op.
+
 ## Releasing a booking (holds, cancellations, unblocks)
 
 **A `BookingSlot` row exists only while its booking actually holds that hour.** Releasing a booking — an expired hold, a cancellation, an unblock — *deletes* its `BookingSlot` rows. The parent stays behind as the record, with status `expired` / `cancelled`.

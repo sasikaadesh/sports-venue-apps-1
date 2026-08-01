@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CalendarDays, CheckCircle2, Clock, CreditCard, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock, CreditCard, Users, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/link-button";
 import { CancelBookingButton } from "@/components/public/cancel-booking-button";
+import { PayNowButton } from "@/components/public/pay-now-button";
 import { requireUser, roleIsAdmin } from "@/lib/auth";
+import { latestPaymentForBooking } from "@/lib/payment-service";
 import { prisma } from "@/lib/prisma";
 import { dateToTimeString, formatDate, formatPrice, isFuture } from "@/lib/time";
 
@@ -16,18 +18,22 @@ export const metadata: Metadata = {
 };
 
 /**
- * Booking summary — the end of the Phase 7 flow.
+ * Booking summary, and where payment starts.
  *
- * The booking is `pending`: its hours are held, nothing has been paid. Phase 8
- * adds PayHere checkout here, and only the verified `notify_url` webhook will
- * be allowed to move it to `confirmed`.
+ * A `pending` booking holds its hours and shows "Pay now", which opens the
+ * PayHere popup. Nothing on this page can confirm the booking: the button only
+ * asks the server for checkout parameters, and the flip to `confirmed` happens
+ * on the verified `notify_url` webhook (CLAUDE.md).
  */
 export default async function BookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ payment?: string }>;
 }) {
   const { id } = await params;
+  const { payment: paymentFlag } = await searchParams;
   const user = await requireUser(`/bookings/${id}`);
 
   const booking = await prisma.booking.findUnique({
@@ -65,7 +71,12 @@ export default async function BookingPage({
     : null;
 
   const isPending = booking.status === "pending";
+  const isConfirmed = booking.status === "confirmed";
   const holdLive = isPending && isFuture(booking.holdExpiresAt);
+  const isOwner = booking.userId === user.id;
+
+  const payment = await latestPaymentForBooking(booking.id);
+  const canPay = holdLive && isOwner && booking.totalPrice.greaterThan(0);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-12 sm:px-8">
@@ -74,14 +85,36 @@ export default async function BookingPage({
           <CheckCircle2 className="size-6" />
         </span>
         <h1 className="text-4xl leading-none">
-          {holdLive ? "Your slot is held" : "Your booking"}
+          {isConfirmed
+            ? "Your booking is confirmed"
+            : holdLive
+              ? "Your slot is held"
+              : "Your booking"}
         </h1>
         <p className="max-w-prose text-muted-foreground">
-          {holdLive
-            ? `We are holding ${booking.durationHours === 1 ? "this hour" : "these hours"} for you. Payment is not wired up yet — that lands in the next release.`
-            : "Here is the booking as it stands."}
+          {isConfirmed
+            ? "Payment received — the court is yours. A confirmation email has been sent."
+            : holdLive
+              ? `We are holding ${booking.durationHours === 1 ? "this hour" : "these hours"} for you. Pay below to make the booking permanent.`
+              : "Here is the booking as it stands."}
         </p>
       </div>
+
+      {/* PayHere sends a cancelled checkout back here rather than to the status
+          page — nothing was charged and the hold is untouched, so this is a
+          notice, not a failure. */}
+      {paymentFlag === "cancelled" && isPending && (
+        <p
+          role="status"
+          className="mt-8 flex items-start gap-2.5 rounded-xl border bg-muted px-4 py-3 text-sm"
+        >
+          <XCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <span>
+            Payment was cancelled — nothing has been charged. Your hold is still
+            live until it lapses.
+          </span>
+        </p>
+      )}
 
       <div className="mt-10 overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
@@ -156,8 +189,34 @@ export default async function BookingPage({
                 timeZone: "Asia/Colombo",
               })}
             </span>
-            , after which the hours go back on sale. Once PayHere is wired up,
-            paying is what will make it permanent.
+            , after which the hours go back on sale. Paying is what makes it
+            permanent.
+          </span>
+        </p>
+      )}
+
+      {canPay && (
+        <div className="mt-8">
+          <PayNowButton
+            bookingId={booking.id}
+            amountLabel={formatPrice(booking.totalPrice.toString())}
+          />
+        </div>
+      )}
+
+      {/* Paid, but the booking is not confirmed: the hold lapsed before the
+          webhook landed. The user must not be left guessing about money that
+          left their account. */}
+      {!isConfirmed && payment?.status === "success" && (
+        <p
+          role="alert"
+          className="mt-6 flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <XCircle className="mt-0.5 size-4 shrink-0" />
+          <span>
+            A payment for this booking succeeded, but the hours had already been
+            released and could not be confirmed. The sports office will contact
+            you to rebook or refund.
           </span>
         </p>
       )}
@@ -166,9 +225,7 @@ export default async function BookingPage({
         <LinkButton href="/courts" variant="outline" className="h-10">
           Browse more courts
         </LinkButton>
-        {isPending && booking.userId === user.id && (
-          <CancelBookingButton bookingId={booking.id} />
-        )}
+        {isPending && isOwner && <CancelBookingButton bookingId={booking.id} />}
       </div>
     </div>
   );
