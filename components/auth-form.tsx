@@ -17,6 +17,7 @@ type AuthFormProps = {
   action: (state: AuthFormState, formData: FormData) => Promise<AuthFormState>;
   next?: string;
   initialError?: string;
+  initialNotice?: string;
 };
 
 function SubmitButton({ label }: { label: string }) {
@@ -39,9 +40,16 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
-export function AuthForm({ mode, action, next, initialError }: AuthFormProps) {
+export function AuthForm({
+  mode,
+  action,
+  next,
+  initialError,
+  initialNotice,
+}: AuthFormProps) {
   const [state, formAction] = useActionState<AuthFormState, FormData>(action, {
     error: initialError,
+    notice: initialNotice,
   });
 
   const isSignup = mode === "signup";

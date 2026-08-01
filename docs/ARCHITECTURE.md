@@ -251,6 +251,28 @@ Supabase Auth owns credentials; the app owns the role.
 - `siteOrigin()` (`lib/site-url.ts`) prefers `NEXT_PUBLIC_BASE_URL` and falls back to the forwarded host so previews work unconfigured. That fallback is not a security boundary: Supabase only honours a `redirectTo` matching its own Redirect URLs allow list, which is what actually stops a spoofed host header redirecting the callback elsewhere. Keep that list tight.
 - **Setup lives outside the codebase** — Google Cloud OAuth client + Supabase provider config. The authorized redirect URI is Supabase's own callback (`https://<project-ref>.supabase.co/auth/v1/callback`), *not* an app URL; the app URL goes in Supabase's Site URL / Redirect URLs instead.
 
+### Password reset
+
+`/forgot-password` → email → **`/reset-password`** → `/login?reset=1`.
+
+`resetPasswordForEmail` is given `redirectTo = <origin>/reset-password`, **with no query string of its own**. Supabase matches `redirectTo` against its Redirect URLs allow list as a whole URL, so an entry of `/auth/callback` does not match `/auth/callback?next=%2Freset-password` — it silently falls back to the Site URL and the user lands on the home page or the login form. A bare path cannot be mismatched that way.
+
+**The token arrives in one of three shapes, and the page handles all three**, because which one shows up is decided by the SDK version, the flow type and whether the email template was customised — not by the app:
+
+| shape | when | handled by |
+| --- | --- | --- |
+| `?code=…` | PKCE; `@supabase/ssr` calling `resetPasswordForEmail` on the server | page forwards to `/auth/callback`, which exchanges it |
+| `?token_hash=…&type=recovery` | a template customised to use `{{ .TokenHash }}` | page forwards to `/auth/callback`, which calls `verifyOtp` |
+| `#access_token=…&refresh_token=…` | the implicit flow — **what this project's Supabase instance returns today** (verified by following a generated link) | `components/recovery-hash-handler.tsx`, in the browser |
+
+The fragment case is the one that cannot be done on the server at all: a URL fragment is never transmitted in a request, so no route handler, page or proxy can see it. It is read client-side and passed to `setSession`, which — because `createBrowserClient` stores the session in cookies rather than localStorage — makes the server see the user too.
+
+Conversely, `?code=` and `?token_hash=` cannot be handled by the page itself, because a Server Component cannot write cookies. Both are forwarded to `/auth/callback`, the one place that can, which then redirects back to a clean `/reset-password` URL.
+
+- **Supabase's own rejection** arrives as `?error=access_denied&error_code=otp_expired`, which the page turns into a specific message — most often the link was already opened once, including by a mail scanner that follows links automatically.
+- **On success every session is ended** (`signOut({ scope: 'global' })`) and the user is sent to `/login?reset=1`. A reset usually means someone else knew the old password, so leaving any session alive defeats it.
+- **`authRedirectOrigin()` vs `siteOrigin()`** — auth links use the *request* host, falling back to `NEXT_PUBLIC_BASE_URL`; PayHere and email body links use `NEXT_PUBLIC_BASE_URL` first. `NEXT_PUBLIC_BASE_URL` has to point at production (PayHere's `notify_url` must be publicly reachable), so env-first would email a `localhost` developer a link to the deployed site. Safe only because Supabase's allow list is the real boundary — **never put a wildcard host in it**.
+
 ## Contact Us
 
 - Public page at `/contact`: a form (name, email, message) beside static venue details from `lib/contact-details.ts` (one module, so the page and footer cannot disagree — and swapping them for the next club is a one-file change). **The shipped details are placeholders.**

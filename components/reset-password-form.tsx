@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 
@@ -10,6 +11,26 @@ import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { LinkButton } from "@/components/link-button";
 import { updatePassword, type UpdatePasswordState } from "@/app/(auth)/actions";
+
+/** `?reset=1` is what makes the login form say the password was changed. */
+const LOGIN_AFTER_RESET = "/login?reset=1";
+
+/**
+ * Send the user to the login form a moment after the success panel appears —
+ * long enough to read it, short enough not to feel stuck. The button below is
+ * the same destination for anyone who does not want to wait, so the redirect
+ * is a convenience and never the only way out.
+ */
+function RedirectToLogin() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const timer = setTimeout(() => router.replace(LOGIN_AFTER_RESET), 2500);
+    return () => clearTimeout(timer);
+  }, [router]);
+
+  return null;
+}
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -48,14 +69,16 @@ export function ResetPasswordForm() {
               Password updated
             </p>
             <p className="text-sm text-muted-foreground">
-              You are signed in on this device. Any other device that was signed
-              in has been logged out.
+              Every device that was signed in has been logged out. Log in again
+              with your new password — taking you there now.
             </p>
           </div>
         </div>
 
-        <LinkButton href="/account" size="lg" className="h-11 w-full text-sm">
-          Go to your account
+        <RedirectToLogin />
+
+        <LinkButton href={LOGIN_AFTER_RESET} size="lg" className="h-11 w-full text-sm">
+          Go to log in
         </LinkButton>
       </div>
     );

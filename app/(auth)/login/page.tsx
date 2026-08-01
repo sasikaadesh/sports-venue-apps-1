@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; reset?: string }>;
 }) {
-  const { next, error } = await searchParams;
+  const { next, error, reset } = await searchParams;
 
   if (await getCurrentUser()) {
     redirect(next?.startsWith("/") ? next : "/account");
@@ -29,7 +29,19 @@ export default async function LoginPage({
         </p>
       </div>
 
-      <AuthForm mode="login" action={signIn} next={next} initialError={error} />
+      <AuthForm
+        mode="login"
+        action={signIn}
+        next={next}
+        initialError={error}
+        // Set by the reset page after a successful password change, which
+        // signs every session out — so this is the first thing they see.
+        initialNotice={
+          reset === "1"
+            ? "Password updated. Log in with your new password."
+            : undefined
+        }
+      />
     </div>
   );
 }
