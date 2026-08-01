@@ -157,9 +157,21 @@ export function AuthForm({ mode, action, next, initialError }: AuthFormProps) {
           )}
 
           <Field>
-            <FieldLabel htmlFor="password" className="text-sm font-medium">
-              Password
-            </FieldLabel>
+            {/* On login the label shares its row with the recovery link — the
+                moment someone needs it is the moment the password fails. */}
+            <div className="flex items-baseline justify-between gap-3">
+              <FieldLabel htmlFor="password" className="text-sm font-medium">
+                Password
+              </FieldLabel>
+              {!isSignup && (
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <Input
               id="password"
               name="password"

@@ -28,6 +28,13 @@ export async function siteOrigin(): Promise<string> {
   return `${proto}://${host}`;
 }
 
+/**
+ * Where a recovery email drops the user once /auth/callback has verified the
+ * link. Lives here rather than in `(auth)/actions.ts` because a "use server"
+ * file may only export async functions.
+ */
+export const RESET_PASSWORD_PATH = "/reset-password";
+
 /** Only relative, single-slash paths — never an attacker-supplied host. */
 export function safeNextPath(
   value: FormDataEntryValue | string | null | undefined,
