@@ -7,10 +7,16 @@ import { RESET_PASSWORD_PATH, safeNextPath } from "@/lib/site-url";
 
 /**
  * The single landing point for every out-of-app auth hop: email confirmation
- * links and the Google OAuth redirect both come back here.
+ * links, the Google OAuth redirect, and password recovery all come back here.
  *
  * Supabase sends either `?code=` (PKCE / OAuth) or `?token_hash=&type=`
- * depending on the project's email template, so both are handled.
+ * depending on the project's email template, so both are handled. This is the
+ * only place either one can be turned into a session, because only a route
+ * handler can write the cookie — a Server Component cannot. The reset page
+ * therefore forwards its token here rather than trying to exchange it itself.
+ *
+ * The third transport, a token in the URL *fragment*, never reaches the server
+ * at all and is handled in the browser (`components/recovery-hash-handler.tsx`).
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -18,18 +24,27 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
 
+  // Only relative paths — an open redirect here would be handed to every new
+  // user by email.
+  const next = safeNextPath(searchParams.get("next"));
+
+  // A recovery hop is told apart by where it is going, or by the OTP type.
+  // Both are needed: the PKCE link carries `next` and no type, the
+  // `token_hash` link carries the type.
+  const isRecovery = next === RESET_PASSWORD_PATH || type === "recovery";
+
   // The provider can hand back its own failure instead of a code.
   const providerError =
     searchParams.get("error_description") ?? searchParams.get("error");
   if (providerError) {
+    // Send a failed recovery back to "email me a link", not to the login form
+    // — the whole reason they are here is that they cannot log in.
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(providerError)}`
+      isRecovery
+        ? `${origin}/forgot-password?error=${encodeURIComponent(providerError)}`
+        : `${origin}/login?error=${encodeURIComponent(providerError)}`
     );
   }
-
-  // Only relative paths — an open redirect here would be handed to every new
-  // user by email.
-  const next = safeNextPath(searchParams.get("next"));
 
   const supabase = await createClient();
 
@@ -41,8 +56,6 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     signedIn = !error;
   }
-
-  const isRecovery = next === RESET_PASSWORD_PATH || type === "recovery";
 
   if (!signedIn) {
     // A dead recovery link belongs back on "email me a link", not on the login

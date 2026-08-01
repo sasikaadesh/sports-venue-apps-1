@@ -6,7 +6,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, profileIsComplete } from "@/lib/auth";
 import { isOAuthOnlyAccount } from "@/lib/auth-identities";
-import { RESET_PASSWORD_PATH, safeNextPath, siteOrigin } from "@/lib/site-url";
+import {
+  authRedirectOrigin,
+  RESET_PASSWORD_PATH,
+  safeNextPath,
+} from "@/lib/site-url";
 import {
   firstIssue,
   newPasswordSchema,
@@ -54,7 +58,7 @@ export async function signUp(
 
   const { email, password, name, phone, address } = parsed.data;
   const supabase = await createClient();
-  const origin = await siteOrigin();
+  const origin = await authRedirectOrigin();
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -145,12 +149,19 @@ export async function requestPasswordReset(
   }
 
   const supabase = await createClient();
-  const origin = await siteOrigin();
+  const origin = await authRedirectOrigin();
 
-  // The link lands on /auth/callback, which exchanges the recovery code for a
-  // session and then forwards to the "set a new password" page.
+  // The link lands directly on the reset page, and that URL carries NO query
+  // string of its own. Supabase matches `redirectTo` against its Redirect URLs
+  // allow list as a whole URL, so an entry of `.../auth/callback` does not
+  // match `.../auth/callback?next=%2Freset-password` — it silently falls back
+  // to the Site URL, and the user lands on the home page or the login form
+  // instead of the reset form. A bare path cannot be mismatched that way.
+  //
+  // The page itself handles every transport Supabase might use to deliver the
+  // token — see app/(auth)/reset-password/page.tsx.
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(RESET_PASSWORD_PATH)}`,
+    redirectTo: `${origin}${RESET_PASSWORD_PATH}`,
   });
 
   if (error) {
@@ -210,9 +221,11 @@ export async function updatePassword(
     return { error: error.message };
   }
 
-  // Whoever knew the old password is signed out everywhere else — the point of
-  // a reset is usually that someone else had it. This session stays alive.
-  await supabase.auth.signOut({ scope: "others" });
+  // Every session is ended, this one included. The point of a reset is usually
+  // that someone else knew the old password, so leaving any session alive
+  // defeats it — and signing out here is what makes "now log in with your new
+  // password" an honest instruction rather than a detour past /account.
+  await supabase.auth.signOut({ scope: "global" });
 
   revalidatePath("/", "layout");
   return { done: true };
@@ -232,7 +245,7 @@ export async function signInWithGoogle(
 ): Promise<AuthFormState> {
   const next = safeNextPath(formData.get("next"));
   const supabase = await createClient();
-  const origin = await siteOrigin();
+  const origin = await authRedirectOrigin();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
