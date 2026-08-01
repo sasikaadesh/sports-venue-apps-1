@@ -16,7 +16,7 @@ import { RESET_PASSWORD_PATH, safeNextPath } from "@/lib/site-url";
  * therefore forwards its token here rather than trying to exchange it itself.
  *
  * The third transport, a token in the URL *fragment*, never reaches the server
- * at all and is handled in the browser (`components/recovery-hash-handler.tsx`).
+ * at all and is handled in the browser (`components/recovery-gate.tsx`).
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);

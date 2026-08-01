@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { AccountBookings } from "@/components/account-bookings";
 import { LinkButton } from "@/components/link-button";
 import { ProfileForm } from "@/components/profile-form";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -17,6 +18,10 @@ import { profileIsComplete, requireUser, roleIsAdmin } from "@/lib/auth";
 export const metadata: Metadata = {
   title: "Your account — Courtside",
 };
+
+// Booking status changes underneath the user — the PayHere webhook confirms a
+// booking without the browser being involved — so this must never be cached.
+export const dynamic = "force-dynamic";
 
 const ROLE_LABELS: Record<string, string> = {
   user: "user",
@@ -115,6 +120,20 @@ export default async function AccountPage({
           </dd>
         </div>
       </dl>
+
+      <section className="mt-12 flex flex-col gap-5 border-t pt-10">
+        <div className="flex flex-col gap-1.5">
+          <h2 className="text-2xl leading-none">My bookings</h2>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Your reservations, most recent first. Open one to see the hours it
+            covers or to pay for a slot that is still on hold.
+          </p>
+        </div>
+
+        {/* Scoped to this user inside the component, from the id `requireUser`
+            returned — never from anything in the request. */}
+        <AccountBookings userId={user.id} />
+      </section>
 
       <section className="mt-12 flex flex-col gap-5 border-t pt-10">
         <div className="flex flex-col gap-1.5">
