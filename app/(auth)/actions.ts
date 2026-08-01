@@ -5,8 +5,15 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, profileIsComplete } from "@/lib/auth";
-import { safeNextPath, siteOrigin } from "@/lib/site-url";
-import { firstIssue, signInSchema, signUpSchema } from "@/lib/validations";
+import { isOAuthOnlyAccount } from "@/lib/auth-identities";
+import { RESET_PASSWORD_PATH, safeNextPath, siteOrigin } from "@/lib/site-url";
+import {
+  firstIssue,
+  newPasswordSchema,
+  passwordResetRequestSchema,
+  signInSchema,
+  signUpSchema,
+} from "@/lib/validations";
 
 export type AuthFormState = {
   error?: string;
@@ -99,6 +106,116 @@ export async function signIn(
 
   revalidatePath("/", "layout");
   redirect(await destinationAfterAuth(safeNextPath(formData.get("next"))));
+}
+
+export type ResetRequestState = {
+  error?: string;
+  /** The address the link went to — drives the "check your email" panel. */
+  sentTo?: string;
+  /** The address signs in with Google, so there is no password to reset. */
+  googleOnly?: boolean;
+};
+
+/**
+ * Send a password-reset link.
+ *
+ * Supabase answers identically whether or not the address has an account, and
+ * so do we — the response never confirms who is registered. The one exception
+ * is a Google-only account: a reset link would be a dead end for them (there is
+ * no password on the account), so they are pointed at the Google button
+ * instead. That does disclose that the address is a Google user, which is the
+ * deliberate trade for not stranding them.
+ */
+export async function requestPasswordReset(
+  _prev: ResetRequestState,
+  formData: FormData
+): Promise<ResetRequestState> {
+  const parsed = passwordResetRequestSchema.safeParse({
+    email: formData.get("email"),
+  });
+
+  if (!parsed.success) {
+    return { error: firstIssue(parsed.error) };
+  }
+
+  const { email } = parsed.data;
+
+  if (await isOAuthOnlyAccount(email)) {
+    return { googleOnly: true };
+  }
+
+  const supabase = await createClient();
+  const origin = await siteOrigin();
+
+  // The link lands on /auth/callback, which exchanges the recovery code for a
+  // session and then forwards to the "set a new password" page.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(RESET_PASSWORD_PATH)}`,
+  });
+
+  if (error) {
+    // Mostly Supabase's own email rate limit. Say so without leaking whether
+    // the address exists.
+    return {
+      error: "Could not send that email just now. Wait a minute and try again.",
+    };
+  }
+
+  return { sentTo: email };
+}
+
+export type UpdatePasswordState = {
+  error?: string;
+  done?: boolean;
+};
+
+/**
+ * Set a new password for the currently authenticated user.
+ *
+ * Reached with the short-lived session that the recovery link created. The
+ * session is the authorization — `getUser()` revalidates it against Supabase,
+ * so an expired or forged cookie cannot change anybody's password.
+ */
+export async function updatePassword(
+  _prev: UpdatePasswordState,
+  formData: FormData
+): Promise<UpdatePasswordState> {
+  const parsed = newPasswordSchema.safeParse({
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    return { error: firstIssue(parsed.error) };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      error:
+        "That reset link has expired. Request a new one and open it within the hour.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  // Whoever knew the old password is signed out everywhere else — the point of
+  // a reset is usually that someone else had it. This session stays alive.
+  await supabase.auth.signOut({ scope: "others" });
+
+  revalidatePath("/", "layout");
+  return { done: true };
 }
 
 /**

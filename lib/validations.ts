@@ -83,6 +83,24 @@ export const signUpSchema = profileSchema.extend({
   password: passwordField,
 });
 
+/** "Email me a reset link" — the address is all we ask for. */
+export const passwordResetRequestSchema = z.object({ email: emailField });
+
+/**
+ * Setting a new password from a recovery link. The confirmation field is
+ * validated server-side too: the server action is a public endpoint and can be
+ * called without the form, and a mistyped password here locks someone out.
+ */
+export const newPasswordSchema = z
+  .object({
+    password: passwordField,
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: "Those passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
 /**
  * The Google path collects only what Google cannot give us. `name` is
  * included because the OIDC claim can be absent or unhelpful, and the user
@@ -242,6 +260,8 @@ export const createBookingSchema = z.object({
 export type ProfileInput = z.infer<typeof profileSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+export type NewPasswordInput = z.infer<typeof newPasswordSchema>;
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
 export type AssignableRole = z.infer<typeof assignableRoleSchema>;
 export type CourtTypeInput = z.infer<typeof courtTypeSchema>;

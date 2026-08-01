@@ -3,7 +3,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, profileIsComplete } from "@/lib/auth";
-import { safeNextPath } from "@/lib/site-url";
+import { RESET_PASSWORD_PATH, safeNextPath } from "@/lib/site-url";
 
 /**
  * The single landing point for every out-of-app auth hop: email confirmation
@@ -42,10 +42,25 @@ export async function GET(request: NextRequest) {
     signedIn = !error;
   }
 
+  const isRecovery = next === RESET_PASSWORD_PATH || type === "recovery";
+
   if (!signedIn) {
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent("That sign-in link is invalid or has expired.")}`
-    );
+    // A dead recovery link belongs back on "email me a link", not on the login
+    // form — the whole point is that they cannot log in.
+    return isRecovery
+      ? NextResponse.redirect(
+          `${origin}/forgot-password?error=${encodeURIComponent("That reset link is invalid or has expired. Request a new one.")}`
+        )
+      : NextResponse.redirect(
+          `${origin}/login?error=${encodeURIComponent("That sign-in link is invalid or has expired.")}`
+        );
+  }
+
+  // A recovery link goes straight to "set a new password" — someone locked out
+  // of their account should not be asked for a phone number first, and the
+  // recovery session is short-lived enough that the detour could expire it.
+  if (isRecovery) {
+    return NextResponse.redirect(`${origin}${RESET_PASSWORD_PATH}`);
   }
 
   // Google gives us an email and usually a name, but never a phone number or
