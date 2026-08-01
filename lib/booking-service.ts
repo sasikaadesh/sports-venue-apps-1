@@ -41,6 +41,17 @@ export const OCCUPYING_STATUSES: BookingStatus[] = [
 /** How long an unpaid hold survives before the hours are released. */
 export const HOLD_MINUTES = 10;
 
+/**
+ * How long the hours are held once the user opens the payment popup.
+ *
+ * Longer than the initial hold because entering card details, waiting for an
+ * OTP and the bank's redirect all happen inside it. If the hold lapsed
+ * mid-payment the sweep would release the hours and the webhook would arrive
+ * for a booking that no longer holds anything — see `confirmPaidBooking`,
+ * which refuses to confirm in that state rather than selling an hour twice.
+ */
+export const PAYMENT_HOLD_MINUTES = 20;
+
 /** How far ahead the public may book. */
 export const BOOKING_WINDOW_DAYS = 60;
 
@@ -477,6 +488,133 @@ export async function cancelOwnBooking(
   ]);
 
   return { ok: true, data: { id: bookingId } };
+}
+
+/**
+ * Extend a pending hold for the duration of a payment attempt.
+ *
+ * Called when checkout starts, so the hours are not swept out from under a
+ * user who is mid-way through entering card details. Scoped to the owner and
+ * to `status: 'pending'` in the WHERE clause, and it only ever pushes the
+ * expiry *later* — it cannot resurrect a hold that has already lapsed, because
+ * `holdExpiresAt: { gt: now }` is part of the match.
+ */
+export async function extendHoldForPayment(
+  bookingId: string,
+  userId: string
+): Promise<BookingResult<{ holdExpiresAt: Date }>> {
+  const holdExpiresAt = new Date(Date.now() + PAYMENT_HOLD_MINUTES * 60_000);
+
+  const result = await prisma.booking.updateMany({
+    where: {
+      id: bookingId,
+      userId,
+      status: "pending",
+      holdExpiresAt: { gt: new Date() },
+    },
+    data: { holdExpiresAt },
+  });
+
+  if (result.count === 0) {
+    return {
+      ok: false,
+      error: "This hold has lapsed. Pick your slot again.",
+      reason: "invalid",
+    };
+  }
+
+  return { ok: true, data: { holdExpiresAt } };
+}
+
+/**
+ * Mark a booking paid. **Only the verified `notify_url` webhook may call this**
+ * (CLAUDE.md): the `return_url` redirect can be spoofed, so nothing on the
+ * browser's path is allowed to reach it.
+ *
+ * The flip is a compare-and-set: `updateMany` matching `status: 'pending'`
+ * either updates exactly one row or none. That makes it safe against the
+ * expiry sweep running in the same instant — whichever lands first wins, and
+ * there is no read-then-write window in between.
+ *
+ * Three outcomes the caller must distinguish:
+ *  - `confirmed: true`  — this call did the flip; send the confirmation email.
+ *  - `confirmed: false` — it was already confirmed (PayHere retried the
+ *    webhook). Idempotent: nothing changes and no second email goes out.
+ *  - `ok: false`        — the booking no longer holds its hours (the hold
+ *    lapsed and the sweep released them). We must NOT confirm: the hours may
+ *    already belong to someone else. The payment is still recorded as
+ *    successful, and the caller escalates for a manual refund.
+ */
+export async function confirmPaidBooking(
+  bookingId: string
+): Promise<BookingResult<{ id: string; confirmed: boolean }>> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, status: true },
+  });
+
+  if (!booking) {
+    return { ok: false, error: "Booking not found.", reason: "notfound" };
+  }
+
+  if (booking.status === "confirmed") {
+    return { ok: true, data: { id: bookingId, confirmed: false } };
+  }
+
+  const result = await prisma.booking.updateMany({
+    where: { id: bookingId, status: "pending" },
+    // The hold is over — this booking now owns its hours outright.
+    data: { status: "confirmed", holdExpiresAt: null },
+  });
+
+  if (result.count === 0) {
+    // Either the sweep expired it, or the user released it, between the read
+    // above and here. Both mean the BookingSlot rows are gone.
+    return {
+      ok: false,
+      error: `Booking ${bookingId} could not be confirmed — it no longer holds its hours (status ${booking.status}).`,
+      reason: "invalid",
+    };
+  }
+
+  return { ok: true, data: { id: bookingId, confirmed: true } };
+}
+
+/**
+ * Release a hold whose payment did not go through (cancelled or failed at
+ * PayHere). Deleting the hour-rows is what frees the time, exactly as for an
+ * expired hold.
+ *
+ * Guarded on `status: 'pending'`, so a webhook arriving late for a booking
+ * that has since been confirmed by a *successful* retry cannot release a paid
+ * slot.
+ */
+export async function releaseUnpaidBooking(
+  bookingId: string
+): Promise<BookingResult<{ id: string; released: boolean }>> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, status: true },
+  });
+
+  if (!booking) {
+    return { ok: false, error: "Booking not found.", reason: "notfound" };
+  }
+
+  if (booking.status !== "pending") {
+    // Already expired, cancelled or confirmed — nothing to release.
+    return { ok: true, data: { id: bookingId, released: false } };
+  }
+
+  const [, updated] = await prisma.$transaction([
+    prisma.bookingSlot.deleteMany({ where: { bookingId } }),
+    prisma.booking.updateMany({
+      where: { id: bookingId, status: "pending" },
+      data: { status: "cancelled" },
+    }),
+  ]);
+
+  return { ok: true, data: { id: bookingId, released: updated.count > 0 } };
 }
 
 /**

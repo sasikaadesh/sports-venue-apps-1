@@ -65,11 +65,13 @@ Build one phase at a time. Finish and verify a phase (its "Done when") before st
 - Google OAuth credentials are configured outside the codebase — see ARCHITECTURE.md → Google sign-in. Contact details in `lib/contact-details.ts` are **placeholders**.
 
 ## Phase 8 — PayHere  ← *(consider adding a security-reviewer subagent here)*
-- [ ] Server-side hash generation (secret stays server-only)
-- [ ] Checkout popup for a pending booking
-- [ ] `notify_url` webhook: verify `md5sig`, then flip booking to `confirmed`
-- [ ] Status page on `return_url` (never confirms)
+- [x] Server-side hash generation (secret stays server-only)
+- [x] Checkout popup for a pending booking
+- [x] `notify_url` webhook: verify `md5sig`, then flip booking to `confirmed`
+- [x] Status page on `return_url` (never confirms)
+- [x] Confirmation email on `confirmed`, via the existing Resend setup
 - **Done when:** browse → book → pay (sandbox test card) → booking becomes `confirmed`.
+- `POST /api/payhere/notify` and `/payments/return?booking=<id>`. The webhook path is verified against signed fixtures locally, but the **end-to-end sandbox run needs a public URL** (`notify_url` cannot reach `localhost`) — do it on the Vercel deployment or a tunnel. See ARCHITECTURE.md → Payment flow → As built.
 
 ## Phase 9 — Polish, deploy, cleanup
 - [ ] UI polish against DESIGN.md checklist

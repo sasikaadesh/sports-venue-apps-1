@@ -1,5 +1,6 @@
 import {
   Body,
+  Column,
   Container,
   Head,
   Heading,
@@ -7,6 +8,7 @@ import {
   Html,
   Link,
   Preview,
+  Row,
   Section,
   Text,
 } from "@react-email/components";
@@ -102,6 +104,29 @@ const quotedMessage = {
   whiteSpace: "pre-wrap" as const,
 };
 
+const detailTable = {
+  border: `1px solid ${BORDER}`,
+  borderRadius: "8px",
+  margin: "0 0 20px",
+  padding: "4px 16px",
+};
+
+const detailRow = { borderBottom: `1px solid ${BORDER}` };
+
+const detailKey = {
+  color: MUTED,
+  fontSize: "13px",
+  padding: "10px 12px 10px 0",
+  width: "35%",
+};
+
+const detailValue = {
+  color: INK,
+  fontSize: "15px",
+  fontWeight: 600,
+  padding: "10px 0",
+};
+
 const rule = { borderColor: BORDER, margin: "24px 0" };
 
 const footer = { color: MUTED, fontSize: "13px", lineHeight: "20px", margin: 0 };
@@ -142,6 +167,89 @@ export function ContactAdminEmail({ name, email, message }: ContactEmailProps) {
           <Text style={footer}>
             Reply directly to this email to answer {name}. The message is also in
             the admin panel under Messages.
+          </Text>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+export type BookingConfirmationEmailProps = {
+  name: string;
+  courtName: string;
+  date: string;
+  timeRange: string;
+  durationHours: number;
+  playerCount: number;
+  total: string;
+  /** Absolute URL — an email has no origin to resolve a relative path against. */
+  bookingUrl: string;
+};
+
+/**
+ * Sent once, when a verified PayHere notification confirms the booking.
+ *
+ * The detail rows are a two-column table rather than flex: Outlook renders
+ * neither flexbox nor grid, and this is the layout that survives it.
+ */
+export function BookingConfirmationEmail({
+  name,
+  courtName,
+  date,
+  timeRange,
+  durationHours,
+  playerCount,
+  total,
+  bookingUrl,
+}: BookingConfirmationEmailProps) {
+  const rows: [string, string][] = [
+    ["Court", courtName],
+    ["Date", date],
+    ["Time", `${timeRange} (${durationHours} ${durationHours === 1 ? "hour" : "hours"})`],
+    ["Players", String(playerCount)],
+    ["Paid", total],
+  ];
+
+  return (
+    <Html lang="en">
+      <Head />
+      <Preview>{`Your ${courtName} booking is confirmed`}</Preview>
+      <Body style={body}>
+        <Container style={container}>
+          <Section style={accentBar} />
+          <Heading style={heading}>Your booking is confirmed</Heading>
+
+          <Text style={paragraph}>
+            Hi {name}, your payment went through and the court is yours. Here are
+            the details.
+          </Text>
+
+          <Section style={detailTable}>
+            {rows.map(([key, value]) => (
+              <Row key={key} style={detailRow}>
+                <Column style={detailKey}>{key}</Column>
+                <Column style={detailValue}>{value}</Column>
+              </Row>
+            ))}
+          </Section>
+
+          <Text style={paragraph}>
+            <Link href={bookingUrl} style={link}>
+              View your booking
+            </Link>
+          </Text>
+
+          <Hr style={rule} />
+          <Text style={footer}>
+            Please arrive a few minutes early. To change or cancel a paid
+            booking, contact the sports office.
+          </Text>
+          <Text style={{ ...footer, marginTop: "12px" }}>
+            {CONTACT_DETAILS.organisation}
+            <br />
+            {CONTACT_DETAILS.addressLines.join(", ")}
+            <br />
+            {CONTACT_DETAILS.phone}
           </Text>
         </Container>
       </Body>
