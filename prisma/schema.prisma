@@ -136,11 +136,17 @@ model Booking {
   status        BookingStatus @default(pending)
   holdExpiresAt DateTime? // expiry for a pending hold
   createdAt     DateTime      @default(now())
+  /// Set when the OWNER removes an unpaid booking from their own list. The row
+  /// stays: a booking is a record, and it may already have Payment attempts
+  /// hanging off it. Only the user's account list hides it — admin views and
+  /// every availability query are untouched.
+  removedAt     DateTime?
   payments      Payment[]
   slots         BookingSlot[]
 
   @@index([courtId, bookingDate])
   @@index([userId])
+  @@index([userId, removedAt])
   @@index([status])
   @@index([status, holdExpiresAt])
 }

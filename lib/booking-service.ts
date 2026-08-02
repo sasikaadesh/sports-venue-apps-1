@@ -490,6 +490,95 @@ export async function cancelOwnBooking(
   return { ok: true, data: { id: bookingId } };
 }
 
+/** The only statuses a user may remove from their own list. */
+const USER_REMOVABLE_STATUSES: BookingStatus[] = ["pending", "cancelled"];
+
+/**
+ * Remove a booking from the owner's list — the "clear this out" path.
+ *
+ * The paid/unpaid divide (docs/ARCHITECTURE.md) is enforced HERE, not by which
+ * buttons the page draws: only `pending` (unpaid, still on hold) and
+ * `cancelled` bookings can be removed, and only by the user who owns them. A
+ * `confirmed` booking is money that changed hands and can only be released
+ * through the admin-reviewed refund flow, so it is refused however the request
+ * is crafted.
+ *
+ * A `pending` booking is still holding its hours, so removing it releases them
+ * the same way every other release does — by DELETING the `BookingSlot` rows.
+ * The parent is then marked `cancelled`, exactly as `cancelOwnBooking` leaves
+ * it, so the availability queries and the sweep see nothing new.
+ *
+ * The booking row itself survives, stamped with `removedAt`: it is a record,
+ * it may own `Payment` attempt rows, and RLS grants DELETE to admins only.
+ * Only the user's own list filters on `removedAt`.
+ */
+export async function removeOwnBooking(
+  bookingId: string,
+  userId: string
+): Promise<BookingResult<{ id: string; releasedHours: boolean }>> {
+  const booking = await prisma.booking.findFirst({
+    // Ownership is part of the query, not a check on the result — another
+    // user's id cannot match this row even with the right uuid.
+    where: { id: bookingId, userId },
+    select: { id: true, status: true, removedAt: true },
+  });
+
+  if (!booking) {
+    return { ok: false, error: "Booking not found.", reason: "notfound" };
+  }
+
+  if (booking.removedAt) {
+    // Already gone from their list — a double submit, not an error.
+    return { ok: true, data: { id: bookingId, releasedHours: false } };
+  }
+
+  if (!USER_REMOVABLE_STATUSES.includes(booking.status)) {
+    return {
+      ok: false,
+      error:
+        booking.status === "confirmed"
+          ? "A paid booking cannot be removed here. Contact the sports office to request a refund."
+          : "This booking cannot be removed.",
+      reason: "invalid",
+    };
+  }
+
+  const wasHolding = booking.status === "pending";
+
+  // Interactive transaction, and the ORDER matters: the guarded status flip
+  // goes first, and the hour-rows are only deleted if it actually matched. If
+  // the PayHere webhook confirmed this booking in the instant between the read
+  // above and here, the flip matches nothing and we must NOT delete the hours
+  // — that would leave a paid booking holding nothing.
+  const removed = await prisma.$transaction(async (tx) => {
+    const flip = await tx.booking.updateMany({
+      where: { id: bookingId, userId, status: { in: USER_REMOVABLE_STATUSES } },
+      data: {
+        status: "cancelled",
+        holdExpiresAt: null,
+        removedAt: new Date(),
+      },
+    });
+
+    if (flip.count === 0) return false;
+
+    // No-op for an already-released booking; the freeing act for a live hold.
+    await tx.bookingSlot.deleteMany({ where: { bookingId } });
+    return true;
+  });
+
+  if (!removed) {
+    return {
+      ok: false,
+      error:
+        "This booking changed while you were removing it. Reload the page to see where it stands.",
+      reason: "invalid",
+    };
+  }
+
+  return { ok: true, data: { id: bookingId, releasedHours: wasHolding } };
+}
+
 /**
  * Extend a pending hold for the duration of a payment attempt.
  *
