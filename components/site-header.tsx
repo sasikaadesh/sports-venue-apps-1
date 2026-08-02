@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { LogOut, ShieldCheck, Zap } from "lucide-react";
+import { ShieldCheck, Zap } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/link-button";
+import { LinkPending } from "@/components/link-pending";
+import { LogoutButton } from "@/components/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { signOut } from "@/app/(auth)/actions";
 import { getCurrentUser, roleIsAdmin } from "@/lib/auth";
 
 export async function SiteHeader() {
@@ -52,28 +52,24 @@ export async function SiteHeader() {
                 >
                   <ShieldCheck />
                   Admin
+                  <LinkPending />
                 </LinkButton>
               )}
               <LinkButton href="/account" size="lg" className="h-9">
                 Your account
+                {/* /account and /courts are dynamic pages behind a session
+                    check, so there is no cached payload to swap in on click —
+                    acknowledge the press while the server renders. */}
+                <LinkPending />
               </LinkButton>
 
-              {/* Signing out is a plain server action on a form, so it works
-                  before (and without) hydration — and it keeps the session
-                  cookie clearing on the server, where it is set. The label
-                  drops on narrow screens; the icon and aria-label stay. */}
-              <form action={signOut}>
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="lg"
-                  aria-label="Log out"
-                  className="h-9 text-muted-foreground hover:text-foreground"
-                >
-                  <LogOut />
-                  <span className="hidden sm:inline">Log out</span>
-                </Button>
-              </form>
+              {/* Still a plain server action on a form, so it works before
+                  (and without) hydration; the button only adds a pending
+                  state. The label drops on narrow screens, the icon stays. */}
+              <LogoutButton
+                compact
+                className="h-9 text-muted-foreground hover:text-foreground"
+              />
             </>
           ) : (
             <>

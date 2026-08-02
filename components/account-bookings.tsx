@@ -11,6 +11,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/link-button";
+import { LinkPending } from "@/components/link-pending";
 import { RemoveAccountBookingButton } from "@/components/remove-account-booking-button";
 import { prisma } from "@/lib/prisma";
 import { dateToTimeString, formatDate, formatPrice, isFuture } from "@/lib/time";
@@ -239,6 +240,7 @@ export async function AccountBookings({
                   >
                     View details
                     <ChevronRight />
+                    <LinkPending />
                   </LinkButton>
 
                   {removable && (
@@ -289,6 +291,10 @@ export async function AccountBookings({
 /**
  * One pagination step. Disabled ends render as a span, not a dead link — an
  * anchor with no destination is a trap for keyboard and screen-reader users.
+ *
+ * This is the one control on the page that genuinely must go back to the
+ * server: page 2 is a different ten rows. It is prefetched, and it shows a
+ * spinner the moment it is clicked, so the wait is acknowledged straight away.
  */
 function PageLink({
   page,
@@ -320,6 +326,7 @@ function PageLink({
       className={`${classes} hover:bg-muted hover:text-foreground`}
     >
       {children}
+      <LinkPending />
     </Link>
   );
 }
