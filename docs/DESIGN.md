@@ -42,7 +42,7 @@ Three rules that make it hold together:
 
 ### The toggle
 
-Light / dark / **system**, persisted, in the header — `components/theme-toggle.tsx`, driven by `next-themes` (`attribute="class"`). A three-way segmented control, not a cycling icon button: "system" is a real choice and one button cannot show which of the three is active. It appears in the site header, the admin header, the auth layout and the account page — the last two render outside the site header and would otherwise be dead ends.
+Light / dark / **system**, persisted, in the header — `components/theme-toggle.tsx`, driven by `next-themes` (`attribute="class"`). A three-way segmented control, not a cycling icon button: "system" is a real choice and one button cannot show which of the three is active. It appears in the site header, the admin header and the auth layout — the last renders outside the site header and would otherwise be a dead end. The account page carries no toggle of its own: it renders inside the site header (`app/account/layout.tsx`), which already has one.
 
 ## Typography
 

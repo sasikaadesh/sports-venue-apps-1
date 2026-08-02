@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { ShieldCheck, Zap } from "lucide-react";
+import { LogOut, ShieldCheck, Zap } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/link-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { signOut } from "@/app/(auth)/actions";
 import { getCurrentUser, roleIsAdmin } from "@/lib/auth";
 
 export async function SiteHeader() {
@@ -55,6 +57,23 @@ export async function SiteHeader() {
               <LinkButton href="/account" size="lg" className="h-9">
                 Your account
               </LinkButton>
+
+              {/* Signing out is a plain server action on a form, so it works
+                  before (and without) hydration — and it keeps the session
+                  cookie clearing on the server, where it is set. The label
+                  drops on narrow screens; the icon and aria-label stay. */}
+              <form action={signOut}>
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="lg"
+                  aria-label="Log out"
+                  className="h-9 text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut />
+                  <span className="hidden sm:inline">Log out</span>
+                </Button>
+              </form>
             </>
           ) : (
             <>

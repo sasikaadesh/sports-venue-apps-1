@@ -3,17 +3,51 @@ import {
   CalendarDays,
   CalendarX,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Users,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/link-button";
+import { RemoveAccountBookingButton } from "@/components/remove-account-booking-button";
 import { prisma } from "@/lib/prisma";
 import { dateToTimeString, formatDate, formatPrice, isFuture } from "@/lib/time";
+import type { BookingStatus } from "@/lib/generated/prisma/enums";
 
-/** How many to show before pointing at the venue rather than paginating. */
-const LIMIT = 25;
+/** How many bookings one page of the list shows. */
+export const BOOKINGS_PER_PAGE = 10;
+
+/**
+ * The rows that belong on a user's own list.
+ *
+ * `blocked` is excluded: an admin's slot blocks are `Booking`s owned by that
+ * admin, and they are not that person's bookings in any sense a user means.
+ * `removedAt` is the user's own "clear this out" marker — the row survives as a
+ * record (and for its payment attempts), it just leaves this list.
+ */
+function ownListFilter(userId: string) {
+  return {
+    userId,
+    status: { not: "blocked" as BookingStatus },
+    removedAt: null,
+  };
+}
+
+/** How many bookings the user has — drives the tab badge and the pagination. */
+export async function countAccountBookings(userId: string): Promise<number> {
+  return prisma.booking.count({ where: ownListFilter(userId) });
+}
+
+/**
+ * Statuses the owner may remove themselves. Money is the dividing line: a
+ * `confirmed` booking has been paid for, so it is released only through the
+ * admin-reviewed refund flow, never by deleting a row (docs/ARCHITECTURE.md →
+ * the paid/unpaid divide). Mirrored — and actually enforced — server-side in
+ * `removeOwnBooking`.
+ */
+const REMOVABLE_STATUSES: BookingStatus[] = ["pending", "cancelled"];
 
 type StatusView = {
   label: string;
@@ -31,41 +65,51 @@ const STATUS_VIEWS: Record<string, StatusView> = {
 };
 
 /**
- * The signed-in user's own bookings, newest play date first.
+ * The signed-in user's own bookings, newest play date first, ten to a page.
  *
  * **Scoped to `userId` in the query itself.** Prisma connects as `postgres` and
  * bypasses RLS, so the `where` clause is the enforcement here, not a filter on
  * top of one — RLS is the second layer, covering the anon-key path (CLAUDE.md,
  * docs/ARCHITECTURE.md → Security). The id comes from `requireUser()` in the
  * page, never from a parameter, so there is nothing to tamper with.
- *
- * `blocked` rows are excluded: an admin's slot blocks are `Booking`s owned by
- * that admin, and they are not that person's bookings in any sense a user
- * means.
  */
-export async function AccountBookings({ userId }: { userId: string }) {
-  const [bookings, total] = await Promise.all([
-    prisma.booking.findMany({
-      where: { userId, status: { not: "blocked" } },
-      orderBy: [{ bookingDate: "desc" }, { createdAt: "desc" }],
-      take: LIMIT,
-      select: {
-        id: true,
-        bookingDate: true,
-        playerCount: true,
-        durationHours: true,
-        totalPrice: true,
-        status: true,
-        holdExpiresAt: true,
-        court: { select: { name: true } },
-        slots: {
-          orderBy: { slot: { startTime: "asc" } },
-          select: { slot: { select: { startTime: true, endTime: true } } },
-        },
-      },
-    }),
-    prisma.booking.count({ where: { userId, status: { not: "blocked" } } }),
-  ]);
+export async function AccountBookings({
+  userId,
+  total,
+  page,
+}: {
+  userId: string;
+  /** Already counted by the page (it needs the number for the tab badge). */
+  total: number;
+  /** 1-based, straight off `?page=` — clamped here, not trusted. */
+  page: number;
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / BOOKINGS_PER_PAGE));
+  const currentPage = Math.min(Math.max(1, page), pageCount);
+
+  const bookings =
+    total === 0
+      ? []
+      : await prisma.booking.findMany({
+          where: ownListFilter(userId),
+          orderBy: [{ bookingDate: "desc" }, { createdAt: "desc" }],
+          skip: (currentPage - 1) * BOOKINGS_PER_PAGE,
+          take: BOOKINGS_PER_PAGE,
+          select: {
+            id: true,
+            bookingDate: true,
+            playerCount: true,
+            durationHours: true,
+            totalPrice: true,
+            status: true,
+            holdExpiresAt: true,
+            court: { select: { name: true } },
+            slots: {
+              orderBy: { slot: { startTime: "asc" } },
+              select: { slot: { select: { startTime: true, endTime: true } } },
+            },
+          },
+        });
 
   if (bookings.length === 0) {
     return (
@@ -89,8 +133,11 @@ export async function AccountBookings({ userId }: { userId: string }) {
     );
   }
 
+  const firstShown = (currentPage - 1) * BOOKINGS_PER_PAGE + 1;
+  const lastShown = firstShown + bookings.length - 1;
+
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <ul className="flex flex-col gap-3">
         {bookings.map((booking) => {
           const view = STATUS_VIEWS[booking.status] ?? {
@@ -114,86 +161,165 @@ export async function AccountBookings({ userId }: { userId: string }) {
           const holdLive =
             booking.status === "pending" && isFuture(booking.holdExpiresAt);
 
+          const removable = REMOVABLE_STATUSES.includes(booking.status);
+
           return (
-            <li key={booking.id}>
-              <Link
-                href={`/bookings/${booking.id}`}
-                className={`group flex flex-col gap-4 rounded-xl border bg-card px-5 py-4 transition-all hover:-translate-y-0.5 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between ${
-                  // A flat accent wash vanishes on a near-black surface, so the
-                  // emphasis is a border as well as a tint (DESIGN.md).
-                  view.emphasised
-                    ? "border-primary/40 bg-primary/[0.06]"
-                    : "hover:border-foreground/20"
-                }`}
-              >
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-heading text-lg font-bold tracking-tight">
-                      {booking.court.name}
-                    </span>
-                    <Badge variant={view.variant}>
-                      {view.emphasised && <CheckCircle2 />}
-                      {view.label}
-                    </Badge>
-                  </div>
+            <li
+              key={booking.id}
+              className={`flex flex-col gap-4 rounded-xl border bg-card px-5 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                // A flat accent wash vanishes on a near-black surface, so the
+                // emphasis is a border as well as a tint (docs/DESIGN.md).
+                view.emphasised
+                  ? "border-primary/40 bg-primary/[0.06]"
+                  : "hover:border-foreground/20"
+              }`}
+            >
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="font-heading text-lg font-bold tracking-tight">
+                    {booking.court.name}
+                  </span>
+                  <Badge variant={view.variant}>
+                    {view.emphasised && <CheckCircle2 />}
+                    {view.label}
+                  </Badge>
+                </div>
 
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <CalendarDays className="size-4" />
-                      {formatDate(booking.bookingDate)}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarDays className="size-4" />
+                    {formatDate(booking.bookingDate)}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="size-4" />
+                    {timeRange}
+                    <span className="text-muted-foreground/70">
+                      ({booking.durationHours}{" "}
+                      {booking.durationHours === 1 ? "hr" : "hrs"})
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="size-4" />
-                      {timeRange}
-                      <span className="text-muted-foreground/70">
-                        ({booking.durationHours}{" "}
-                        {booking.durationHours === 1 ? "hr" : "hrs"})
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Users className="size-4" />
-                      {booking.playerCount}{" "}
-                      {booking.playerCount === 1 ? "player" : "players"}
-                    </span>
-                  </div>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Users className="size-4" />
+                    {booking.playerCount}{" "}
+                    {booking.playerCount === 1 ? "player" : "players"}
+                  </span>
+                </div>
 
-                  {holdLive && (
-                    <p className="text-xs font-medium text-foreground">
-                      Held until{" "}
-                      {booking.holdExpiresAt?.toLocaleTimeString("en-GB", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        timeZone: "Asia/Colombo",
-                      })}{" "}
-                      — pay to confirm it.
-                    </p>
+                {holdLive && (
+                  <p className="text-xs font-medium text-foreground">
+                    Held until{" "}
+                    {booking.holdExpiresAt?.toLocaleTimeString("en-GB", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: "Asia/Colombo",
+                    })}{" "}
+                    — pay to confirm it.
+                  </p>
+                )}
+              </div>
+
+              {/* The card is no longer one big link: it now carries a button,
+                  and a button inside an anchor is invalid markup. The link is
+                  explicit instead. */}
+              <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:gap-2">
+                <span
+                  className={`font-heading text-xl font-bold tabular-nums ${
+                    view.emphasised ? "" : "text-muted-foreground"
+                  }`}
+                >
+                  {formatPrice(booking.totalPrice.toString())}
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <LinkButton
+                    href={`/bookings/${booking.id}`}
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    View details
+                    <ChevronRight />
+                  </LinkButton>
+
+                  {removable && (
+                    <RemoveAccountBookingButton
+                      bookingId={booking.id}
+                      courtName={booking.court.name}
+                      holdsHours={holdLive}
+                    />
                   )}
                 </div>
-
-                <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:gap-1">
-                  <span
-                    className={`font-heading text-xl font-bold tabular-nums ${
-                      view.emphasised ? "" : "text-muted-foreground"
-                    }`}
-                  >
-                    {formatPrice(booking.totalPrice.toString())}
-                  </span>
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground">
-                    View details
-                  </span>
-                </div>
-              </Link>
+              </div>
             </li>
           );
         })}
       </ul>
 
-      {total > LIMIT && (
-        <p className="text-sm text-muted-foreground">
-          Showing your {LIMIT} most recent bookings of {total}. Contact the
-          sports office for anything older.
-        </p>
+      {pageCount > 1 && (
+        <nav
+          aria-label="Bookings pages"
+          className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"
+        >
+          <p className="text-sm text-muted-foreground tabular-nums">
+            Showing {firstShown}–{lastShown} of {total}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <PageLink page={currentPage - 1} disabled={currentPage === 1}>
+              <ChevronLeft />
+              Previous
+            </PageLink>
+            <span className="px-1 text-sm text-muted-foreground tabular-nums">
+              Page {currentPage} of {pageCount}
+            </span>
+            <PageLink
+              page={currentPage + 1}
+              disabled={currentPage === pageCount}
+            >
+              Next
+              <ChevronRight />
+            </PageLink>
+          </div>
+        </nav>
       )}
     </div>
+  );
+}
+
+/**
+ * One pagination step. Disabled ends render as a span, not a dead link — an
+ * anchor with no destination is a trap for keyboard and screen-reader users.
+ */
+function PageLink({
+  page,
+  disabled,
+  children,
+}: {
+  page: number;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  const classes =
+    "inline-flex h-9 items-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors [&_svg]:size-4";
+
+  if (disabled) {
+    return (
+      <span
+        aria-disabled="true"
+        className={`${classes} border-border/60 text-muted-foreground/50`}
+      >
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={`/account?tab=bookings&page=${page}`}
+      scroll={false}
+      className={`${classes} hover:bg-muted hover:text-foreground`}
+    >
+      {children}
+    </Link>
   );
 }
