@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LogOut, ShieldAlert, ShieldCheck, User as UserIcon } from "lucide-react";
+import { ShieldAlert, ShieldCheck, User as UserIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   AccountBookings,
   countAccountBookings,
 } from "@/components/account-bookings";
-import { AccountTabs, parseAccountTab } from "@/components/account-tabs";
+import { AccountTabs } from "@/components/account-tabs";
 import { LinkButton } from "@/components/link-button";
+import { LogoutButton } from "@/components/logout-button";
 import { ProfileForm } from "@/components/profile-form";
-import { signOut } from "@/app/(auth)/actions";
+import { parseAccountTab } from "@/lib/account-tab";
 import { profileIsComplete, requireUser, roleIsAdmin } from "@/lib/auth";
+import type { CurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Your account — Courtside",
@@ -42,7 +43,6 @@ export default async function AccountPage({
   const user = await requireUser("/account");
   const { denied, tab, page } = await searchParams;
 
-  const activeTab = parseAccountTab(tab);
   const isAdmin = roleIsAdmin(user.role);
   const incomplete = !profileIsComplete(user);
 
@@ -86,123 +86,136 @@ export default async function AccountPage({
         >
           <UserIcon className="mt-0.5 size-4 shrink-0 text-primary" />
           <span>
-            Add your phone number and address under{" "}
-            <Link
-              href="/account?tab=details"
-              className="font-medium underline underline-offset-4"
-            >
-              Details
-            </Link>{" "}
-            so we can reach you about a booking.
+            Add your phone number and address under <strong>Details</strong> so
+            we can reach you about a booking.
           </span>
         </p>
       )}
 
+      {/* Both panels are rendered here, in this one request, and handed to the
+          tab bar as props. Switching tabs is then local state — it does not go
+          back to the server (see components/account-tabs.tsx). */}
       <div className="mt-10">
-        <AccountTabs active={activeTab} bookingCount={bookingCount} />
+        <AccountTabs
+          initialTab={parseAccountTab(tab)}
+          bookingCount={bookingCount}
+          details={<DetailsPanel user={user} isAdmin={isAdmin} />}
+          bookings={
+            <BookingsPanel
+              userId={user.id}
+              total={bookingCount}
+              page={parsePage(page)}
+            />
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function BookingsPanel({
+  userId,
+  total,
+  page,
+}: {
+  userId: string;
+  total: number;
+  page: number;
+}) {
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-2xl leading-none">My bookings</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          Your reservations, most recent first. Open one to see the hours it
+          covers or to pay for a slot that is still on hold. A booking you have
+          paid for can only be changed by the sports office.
+        </p>
       </div>
 
-      {activeTab === "bookings" ? (
-        <section className="mt-8 flex flex-col gap-5">
-          <div className="flex flex-col gap-1.5">
-            <h2 className="text-2xl leading-none">My bookings</h2>
-            <p className="max-w-prose text-sm text-muted-foreground">
-              Your reservations, most recent first. Open one to see the hours it
-              covers or to pay for a slot that is still on hold. A booking you
-              have paid for can only be changed by the sports office.
-            </p>
-          </div>
+      {/* Scoped to this user inside the component, from the id `requireUser`
+          returned — never from anything in the request. */}
+      <AccountBookings userId={userId} total={total} page={page} />
+    </section>
+  );
+}
 
-          {/* Scoped to this user inside the component, from the id
-              `requireUser` returned — never from anything in the request. */}
-          <AccountBookings
-            userId={user.id}
-            total={bookingCount}
-            page={parsePage(page)}
-          />
-        </section>
-      ) : (
-        <section className="mt-8 flex flex-col gap-8">
-          <dl className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2">
-            <div className="bg-card px-5 py-4">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Email
-              </dt>
-              <dd className="mt-1 truncate text-sm">{user.email}</dd>
-            </div>
-            <div className="bg-card px-5 py-4">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Role
-              </dt>
-              <dd className="mt-1 flex items-center gap-2 text-sm">
-                {isAdmin ? (
-                  <ShieldCheck className="size-4 text-primary" />
-                ) : (
-                  <UserIcon className="size-4 text-muted-foreground" />
-                )}
-                <span className="font-medium">
-                  {ROLE_LABELS[user.role] ?? user.role}
-                </span>
-              </dd>
-            </div>
-            <div className="bg-card px-5 py-4 sm:col-span-2">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                User ID
-              </dt>
-              <dd className="mt-1 font-mono text-xs text-muted-foreground">
-                {user.id}
-              </dd>
-            </div>
-          </dl>
+function DetailsPanel({
+  user,
+  isAdmin,
+}: {
+  user: CurrentUser;
+  isAdmin: boolean;
+}) {
+  return (
+    <section className="flex flex-col gap-8">
+      <dl className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2">
+        <div className="bg-card px-5 py-4">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Email
+          </dt>
+          <dd className="mt-1 truncate text-sm">{user.email}</dd>
+        </div>
+        <div className="bg-card px-5 py-4">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Role
+          </dt>
+          <dd className="mt-1 flex items-center gap-2 text-sm">
+            {isAdmin ? (
+              <ShieldCheck className="size-4 text-primary" />
+            ) : (
+              <UserIcon className="size-4 text-muted-foreground" />
+            )}
+            <span className="font-medium">
+              {ROLE_LABELS[user.role] ?? user.role}
+            </span>
+          </dd>
+        </div>
+        <div className="bg-card px-5 py-4 sm:col-span-2">
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            User ID
+          </dt>
+          <dd className="mt-1 font-mono text-xs text-muted-foreground">
+            {user.id}
+          </dd>
+        </div>
+      </dl>
 
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1.5">
-              <h2 className="text-2xl leading-none">Your details</h2>
-              <p className="max-w-prose text-sm text-muted-foreground">
-                Used to contact you about a booking. Your email address is your
-                sign-in and cannot be changed here.
-              </p>
-            </div>
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1.5">
+          <h2 className="text-2xl leading-none">Your details</h2>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Used to contact you about a booking. Your email address is your
+            sign-in and cannot be changed here.
+          </p>
+        </div>
 
-            <ProfileForm
-              defaultValues={{
-                name: user.name ?? "",
-                phone: user.phone ?? "",
-                address: user.address ?? "",
-              }}
-            />
-          </div>
+        <ProfileForm
+          defaultValues={{
+            name: user.name ?? "",
+            phone: user.phone ?? "",
+            address: user.address ?? "",
+          }}
+        />
+      </div>
 
-          <div className="flex flex-wrap items-center gap-3 border-t pt-8">
-            <LinkButton
-              href="/courts"
-              variant="outline"
-              size="lg"
-              className="h-10"
-            >
-              Browse courts
-            </LinkButton>
-            <form action={signOut}>
-              <Button type="submit" variant="ghost" size="lg" className="h-10">
-                <LogOut />
-                Log out
-              </Button>
-            </form>
-          </div>
+      <div className="flex flex-wrap items-center gap-3 border-t pt-8">
+        <LinkButton href="/courts" variant="outline" size="lg" className="h-10">
+          Browse courts
+        </LinkButton>
+        <LogoutButton className="h-10" />
+      </div>
 
-          {!isAdmin && (
-            <p className="max-w-prose text-sm text-muted-foreground">
-              Your role is{" "}
-              <span className="font-medium text-foreground">user</span>.
-              Visiting{" "}
-              <Link href="/admin" className="underline underline-offset-4">
-                /admin
-              </Link>{" "}
-              directly will be refused by the server, not just hidden here.
-            </p>
-          )}
-        </section>
+      {!isAdmin && (
+        <p className="max-w-prose text-sm text-muted-foreground">
+          Your role is <span className="font-medium text-foreground">user</span>
+          . Visiting{" "}
+          <Link href="/admin" className="underline underline-offset-4">
+            /admin
+          </Link>{" "}
+          directly will be refused by the server, not just hidden here.
+        </p>
       )}
-    </div>
+    </section>
   );
 }

@@ -1,78 +1,131 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { CalendarDays, UserRound } from "lucide-react";
 
-export const ACCOUNT_TABS = ["details", "bookings"] as const;
+import { ACCOUNT_TABS, type AccountTab } from "@/lib/account-tab";
 
-export type AccountTab = (typeof ACCOUNT_TABS)[number];
-
-/** Whatever arrives in `?tab=`, narrowed to a tab we actually render. */
-export function parseAccountTab(value: string | undefined): AccountTab {
-  return value === "bookings" ? "bookings" : "details";
-}
+const TAB_META = {
+  details: { label: "Details", Icon: UserRound },
+  bookings: { label: "My bookings", Icon: CalendarDays },
+} as const;
 
 /**
  * Details / My bookings.
  *
- * Links, not client state: the tab lives in the URL, so a bookings page is
- * shareable and bookmarkable, the back button steps through it, and the whole
- * account page stays a server component — which matters because the bookings
- * list is a database read that must never be cached (the PayHere webhook
- * changes a booking's status without the browser being involved).
+ * **Both panels are rendered on the server in the one page request and handed
+ * in as props**, so switching tabs is a local state change — no navigation, no
+ * RSC fetch, no second trip through `getUser()` and the database. It used to be
+ * a pair of `<Link href="/account?tab=…">`s, which meant every click was a full
+ * dynamic navigation: the proxy's session refresh, `requireUser()`, the booking
+ * count and the booking page all re-ran before anything moved on screen.
  *
- * The active segment carries a background AND a ring: on a near-black surface a
- * flat tint alone is invisible (docs/DESIGN.md).
+ * The URL still tracks the tab, via `history.replaceState` rather than the
+ * router — Next reads its own history state back, so the address bar stays
+ * shareable and `?tab=bookings` still opens on the right panel, without a
+ * server round-trip.
+ *
+ * Both panels stay MOUNTED and are toggled with a class. Unmounting the details
+ * panel would throw away whatever the user had typed into the profile form.
  */
 export function AccountTabs({
-  active,
+  initialTab,
   bookingCount,
+  details,
+  bookings,
 }: {
-  active: AccountTab;
+  initialTab: AccountTab;
   bookingCount: number;
+  details: React.ReactNode;
+  bookings: React.ReactNode;
 }) {
-  const tabs = [
-    { key: "details" as const, label: "Details", Icon: UserRound, count: 0 },
-    {
-      key: "bookings" as const,
-      label: "My bookings",
-      Icon: CalendarDays,
-      count: bookingCount,
-    },
-  ];
+  const [active, setActive] = useState<AccountTab>(initialTab);
+
+  function select(tab: AccountTab) {
+    if (tab === active) return;
+    setActive(tab);
+    window.history.replaceState(null, "", `/account?tab=${tab}`);
+  }
+
+  // Arrow keys move between tabs, as the tablist pattern expects.
+  function onKeyDown(event: React.KeyboardEvent) {
+    const delta =
+      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (delta === 0) return;
+
+    event.preventDefault();
+    const index = ACCOUNT_TABS.indexOf(active);
+    const next = ACCOUNT_TABS[(index + delta + ACCOUNT_TABS.length) % ACCOUNT_TABS.length];
+    select(next);
+    document.getElementById(`account-tab-${next}`)?.focus();
+  }
 
   return (
-    <nav
-      aria-label="Account sections"
-      className="inline-flex items-center gap-1 rounded-xl border bg-muted/50 p-1"
-    >
-      {tabs.map(({ key, label, Icon, count }) => {
-        const isActive = key === active;
-        return (
-          <Link
-            key={key}
-            href={`/account?tab=${key}`}
-            aria-current={isActive ? "page" : undefined}
-            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
-              isActive
-                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Icon className="size-4" />
-            {label}
-            {count > 0 && (
-              <span
-                className={`rounded-md px-1.5 py-0.5 text-xs tabular-nums ${
-                  isActive
-                    ? "bg-primary/15 text-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {count}
-              </span>
-            )}
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      <div
+        role="tablist"
+        aria-label="Account sections"
+        onKeyDown={onKeyDown}
+        className="inline-flex items-center gap-1 rounded-xl border bg-muted/50 p-1"
+      >
+        {ACCOUNT_TABS.map((tab) => {
+          const { label, Icon } = TAB_META[tab];
+          const isActive = tab === active;
+          const count = tab === "bookings" ? bookingCount : 0;
+
+          return (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              id={`account-tab-${tab}`}
+              aria-selected={isActive}
+              aria-controls={`account-panel-${tab}`}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => select(tab)}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                // On a near-black surface a flat tint alone is invisible, so the
+                // selected segment carries a ring too (docs/DESIGN.md).
+                isActive
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="size-4" />
+              {label}
+              {count > 0 && (
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-xs tabular-nums ${
+                    isActive
+                      ? "bg-primary/15 text-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="account-panel-details"
+        aria-labelledby="account-tab-details"
+        className={active === "details" ? "mt-8" : "hidden"}
+      >
+        {details}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="account-panel-bookings"
+        aria-labelledby="account-tab-bookings"
+        className={active === "bookings" ? "mt-8" : "hidden"}
+      >
+        {bookings}
+      </div>
+    </>
   );
 }
