@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
-import type { Role } from "@/lib/generated/prisma/enums";
+import type { Affiliation, Role } from "@/lib/generated/prisma/enums";
 
 /**
  * Server-side auth and role checks.
@@ -23,6 +23,9 @@ export type CurrentUser = {
   name: string | null;
   phone: string | null;
   address: string | null;
+  /** Sensitive. Fine to hand to the owner or an admin; never to a public page. */
+  nic: string | null;
+  affiliation: Affiliation | null;
   role: Role;
 };
 
@@ -33,6 +36,8 @@ const PROFILE_SELECT = {
   name: true,
   phone: true,
   address: true,
+  nic: true,
+  affiliation: true,
   role: true,
 } as const;
 
@@ -45,6 +50,13 @@ const ADMIN_ROLES: readonly Role[] = ["admin", "super_admin"];
 
 export function roleIsAdmin(role: Role): boolean {
   return ADMIN_ROLES.includes(role);
+}
+
+const AFFILIATIONS: readonly string[] = ["old_boy", "parent", "staff", "outsider"];
+
+/** Narrows an untrusted metadata string to the enum, or nothing. */
+function isAffiliation(value: string | undefined): value is Affiliation {
+  return !!value && AFFILIATIONS.includes(value);
 }
 
 /**
@@ -89,6 +101,13 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     return typeof value === "string" && value.trim() ? value.trim() : undefined;
   };
 
+  // `nic` is deliberately NOT set here even though signup puts it in metadata.
+  // It is UNIQUE, and a collision on this path would throw on *every* request
+  // this user makes — an unrecoverable loop. The trigger is the place that
+  // writes it (with its own collision fallback); if we ever land here without
+  // one, the profile is simply incomplete and /complete-profile asks for it.
+  const affiliation = fromMetadata("affiliation");
+
   return prisma.user.upsert({
     where: { id: user.id },
     create: {
@@ -97,6 +116,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       name: fromMetadata("name") ?? fromMetadata("full_name") ?? null,
       phone: fromMetadata("phone") ?? null,
       address: fromMetadata("address") ?? null,
+      affiliation: isAffiliation(affiliation) ? affiliation : null,
     },
     update: {},
     select: PROFILE_SELECT,
@@ -116,15 +136,29 @@ export async function isSuperAdmin(): Promise<boolean> {
 }
 
 /**
- * A profile is complete once we have a phone number and an address.
+ * A profile is complete once we have a phone number, an address, an NIC and an
+ * affiliation.
  *
- * Email/password signup collects both up front. Google does not supply either,
- * so an OAuth user arrives incomplete and is routed to /complete-profile.
+ * Email/password signup collects all four up front. Google supplies none of
+ * them, so an OAuth user arrives incomplete and is routed to
+ * /complete-profile.
+ *
+ * This is also the whole story for **accounts that predate a field**. Every
+ * account created before today has a NULL `nic` and `affiliation`; they are
+ * simply incomplete profiles, which the app already knows how to handle. They
+ * can still sign in — the gate lives after authentication, not inside it — and
+ * are asked for the two missing values once, on the page built for exactly
+ * that. Nothing about the old accounts is invalid; it is just not filled in.
  */
 export function profileIsComplete(
-  user: Pick<CurrentUser, "phone" | "address">
+  user: Pick<CurrentUser, "phone" | "address" | "nic" | "affiliation">
 ): boolean {
-  return !!user.phone?.trim() && !!user.address?.trim();
+  return (
+    !!user.phone?.trim() &&
+    !!user.address?.trim() &&
+    !!user.nic?.trim() &&
+    !!user.affiliation
+  );
 }
 
 /**

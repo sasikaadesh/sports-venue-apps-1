@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { GoogleButton } from "@/components/google-button";
+import { NativeSelect } from "@/components/admin/native-select";
+import { AFFILIATIONS } from "@/lib/validations";
 import type { AuthFormState } from "@/app/(auth)/actions";
 
 type AuthFormProps = {
@@ -160,6 +162,53 @@ export function AuthForm({
                   maxLength={300}
                   className="rounded-xl px-3.5 py-2.5"
                 />
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="nic" className="text-sm font-medium">
+                  NIC number
+                </FieldLabel>
+                <Input
+                  id="nic"
+                  name="nic"
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  placeholder="123456789V or 199012345678"
+                  aria-describedby="nic-hint"
+                  required
+                  maxLength={20}
+                  className="h-11 rounded-xl px-3.5 font-mono tracking-wide uppercase"
+                />
+                <p id="nic-hint" className="text-xs text-muted-foreground">
+                  Old format (9 digits and a V) or new (12 digits). Kept private
+                  to the sports office.
+                </p>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="affiliation" className="text-sm font-medium">
+                  Affiliation
+                </FieldLabel>
+                {/* No pre-selected option — `required` on a select only bites
+                    when the chosen option has an empty value, so the
+                    placeholder is what makes this an actual answer. */}
+                <NativeSelect
+                  id="affiliation"
+                  name="affiliation"
+                  required
+                  defaultValue=""
+                  className="h-11 rounded-xl px-3.5"
+                >
+                  <option value="" disabled>
+                    Choose one…
+                  </option>
+                  {AFFILIATIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </NativeSelect>
               </Field>
             </>
           )}

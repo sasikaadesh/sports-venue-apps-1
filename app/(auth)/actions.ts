@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, profileIsComplete } from "@/lib/auth";
 import { isOAuthOnlyAccount } from "@/lib/auth-identities";
@@ -50,13 +51,27 @@ export async function signUp(
     name: formData.get("name"),
     phone: formData.get("phone"),
     address: formData.get("address"),
+    nic: formData.get("nic"),
+    affiliation: formData.get("affiliation"),
   });
 
   if (!parsed.success) {
     return { error: firstIssue(parsed.error) };
   }
 
-  const { email, password, name, phone, address } = parsed.data;
+  const { email, password, name, phone, address, nic, affiliation } = parsed.data;
+
+  // A taken NIC is caught here only so the person gets a sentence they can act
+  // on. The guarantee is the UNIQUE index — this read and the insert are not
+  // atomic, and the trigger creates the account without the NIC if it loses
+  // the race, leaving them at /complete-profile rather than at a stack trace.
+  if (await prisma.user.findUnique({ where: { nic }, select: { id: true } })) {
+    return {
+      error:
+        "That NIC is already registered. If it is yours, log in instead or use “Forgot password”.",
+    };
+  }
+
   const supabase = await createClient();
   const origin = await authRedirectOrigin();
 
@@ -68,7 +83,7 @@ export async function signUp(
       // Handed to the on_auth_user_created trigger, which copies these into
       // public."User". The app still never INSERTs the profile row itself, so
       // profile creation cannot be skipped — see the migration for the trigger.
-      data: { name, phone, address },
+      data: { name, phone, address, nic, affiliation },
     },
   });
 
