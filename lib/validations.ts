@@ -58,6 +58,49 @@ const addressField = z
   .min(5, "Enter your address.")
   .max(300, "Address must be 300 characters or fewer.");
 
+/**
+ * Sri Lankan NIC, in either of the two formats in circulation:
+ *
+ *   old — 9 digits then V or X   e.g. 123456789V
+ *   new — 12 digits              e.g. 199012345678
+ *
+ * Normalised before it is checked: spaces stripped (people write "123456789 V")
+ * and upper-cased, so `123456789v` and `123456789V` cannot become two accounts
+ * for one person. The column is UNIQUE and carries the same regex as a CHECK
+ * constraint, so this is the friendly layer, not the guarantee.
+ *
+ * SENSITIVE — see ARCHITECTURE.md. Never rendered on a public page.
+ */
+const nicField = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/[\s-]/g, "").toUpperCase())
+  .refine((v) => v.length > 0, { message: "Enter your NIC number." })
+  .refine((v) => /^(\d{9}[VX]|\d{12})$/.test(v), {
+    message: "Enter a valid NIC — 9 digits and a V (123456789V), or 12 digits.",
+  });
+
+/** The four options, and the only four. Mirrors the `Affiliation` enum. */
+export const AFFILIATIONS = [
+  { value: "old_boy", label: "Old Boy" },
+  { value: "parent", label: "Parent" },
+  { value: "staff", label: "Staff" },
+  { value: "outsider", label: "Outsider" },
+] as const;
+
+export type AffiliationValue = (typeof AFFILIATIONS)[number]["value"];
+
+export const AFFILIATION_LABEL: Record<AffiliationValue, string> =
+  Object.fromEntries(AFFILIATIONS.map((a) => [a.value, a.label])) as Record<
+    AffiliationValue,
+    string
+  >;
+
+const affiliationField = z.enum(
+  AFFILIATIONS.map((a) => a.value) as [AffiliationValue, ...AffiliationValue[]],
+  { message: "Choose how you are connected to the school." }
+);
+
 const emailField = z.string().trim().toLowerCase().email("Enter a valid email address.");
 
 const passwordField = z
@@ -65,11 +108,20 @@ const passwordField = z
   .min(8, "Password must be at least 8 characters.")
   .max(72, "Password must be 72 characters or fewer.");
 
-/** The three profile fields a user owns and may edit. */
+/**
+ * The profile fields a user owns and may edit.
+ *
+ * One schema, used by signup, the account page's Details tab and the
+ * "Complete your profile" step, so the three can never ask for different
+ * things. `role` is deliberately absent — the profile writer must not be able
+ * to express a role change however the request is crafted.
+ */
 export const profileSchema = z.object({
   name: nameField,
   phone: phoneField,
   address: addressField,
+  nic: nicField,
+  affiliation: affiliationField,
 });
 
 export const signInSchema = z.object({
@@ -102,11 +154,66 @@ export const newPasswordSchema = z
   });
 
 /**
- * The Google path collects only what Google cannot give us. `name` is
- * included because the OIDC claim can be absent or unhelpful, and the user
- * should be able to correct it here.
+ * The Google path collects everything Google cannot give us — which is now
+ * phone, address, NIC and affiliation. `name` is included because the OIDC
+ * claim can be absent or unhelpful, and the user should be able to correct it.
+ * The same schema also catches accounts created before a field existed: they
+ * are simply incomplete profiles and are asked for the missing values here.
  */
 export const completeProfileSchema = profileSchema;
+
+// ---------------------------------------------------------------------------
+// Admin conduct ratings (private — never shown to the rated user)
+// ---------------------------------------------------------------------------
+
+/**
+ * One conduct note. The comment is REQUIRED: a bare star is an unaccountable
+ * mark on someone's record, and an admin reading the history months later
+ * needs the reason, not the score. Both rules are CHECK constraints too.
+ */
+export const userRatingSchema = z.object({
+  userId: z.uuid("Choose a user to rate."),
+  rating: z.coerce
+    .number<number>()
+    .int()
+    .min(1, "Give a rating from 1 to 5 stars.")
+    .max(5, "Give a rating from 1 to 5 stars."),
+  comment: z
+    .string()
+    .trim()
+    .min(5, "Say why — at least 5 characters.")
+    .max(1000, "Keep the reason to 1000 characters or fewer."),
+});
+
+/** How the admin Users tab is ordered. `?sort=` is user input; anything else falls back. */
+export const USER_SORTS = [
+  "recent",
+  "rating_low",
+  "rating_high",
+  "name",
+] as const;
+
+export type UserSort = (typeof USER_SORTS)[number];
+
+export function parseUserSort(value: string | undefined): UserSort {
+  return USER_SORTS.includes(value as UserSort) ? (value as UserSort) : "recent";
+}
+
+/** Which accounts the Users tab shows. */
+export const USER_RATING_FILTERS = ["all", "flagged", "rated", "unrated"] as const;
+
+export type UserRatingFilter = (typeof USER_RATING_FILTERS)[number];
+
+/** Average at or below this is "flagged" — the problem-user shortlist. */
+export const FLAGGED_RATING_MAX = 2.5;
+
+export function parseUserRatingFilter(
+  value: string | undefined
+): UserRatingFilter {
+  return USER_RATING_FILTERS.includes(value as UserRatingFilter)
+    ? (value as UserRatingFilter)
+    : "all";
+}
 
 /** Public "Contact us" submission. No auth — anyone may send one. */
 export const contactMessageSchema = z.object({
@@ -263,6 +370,7 @@ export type SignInInput = z.infer<typeof signInSchema>;
 export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
 export type NewPasswordInput = z.infer<typeof newPasswordSchema>;
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
+export type UserRatingInput = z.infer<typeof userRatingSchema>;
 export type AssignableRole = z.infer<typeof assignableRoleSchema>;
 export type CourtTypeInput = z.infer<typeof courtTypeSchema>;
 export type CourtInput = z.infer<typeof courtSchema>;

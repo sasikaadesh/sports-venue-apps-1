@@ -29,6 +29,15 @@ enum Role {
   super_admin
 }
 
+/// How a member relates to the school. Required from every new account, and
+/// collected retroactively from older ones through /complete-profile.
+enum Affiliation {
+  old_boy
+  parent
+  staff
+  outsider
+}
+
 enum BookingStatus {
   pending
   confirmed
@@ -50,20 +59,57 @@ enum PaymentStatus {
 
 /// Profile row mirroring a Supabase Auth user. `id` equals `auth.users.id`.
 ///
-/// `name` / `phone` / `address` are nullable because a profile row is created
-/// by a database trigger the moment Supabase Auth makes the user, and an OAuth
-/// (Google) sign-in supplies no phone or address at all. The app treats a row
-/// with a missing phone or address as an *incomplete* profile and routes the
-/// user through /complete-profile — see `profileIsComplete` in lib/auth.ts.
+/// Every profile field is nullable because a profile row is created by a
+/// database trigger the moment Supabase Auth makes the user, and an OAuth
+/// (Google) sign-in supplies none of them. The app treats a row missing any of
+/// phone / address / nic / affiliation as an *incomplete* profile and routes
+/// the user through /complete-profile — see `profileIsComplete` in lib/auth.ts.
+/// Accounts that predate a field simply arrive incomplete and are asked for it.
 model User {
-  id        String    @id @db.Uuid
-  email     String    @unique
-  name      String?
-  phone     String?
-  address   String?
+  id      String  @id @db.Uuid
+  email   String  @unique
+  name    String?
+  phone   String?
+  address String?
+
+  /// Sri Lankan NIC — old format (9 digits + V/X, stored upper-cased) or new
+  /// (12 digits). SENSITIVE: admin-visible and self-visible only, never
+  /// rendered on a public page. Unique, so one NIC means one account.
+  nic         String?      @unique
+  affiliation Affiliation?
+
   role      Role      @default(user)
   createdAt DateTime  @default(now())
   bookings  Booking[]
+
+  /// Conduct notes written ABOUT this user. Admin-only, in every layer.
+  ratings UserRating[] @relation("RatingTarget")
+  /// Conduct notes this user wrote, as an admin.
+  ratingsGiven UserRating[] @relation("RatingAuthor")
+}
+
+/// An admin's private conduct note about a user: 1–5 stars plus a required
+/// reason. Strictly internal — the rated user must never see these, which is
+/// enforced in the server actions AND by RLS (no policy grants a non-admin any
+/// access, not even to rows naming them).
+model UserRating {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  /// Cascade: notes about someone who no longer has an account are meaningless.
+  user   User   @relation("RatingTarget", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The admin who wrote it. Nullable + SET NULL so removing a staff account
+  /// keeps the venue's conduct history intact — it just stops naming them.
+  adminId String? @db.Uuid
+  admin   User?   @relation("RatingAuthor", fields: [adminId], references: [id], onDelete: SetNull)
+
+  rating    Int // 1..5, also CHECK-constrained in the database
+  comment   String
+  createdAt DateTime @default(now())
+
+  // Composite: the only read is "this user's notes, most recent first".
+  @@index([userId, createdAt])
+  @@index([adminId])
 }
 
 /// A "Contact us" submission from the public site. Read-only for admins —

@@ -17,8 +17,19 @@ User
   name          string?   # nullable — see "Profile fields" below
   phone         string?
   address       string?
+  nic           string?   UNIQUE   # Sri Lankan NIC — SENSITIVE, admin + self only
+  affiliation   enum('old_boy','parent','staff','outsider')?
   role          enum('user','admin','super_admin')  default 'user'
   createdAt
+
+UserRating              # PRIVATE admin conduct note — see "Conduct ratings"
+  id
+  userId        -> User  (ON DELETE CASCADE)    # who it is about
+  adminId       -> User? (ON DELETE SET NULL)   # who wrote it
+  rating        int       CHECK (1..5)
+  comment       text      CHECK (non-blank)     # required reason
+  createdAt
+  INDEX (userId, createdAt)
 
 ContactMessage          # public "Contact us" submissions
   id
@@ -94,6 +105,26 @@ Notes:
 - **Player options come from CourtType**, so the players dropdown is data-driven.
 
 Shipped in migration `20260722120000_multi_hour_bookings`, which moved `slotId` and the unique constraint off `Booking` and onto the new `BookingSlot` table, carrying any existing one-hour bookings across as single child rows.
+
+`nic`, `affiliation` and `UserRating` shipped in `20260803120000_nic_affiliation_and_user_ratings` — see "Profile fields", "NIC and affiliation" and "Conduct ratings" below.
+
+### Who can see what
+
+The one table that summarises this doc's access rules. "Owner" means the signed-in user the row is about.
+
+| Data | Public / signed-out | Owner | Admin | Super admin |
+| --- | --- | --- | --- | --- |
+| Court, CourtType, SlotTemplate (active) | read | read | read + write | read + write |
+| Booking / BookingSlot | — | own only | all | all |
+| Payment | — | own only | all | all |
+| ContactMessage | write (submit) | — | read + manage | read + manage |
+| User — name, phone, address | — | own, editable | all, read | all, read |
+| **User.nic** | **never** | own, editable | all, read | all, read |
+| **User.affiliation** | **never** | own, editable | all, read | all, read |
+| User.role | — | own, read-only | read | read + assign (`user`/`admin` only) |
+| **UserRating** | **never** | **never — not even rows about them** | read + add | read + add |
+
+`UserRating` is the only row in this table where the owner column is empty. Everywhere else in the schema a user may read the rows that name them; conduct notes are the deliberate exception, and the reason it is worth a table of its own is that the exception is easy to undo by accident.
 
 ## Demo data (`prisma/seed.mts`)
 
@@ -236,12 +267,52 @@ Supabase Auth owns credentials; the app owns the role.
 
 ### Profile fields and the "complete your profile" gate
 
-`name`, `phone` and `address` are nullable on `User`, which is a consequence of where the row comes from rather than a preference: the row is created by a database trigger the instant Supabase Auth creates the user, and **Google supplies no phone number and no address**.
+`name`, `phone`, `address`, `nic` and `affiliation` are all nullable on `User`, which is a consequence of where the row comes from rather than a preference: the row is created by a database trigger the instant Supabase Auth creates the user, and **Google supplies none of them**.
 
-- **Email/password signup collects all three up front.** They are passed as Supabase Auth user metadata and `handle_new_user()` copies them into `public."User"` — so the app still never INSERTs the profile row itself, and profile creation stays unskippable.
-- **`profileIsComplete()` means "has a phone and an address"**. `NULLIF(TRIM(...), '')` in the trigger keeps an empty metadata string from counting as filled in, or blanks would walk straight through the gate.
+- **Email/password signup collects all of them up front.** They are passed as Supabase Auth user metadata and `handle_new_user()` copies them into `public."User"` — so the app still never INSERTs the profile row itself, and profile creation stays unskippable.
+- **`profileIsComplete()` means "has a phone, an address, an NIC and an affiliation"**. `NULLIF(TRIM(...), '')` in the trigger keeps an empty metadata string from counting as filled in, or blanks would walk straight through the gate.
 - **Anything incomplete is routed to `/complete-profile`**, carrying its original destination in `?next=`. Both the OAuth callback and the two password actions check this, so it also catches accounts created before these columns existed. That page guards with `requireUser`, *not* `requireCompleteProfile` — the latter redirects to it, and would loop.
 - **Users edit their own profile through a server action** (`app/account/actions.ts`), which takes the id from `requireUser()` and never from the form, and whose schema has no `role` field. Users still have **no write policy on `User`**, so the invariant "nobody can promote themselves through the anon key" holds literally: there is no self-UPDATE path to abuse.
+
+### NIC and affiliation (`20260803120000`)
+
+Two fields collected from every member: a Sri Lankan **NIC** and an **affiliation** to the school.
+
+- **`affiliation` is a Postgres enum with exactly four values** — `old_boy`, `parent`, `staff`, `outsider`. A closed type rather than a string column, so a fifth value cannot be written by any path: not the app, not psql, not a future import script. The UI labels ("Old Boy", "Parent", …) live once in `AFFILIATIONS` in `lib/validations.ts`, which the signup form, the profile form and the admin table all render from.
+- **`nic` accepts both formats in circulation** — old (9 digits then `V`/`X`) and new (12 digits) — and is **normalised before it is stored**: spaces and dashes stripped, upper-cased. Without the upper-casing, `123456789v` and `123456789V` would be two accounts for one person, which is precisely what the unique constraint exists to prevent.
+- **Three layers agree on the format.** Zod (`nicField`) for the message the user reads, a `CHECK` constraint (`User_nic_format`) so nothing else can write a malformed value, and `UNIQUE` on the column as the one-NIC-one-account guarantee. `updateProfileAction` translates the resulting `P2002` into "that NIC is already registered to another account"; signup additionally pre-checks so the common case reads well, but that read and the insert are not atomic and the index is what actually decides.
+- **A duplicate NIC must never break account creation.** `handle_new_user()` runs inside the transaction that creates the `auth.users` row, so a unique violation there would abort the *signup itself* with a raw database error. The trigger therefore catches `unique_violation` and retries the insert without the NIC: the account is created, the profile reads as incomplete, and `/complete-profile` asks for the NIC again with a sentence the person can act on.
+- **`getCurrentUser`'s fallback upsert deliberately does not set `nic`.** That path runs on every request for a user whose trigger did not fire; a unique collision there would throw on *every* request they make, with no way out. Affiliation is safe (not unique) and is set; the NIC is left for `/complete-profile`.
+
+**Existing accounts.** Every account created before this migration has `nic` and `affiliation` NULL, and the columns are nullable precisely so that stays true — a `NOT NULL` would have failed the migration against the live database. Those accounts **log in exactly as before**: the completeness gate lives *after* authentication, not inside it. They land on `/complete-profile` once, fill in the two fields, and carry on to wherever they were headed. The unique index tolerates them too — Postgres treats NULLs as distinct, so any number of not-yet-filled-in rows coexist. Everything that renders either field handles the null case explicitly (`not set` in the admin table, an empty field in the forms) rather than assuming a value.
+
+**NIC is sensitive.** It is shown in exactly two places: the owner's own account page (they have to be able to check and correct it) and the admin Users tab. It appears on no public page, in no API response, and in no other user's view — `/api/admin/whoami` returns id/email/role only, and every other `User` read in the codebase selects a narrow explicit field list (`email`, `name`) rather than the whole row. RLS backs this: `user_select_own` already limits `SELECT` on `User` to `id = auth.uid() OR is_admin()`, and `anon` has no grant on the table at all.
+
+### Conduct ratings (admin-only, private)
+
+`UserRating` is the administration's private record of how a member behaves: 1–5 stars plus a **required** reason, signed and dated. It exists so staff can spot a repeat problem before it becomes an incident.
+
+**It is private in a way nothing else in this schema is.** The rated user cannot see their score, cannot see the comments, and cannot discover that a rating exists. Three independent layers say so:
+
+1. **The server actions.** `rateUserAction` and `getUserRatingsAction` (`app/admin/users/actions.ts`) both open with `requireAdmin()`. They are the only entry points into the table from the app, and there is no counterpart anywhere under `/app/account` or `/app/(public)` — a user has no endpoint to call, correctly crafted or otherwise. This is the layer that matters most, because **Prisma bypasses RLS**.
+2. **RLS.** All four policies are `public.is_admin()`, granted `TO authenticated`. The thing to notice is what is *absent*: there is no "select own" policy. Every other table in this schema has one; here it would defeat the entire point. A signed-in user querying `UserRating` through the anon key gets zero rows, including for notes written about them.
+3. **The grant.** `anon` is `REVOKE`d from the table outright. Supabase's `ALTER DEFAULT PRIVILEGES` hands `anon` full DML on every new table in `public`, so this table *arrived* with a signed-out role holding `SELECT` — checked against `information_schema` after the first apply rather than assumed. RLS would have refused it anyway; a private conduct file is the wrong place for a single missing policy to be the only thing in the way.
+
+Verified end-to-end against the database, not reasoned about: with a rating seeded for a plain user, a `SELECT` under that user's `auth.uid()` returns **0 rows**, the same query under an admin's returns the row, and a non-admin `INSERT` is refused with `42501 row-level security policy`.
+
+- **`lib/user-ratings.ts` is the only module that touches the table**, carries `import "server-only"`, and is imported by nothing on the user-facing side.
+- **The comment is required** — in Zod, and as a `CHECK` constraint. A bare star is an unaccountable mark on someone's record, and the admin reading the history in six months has only the words. The 1–5 range is a `CHECK` too: an average is meaningless if a term can sit outside the scale.
+- **Ratings accumulate; nothing edits or replaces one.** The history is the point, and an average over a rewritten past says nothing.
+- **The author is `requireAdmin()`'s id, never the form.** The RLS insert policy pins `adminId = auth.uid()` as well, so a note cannot be signed in someone else's name through either path.
+- **Who may rate whom** follows the existing role ladder exactly (`loadRatingTarget` mirrors `loadTarget`): nobody rates their own account, and a plain admin may only rate plain users — writing a permanent note about a colleague's conduct is very much *acting on* them. Rating a super admin is super-admin-only.
+- **Deleting the subject cascades; deleting the author does not.** `userId` is `ON DELETE CASCADE` (a note about a closed account has no subject left), `adminId` is `ON DELETE SET NULL` (removing a member of staff must not erase the venue's conduct history — the note survives and stops naming them, which is also how `Booking.userId` behaves).
+
+**In the admin Users tab.** A **Conduct** column shows each user's average as stars plus `4.2 (7)`; clicking it opens the record — the full history most recent first, each entry with its stars, comment, author and timestamp, above the form to add a new one. The history is **fetched when the dialog opens**, not shipped with the page: conduct comments about 500 people have no business sitting in the HTML of a table that shows one line each.
+
+**Finding problem users.** `?sort=` and `?rated=` drive the list, both parsed and clamped server-side (`parseUserSort` / `parseUserRatingFilter` — anything unrecognised falls back). Sort by lowest or highest average, or by name; filter to **Flagged** (average ≤ `FLAGGED_RATING_MAX`, 2.5), Rated, or Not rated, with a flagged count in the stat row. They are plain links, so the page stays server-rendered and "everyone at 2.5 or below, worst first" is a URL an admin can bookmark or send to a colleague.
+
+- **Never-rated users sort last under both rating orders.** They are not zero stars; they are unknown, and floating an unrated newcomer to the top of a "worst first" list would be actively misleading.
+- **The average is computed with one `groupBy` for the whole page**, then the sort and filter run in memory (`sortUsersByRating`, `filterUsersByRating`). Postgres cannot order the user query by a column in another table without a join Prisma will not express, and at the 500-row page cap the in-memory pass is free. If this list ever outgrows one page, the thing to replace is the ordering — not the aggregate.
 
 ### Google sign-in (Supabase Auth OAuth)
 
@@ -305,7 +376,7 @@ Flow, on a successful `submitContactMessage`:
 Lives under `/app/admin`, gated by `requireAdmin()` in the layout **and** in every page **and** in every server action — an action is its own HTTP endpoint and never runs the layout that guards the pages.
 
 - **Tabs:** Overview, Court types, Courts, Block slots, Bookings, **Users**, **Messages**. The header carries the signed-in email (linked to `/account`) and a **Log out** control on a single row.
-- **Users** lists every account and is where the role ladder above is applied. What a row draws (`canManage`, `actorIsSuperAdmin`) is presentation only; the same rules are re-derived from the database inside each action.
+- **Users** lists every account and is where the role ladder above is applied. What a row draws (`canManage`, `actorIsSuperAdmin`) is presentation only; the same rules are re-derived from the database inside each action. It also carries the two admin-only fields — **NIC** and **Conduct** — plus the affiliation; see "NIC and affiliation" and "Conduct ratings" above for what may leave this page (nothing).
 
 - **Booking writes** — `/lib/booking-service.ts` is the only module that writes `Booking` or `BookingSlot`. Admin actions (block, unblock, cancel) validate and authorize, then delegate. `blockSlot` rejects a slot that belongs to another court or does not recur on the chosen weekday, and translates the unique-constraint violation (Prisma `P2002`) into "already booked or blocked".
 - **Slot templates are strictly one hour.** A `SlotTemplate` is exactly one bookable hour; the admin never hand-builds an oversized range. Per weekday the admin sets an operating range and one hourly rate, and the server (`generateDaySchedule`) expands it into individual 1-hour slots — 06:00–22:00 → sixteen slots. Rates are adjustable afterwards: bulk for a weekday (`setDayRate`) or per hour (`updateSlotPrice`). Generation refuses to run on a weekday that already has slots, so a day is always either empty or a clean hourly grid. The migration `20260723120000_hourly_slot_templates` removed the legacy multi-hour seed template so no oversized block survives.
@@ -325,7 +396,7 @@ Lives under `/app/admin`, gated by `requireAdmin()` in the layout **and** in eve
 ## Security
 
 - Authorization enforced in server actions/handlers **and** Postgres RLS. Never trust middleware/proxy alone (CVE-2025-29927).
-- RLS: users read/write only their own bookings; only admins manage courts, types, templates, and see all bookings.
+- RLS: users read/write only their own bookings; only admins manage courts, types, templates, and see all bookings. `UserRating` is admin-only in every operation, with **no** "select own" policy — see "Conduct ratings" and the who-can-see-what table.
 - Policies use `public.is_admin()` / `public.is_super_admin()` `SECURITY DEFINER` helpers — required so the `User` table's own policies don't recurse.
 - **Prisma bypasses RLS** (it connects as `postgres`). RLS constrains the anon-key path — i.e. anything a browser could call directly. Both layers are needed; neither alone is sufficient. RLS is deliberately not `FORCE`d, or Prisma queries would fail with a NULL `auth.uid()`.
 - Users have **no write policy on `User`**, so nobody can promote themselves through the anon key. Promotion to `admin` happens in the Users tab (super admin only) or with the service-role key (`npm run make-admin -- <email> [user|admin|super_admin]`); `super_admin` only ever from the script or a migration.

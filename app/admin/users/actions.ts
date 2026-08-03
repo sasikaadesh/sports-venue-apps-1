@@ -6,9 +6,15 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  addUserRating,
+  listUserRatings,
+  type UserRatingEntry,
+} from "@/lib/user-ratings";
+import {
   actionError,
   assignableRoleSchema,
   firstIssue,
+  userRatingSchema,
   type ActionResult,
 } from "@/lib/validations";
 import type { Role } from "@/lib/generated/prisma/enums";
@@ -152,5 +158,122 @@ export async function removeUserAction(targetId: string): Promise<ActionResult> 
 
   revalidatePath("/admin/users");
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Conduct ratings — ADMIN-ONLY, in every direction
+// ---------------------------------------------------------------------------
+//
+// These two actions are the ONLY way into `UserRating` from the app, and both
+// open with `requireAdmin()`. There is deliberately no counterpart anywhere
+// under /app/account or /app/(public): a rated user has no endpoint that
+// returns their score, their comments, or even whether a rating exists. The
+// RLS policies in migration 20260803120000 say the same thing on the anon-key
+// path, where they grant a non-admin nothing at all — not even the "read the
+// rows that name you" every other table allows.
+//
+// A server action is a public HTTP endpoint, so the gate is here rather than
+// in the component that draws the dialog.
+
+/** The rating target, with the same "who may act on whom" rules as above. */
+async function loadRatingTarget(
+  actor: Actor,
+  targetId: string
+): Promise<{ ok: true; target: Target } | { ok: false; error: string }> {
+  if (typeof targetId !== "string" || !targetId) {
+    return { ok: false, error: "Choose an account." };
+  }
+
+  // Nobody rates themselves. A self-authored conduct record is worthless, and
+  // it matches the rule that nobody acts on their own account in this tab.
+  if (targetId === actor.id) {
+    return { ok: false, error: "You cannot rate your own account." };
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, email: true, role: true },
+  });
+
+  if (!target) return { ok: false, error: "That account no longer exists." };
+
+  // Rule 2 again: a plain admin may only act on plain users, and writing a
+  // permanent note about a colleague's conduct is very much acting on them.
+  if (target.role !== "user" && actor.role !== "super_admin") {
+    return {
+      ok: false,
+      error: "Only a super admin can rate an administrator account.",
+    };
+  }
+
+  return { ok: true, target };
+}
+
+/** A history entry, with `createdAt` already a string — Date cannot cross to a client component. */
+export type SerializedUserRating = Omit<UserRatingEntry, "createdAt"> & {
+  createdAt: string;
+};
+
+/**
+ * One user's full rating history, most recent first, plus the average.
+ *
+ * Fetched on demand when the dialog opens rather than shipped with the page:
+ * the table renders up to 500 rows and almost none of them will be looked at,
+ * and conduct comments should not sit in the HTML of a page nobody asked to
+ * see them on.
+ */
+export async function getUserRatingsAction(
+  targetId: string
+): Promise<ActionResult<{ ratings: SerializedUserRating[]; average: number | null }>> {
+  const actor = await requireAdmin();
+
+  const result = await loadRatingTarget(actor, targetId);
+  if (!result.ok) return actionError(result.error);
+
+  const ratings = await listUserRatings(result.target.id);
+
+  const average =
+    ratings.length === 0
+      ? null
+      : ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+
+  return {
+    ok: true,
+    data: {
+      average,
+      ratings: ratings.map((r) => ({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    },
+  };
+}
+
+/**
+ * Add a conduct note: 1–5 stars and a required reason.
+ *
+ * The author is `actor.id` from `requireAdmin()`, never anything in the
+ * request — so a note can only ever be signed by whoever actually wrote it.
+ * Ratings accumulate; nothing here edits or replaces an earlier one, because
+ * the history is the point and an average over a rewritten past means nothing.
+ */
+export async function rateUserAction(input: unknown): Promise<ActionResult> {
+  const actor = await requireAdmin();
+
+  const parsed = userRatingSchema.safeParse(input);
+  if (!parsed.success) return actionError(firstIssue(parsed.error));
+
+  const result = await loadRatingTarget(actor, parsed.data.userId);
+  if (!result.ok) return actionError(result.error);
+
+  await addUserRating({
+    userId: result.target.id,
+    adminId: actor.id,
+    rating: parsed.data.rating,
+    comment: parsed.data.comment,
+  });
+
+  revalidatePath("/admin/users");
   return { ok: true };
 }
