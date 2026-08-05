@@ -176,11 +176,18 @@ export default async function AdminUsersPage({
                       return (
                         <TableRow key={u.id}>
                           <TableCell className="pl-5 font-medium">
-                            {u.name ?? (
-                              <span className="font-normal text-muted-foreground">
-                                —
-                              </span>
-                            )}
+                            {/* The name is the obvious place to click to see a
+                                person, so it opens the same conduct record the
+                                Conduct column does. */}
+                            <UserConductDialog
+                              trigger="name"
+                              triggerLabel={u.name ?? "—"}
+                              userId={u.id}
+                              label={u.name ?? u.email}
+                              average={summary?.average ?? null}
+                              count={summary?.count ?? 0}
+                              canRate={canManage}
+                            />
                           </TableCell>
                           <TableCell className="max-w-[20ch] truncate text-muted-foreground">
                             {u.email}
