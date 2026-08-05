@@ -40,18 +40,37 @@ export function UserConductDialog({
   average,
   count,
   canRate,
+  trigger = "conduct",
+  triggerLabel,
 }: {
   userId: string;
   /** The user's name or email — what the dialog is titled with. */
   label: string;
+  /**
+   * What the `"name"` trigger reads, when that differs from the dialog title.
+   * The Name column shows "—" for an account with no name; it should keep
+   * saying so rather than quietly borrowing the email from the next column.
+   */
+  triggerLabel?: string;
   average: number | null;
   count: number;
   /** False for accounts this admin may not act on (and for your own row). */
   canRate: boolean;
+  /**
+   * Which control opens this record. `"conduct"` is the Conduct column's
+   * chip; `"name"` turns the user's name in the first column into the same
+   * entry point, because "click the person to see the person" is where an
+   * admin looks first — the Conduct chip alone was too easy to miss.
+   */
+  trigger?: "conduct" | "name";
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<SerializedUserRating[] | null>(null);
+  // The average as the *server* computes it, refreshed with the history. The
+  // `average` prop is the table's copy and goes stale the moment a rating is
+  // added from in here.
+  const [liveAverage, setLiveAverage] = useState<number | null>(average);
   const [pending, startTransition] = useTransition();
 
   const [stars, setStars] = useState(0);
@@ -63,8 +82,10 @@ export function UserConductDialog({
     const result = await getUserRatingsAction(userId);
     setLoading(false);
 
-    if (result.ok) setHistory(result.data.ratings);
-    else {
+    if (result.ok) {
+      setHistory(result.data.ratings);
+      setLiveAverage(result.data.average);
+    } else {
       setHistory([]);
       toast.error(result.error);
     }
@@ -106,26 +127,50 @@ export function UserConductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-2 px-2 font-normal"
-          />
-        }
-      >
-        {average === null ? (
-          <span className="text-xs text-muted-foreground">Not rated</span>
-        ) : (
-          <>
-            <StarRating value={average} />
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {average.toFixed(1)} ({count})
-            </span>
-          </>
-        )}
-      </DialogTrigger>
+      {/*
+        Both triggers are real buttons with a visible affordance. The Conduct
+        cell used to be a bare ghost button whose only content was muted text,
+        which in a dense table is indistinguishable from a plain cell value —
+        the record was reachable but undiscoverable.
+      */}
+      {trigger === "name" ? (
+        <DialogTrigger
+          render={
+            <button
+              type="button"
+              title={`Open ${label}'s conduct record`}
+              className="rounded text-left font-medium underline decoration-dotted decoration-muted-foreground/50 underline-offset-4 transition-colors hover:text-primary hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            />
+          }
+        >
+          {triggerLabel ?? label}
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger
+          render={
+            <Button
+              variant="outline"
+              size="sm"
+              title={`Open ${label}'s conduct record`}
+              className="h-8 gap-2 px-2.5 font-normal hover:border-primary/50 hover:bg-primary/5"
+            />
+          }
+        >
+          {average === null ? (
+            <>
+              <Star className="size-3.5 text-muted-foreground/50" />
+              <span className="text-xs text-muted-foreground">Rate</span>
+            </>
+          ) : (
+            <>
+              <StarRating value={average} />
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {average.toFixed(1)} ({count})
+              </span>
+            </>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -140,6 +185,29 @@ export function UserConductDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-5">
+          {/* --- The computed average, as the server reports it --- */}
+          {!loading && history !== null && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+              <span className="text-sm text-muted-foreground">Average</span>
+              {liveAverage === null ? (
+                <span className="text-sm text-muted-foreground">
+                  No ratings yet
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <StarRating value={liveAverage} size="md" />
+                  <span className="font-heading text-lg font-bold tabular-nums">
+                    {liveAverage.toFixed(1)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    from {history.length}{" "}
+                    {history.length === 1 ? "rating" : "ratings"}
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+
           {/* --- Add a rating --- */}
           {canRate ? (
             <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
@@ -226,7 +294,10 @@ export function UserConductDialog({
                     <p className="text-xs text-muted-foreground">
                       {/* Null when that admin's account has since been removed —
                           the note survives, it just stops naming them. */}
-                      {entry.adminName ?? entry.adminEmail ?? "a former administrator"}
+                      by{" "}
+                      {entry.adminName ??
+                        entry.adminEmail ??
+                        "a former administrator"}
                     </p>
                   </li>
                 ))}
