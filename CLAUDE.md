@@ -24,6 +24,8 @@ A sports-court booking web app. Users browse courts (Cricket, Tennis, Table Tenn
 npm run dev            # local dev server
 npm run build          # production build
 npm run lint           # eslint
+npm run format         # prettier — format the whole project
+npm run format:check   # prettier — list unformatted files, change nothing
 npx prisma migrate dev # create/apply a migration (uses DIRECT_URL)
 npx prisma studio      # inspect the DB
 ```
@@ -41,21 +43,25 @@ npx prisma studio      # inspect the DB
 ## Critical rules — never violate these
 
 **Payments**
+
 - The PayHere **merchant secret is server-only**. Never import it into, or expose it to, client code.
 - Generate the PayHere **hash on the server** (a route handler / server action).
 - A booking is confirmed **only** by the server-to-server `notify_url` webhook, after verifying `md5sig`. **Never** confirm a booking based on the `return_url` redirect — the redirect can be spoofed.
 
 **Bookings**
+
 - Every booking write goes through the single booking service in `/lib`. No ad-hoc inserts from routes/components.
 - Enforce the DB **unique constraint on `(court_id, booking_date, slot_id)`** — this is the anti-double-booking guarantee. Booking logic must handle the constraint-violation error gracefully (slot just taken).
 - A new booking starts as `pending`; it becomes `confirmed` only on verified payment. A cleanup job releases `pending` bookings that were never paid.
 - Admin slot blocks are bookings with status `blocked`, owned by the admin.
 
 **Auth / security**
+
 - Authorization is enforced in **server actions/route handlers AND Postgres Row Level Security** — never rely on Next.js middleware alone (ref: CVE-2025-29927).
 - Admin-only operations must check the user's role server-side, not just hide UI.
 
 **Images**
+
 - Use the Next.js `<Image>` component, never raw `<img>`. Whitelist `images.unsplash.com` (dev placeholders) and the Supabase storage domain in `next.config.js`.
 
 ## Environment variables
@@ -73,3 +79,11 @@ Follow `docs/DESIGN.md` (direction: **clean & sporty**). Theme shadcn/ui with th
 - After each working piece, stop so it can be verified, then commit to git.
 - Treat the booking and payment phases as high-risk — build them incrementally and test each step.
 - When unsure about product scope, consult `docs/PRD.md`; when unsure about a flow or the data model, consult `docs/ARCHITECTURE.md`.
+
+## Claude Code tooling
+
+Three helpers are configured in `.claude/`. They are tooling only — none of them affect application behaviour. `.claude/README.md` explains each one in full (it also serves as the comment header for `.claude/settings.json`, which is strict JSON and cannot carry comments of its own).
+
+- **Prettier auto-format hook** — after every Write/Edit, `.claude/hooks/format-with-prettier.mjs` formats the edited file. Config: `prettier.config.mjs`, `.prettierignore`.
+- **`code-reviewer` sub-agent** (`.claude/agents/code-reviewer.md`) — read-only review of changed code against the payment, authorization and booking rules above. Ask for it by name; it never edits.
+- **`clean-and-sporty-brand` skill** (`.claude/skills/clean-and-sporty-brand/SKILL.md`) — loads automatically for UI work so new components stay on-brand. `docs/DESIGN.md` remains the source of truth.
