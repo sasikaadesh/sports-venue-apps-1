@@ -195,6 +195,9 @@ model Booking {
   @@index([userId, removedAt])
   @@index([status])
   @@index([status, holdExpiresAt])
+  // The admin views: /admin orders upcoming bookings by date with a status
+  // filter, /admin/bookings sorts the whole table by date. Both scanned.
+  @@index([bookingDate, status])
 }
 
 /// One row per reserved HOUR — this is the row the anti double-booking

@@ -73,6 +73,73 @@ function isUniqueViolation(e: unknown): boolean {
   );
 }
 
+/** The two statuses that mean "this booking is no longer holding its hours". */
+type ReleasedStatus = Extract<BookingStatus, "cancelled" | "expired">;
+
+/**
+ * Move bookings to a released status AND delete the hours they were holding —
+ * atomically, and only for the ones whose status still matches `guard`.
+ *
+ * **This is the shape every release path must use.** Releasing a booking is two
+ * writes: flip the parent, delete its `BookingSlot` rows. The delete is the part
+ * that actually frees the hour, because the unique index protects
+ * (courtId, bookingDate, slotId) and cannot see the parent's status.
+ *
+ * Every caller here reads the booking, checks its status, and only then writes.
+ * That read-then-write is a race with the PayHere webhook, which can confirm the
+ * booking in between — and the webhook is a *different request*, so nothing in
+ * this process serialises them. Guarding only the status flip is not enough: an
+ * unguarded delete still strips the hour-rows off a booking that just became
+ * `confirmed`, and the hour goes back on sale while the payer keeps their
+ * `confirmed` booking. That is the double-sell this file exists to prevent.
+ *
+ * So both writes are guarded, in this order:
+ *
+ *   1. `updateMany` with the caller's status guard. If the webhook got there
+ *      first, it matches nothing and returns 0.
+ *   2. Only on a match, delete the hour-rows — and scope that delete to
+ *      bookings that are *now* in the released status. A booking that is
+ *      `cancelled` or `expired` must own no `BookingSlot` rows; one that is
+ *      `confirmed` must keep every one of them.
+ *
+ * `removeOwnBooking` already does this by hand (it writes `removedAt` as part of
+ * the same flip); it is left as it is because it is correct, and its comment
+ * explains the same race from the caller's side.
+ *
+ * @returns how many bookings were actually released — 0 means every one of them
+ *   changed underneath the caller, which is never a silent success.
+ */
+async function flipAndReleaseHours(params: {
+  /** The bookings to release. */
+  ids: string[];
+  /** What each booking must STILL be for the release to apply. */
+  guard: Prisma.BookingWhereInput;
+  /** The released status to move them to. */
+  status: ReleasedStatus;
+  /** Anything else to write in the same flip. */
+  alsoSet?: Omit<Prisma.BookingUpdateManyMutationInput, "status">;
+}): Promise<number> {
+  const { ids, guard, status, alsoSet } = params;
+
+  if (ids.length === 0) return 0;
+
+  return prisma.$transaction(async (tx) => {
+    const flip = await tx.booking.updateMany({
+      // `id` last: a guard can narrow this set, never widen it.
+      where: { ...guard, id: { in: ids } },
+      data: { ...alsoSet, status },
+    });
+
+    if (flip.count === 0) return 0;
+
+    await tx.bookingSlot.deleteMany({
+      where: { bookingId: { in: ids }, booking: { status } },
+    });
+
+    return flip.count;
+  });
+}
+
 /**
  * Release holds that were never paid for.
  *
@@ -89,10 +156,12 @@ export async function releaseExpiredHolds(scope?: {
   courtId: string;
   bookingDate: Date;
 }): Promise<number> {
+  const cutoff = new Date();
+
   const stale = await prisma.booking.findMany({
     where: {
       status: "pending",
-      holdExpiresAt: { lte: new Date() },
+      holdExpiresAt: { lte: cutoff },
       ...(scope ?? {}),
     },
     select: { id: true },
@@ -100,19 +169,15 @@ export async function releaseExpiredHolds(scope?: {
 
   if (stale.length === 0) return 0;
 
-  const ids = stale.map((b) => b.id);
-
-  await prisma.$transaction([
-    prisma.bookingSlot.deleteMany({ where: { bookingId: { in: ids } } }),
-    prisma.booking.updateMany({
-      // Re-assert `status: pending` so a booking confirmed in the moment
-      // between the read above and this write is not clobbered to `expired`.
-      where: { id: { in: ids }, status: "pending" },
-      data: { status: "expired" },
-    }),
-  ]);
-
-  return ids.length;
+  // Re-assert the whole condition, not just the ids: a hold that was confirmed
+  // — or extended for a payment attempt (`extendHoldForPayment`) — between the
+  // read above and this write is no longer stale, and must keep its hours.
+  // Returns the number actually swept, which can be fewer than were read.
+  return flipAndReleaseHours({
+    ids: stale.map((b) => b.id),
+    guard: { status: "pending", holdExpiresAt: { lte: cutoff } },
+    status: "expired",
+  });
 }
 
 export type OccupyingSlot = {
@@ -190,7 +255,12 @@ export type BookingQuote = {
   startTime: string;
   endTime: string;
   /** The individual hours, in order, each at the price it will be booked at. */
-  hours: { slotId: string; startTime: string; endTime: string; price: string }[];
+  hours: {
+    slotId: string;
+    startTime: string;
+    endTime: string;
+    price: string;
+  }[];
   /** Sum of `hours[].price`, computed here — never accepted from a client. */
   totalPrice: string;
 };
@@ -304,7 +374,10 @@ export async function quoteBooking(
 
   // An hour that has already started cannot be sold, even though nothing
   // booked it. Judged at the venue's wall clock, like the availability view.
-  if (dateString === now.date && timeToMinutes(chain[0].startTime) <= now.minutes) {
+  if (
+    dateString === now.date &&
+    timeToMinutes(chain[0].startTime) <= now.minutes
+  ) {
     return {
       ok: false,
       error: "That time has already passed.",
@@ -479,13 +552,23 @@ export async function cancelOwnBooking(
     };
   }
 
-  await prisma.$transaction([
-    prisma.bookingSlot.deleteMany({ where: { bookingId } }),
-    prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: "cancelled" },
-    }),
-  ]);
+  // Guarded on `pending` AND on the owner, so the PayHere webhook confirming
+  // this booking between the read above and here means the cancel matches
+  // nothing rather than cancelling a booking that has just been paid for.
+  const released = await flipAndReleaseHours({
+    ids: [bookingId],
+    guard: { userId, status: "pending" },
+    status: "cancelled",
+  });
+
+  if (released === 0) {
+    return {
+      ok: false,
+      error:
+        "This booking changed while you were cancelling it. Reload the page to see where it stands.",
+      reason: "invalid",
+    };
+  }
 
   return { ok: true, data: { id: bookingId } };
 }
@@ -695,15 +778,16 @@ export async function releaseUnpaidBooking(
     return { ok: true, data: { id: bookingId, released: false } };
   }
 
-  const [, updated] = await prisma.$transaction([
-    prisma.bookingSlot.deleteMany({ where: { bookingId } }),
-    prisma.booking.updateMany({
-      where: { id: bookingId, status: "pending" },
-      data: { status: "cancelled" },
-    }),
-  ]);
+  // The status guard now covers the hour-rows too. A `-1`/`-2` notification
+  // arriving after a successful retry already confirmed this booking releases
+  // nothing at all, rather than stripping the hours off a paid booking.
+  const released = await flipAndReleaseHours({
+    ids: [bookingId],
+    guard: { status: "pending" },
+    status: "cancelled",
+  });
 
-  return { ok: true, data: { id: bookingId, released: updated.count > 0 } };
+  return { ok: true, data: { id: bookingId, released: released > 0 } };
 }
 
 /**
@@ -841,13 +925,27 @@ export async function adminCancelBooking(
     };
   }
 
-  await prisma.$transaction([
-    prisma.bookingSlot.deleteMany({ where: { bookingId } }),
-    prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: "cancelled" },
-    }),
-  ]);
+  // Guarded on exactly the statuses the checks above accepted. Note this is NOT
+  // `pending` only: cancelling a *paid* booking is a legitimate admin act (the
+  // refund happens outside the app), so a webhook confirming the booking
+  // mid-cancel does not invalidate the admin's decision — it is already in the
+  // guard. What the guard does stop is cancelling a booking that has meanwhile
+  // become `cancelled`, `expired` or `blocked`, which is what the read above
+  // rejected and the write used to allow.
+  const released = await flipAndReleaseHours({
+    ids: [bookingId],
+    guard: { status: { in: ["pending", "confirmed"] } },
+    status: "cancelled",
+  });
+
+  if (released === 0) {
+    return {
+      ok: false,
+      error:
+        "That booking changed while you were cancelling it. Reload the page to see where it stands.",
+      reason: "invalid",
+    };
+  }
 
   return { ok: true, data: { id: bookingId } };
 }

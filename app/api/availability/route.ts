@@ -1,6 +1,6 @@
 import { getCourtAvailability } from "@/lib/availability";
 import { BOOKING_WINDOW_DAYS } from "@/lib/booking-service";
-import { prisma } from "@/lib/prisma";
+import { getCourtForAvailability } from "@/lib/catalogue";
 import { addDays, dateStringToDate, todayString } from "@/lib/time";
 
 /**
@@ -45,14 +45,9 @@ export async function GET(request: Request) {
         ? maxDate
         : requestedDate;
 
-  const court = await prisma.court.findFirst({
-    where: { id: courtId, isActive: true },
-    select: {
-      id: true,
-      name: true,
-      courtType: { select: { playerOptions: true } },
-    },
-  });
+  // Catalogue half: cached and tag-invalidated. The slots below are not — they
+  // are recomputed on every request, which is what keeps this answer honest.
+  const court = await getCourtForAvailability(courtId);
 
   if (!court) {
     return Response.json({ error: "Unknown court." }, { status: 404 });
@@ -69,7 +64,7 @@ export async function GET(request: Request) {
       date: availability.date,
       // The players dropdown is driven by the court's type, so it has to come
       // back with the slots — the selected court can change client-side.
-      playerOptions: court.courtType.playerOptions,
+      playerOptions: court.playerOptions,
       slots: availability.slots,
       openCount: availability.openCount,
     },

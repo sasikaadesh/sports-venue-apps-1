@@ -5,29 +5,18 @@ import { CourtCard } from "@/components/public/court-card";
 import { HeroBookingBar } from "@/components/public/hero-booking-bar";
 import { HeroCarousel } from "@/components/public/hero-carousel";
 import { BOOKING_WINDOW_DAYS } from "@/lib/booking-service";
-import { prisma } from "@/lib/prisma";
+import { getActiveCourtsNewestFirst } from "@/lib/catalogue";
 import { addDays, todayString } from "@/lib/time";
 
-// Availability changes as people book, so never serve a cached landing page.
+// Rendered per request: the header reads the session, and the booking bar's
+// today/maxDate must be the real current date. The court list underneath comes
+// from the tagged catalogue cache (lib/catalogue.ts) rather than the database —
+// the *availability* the booking bar shows is still fetched live, per date,
+// from /api/availability.
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const courts = await prisma.court.findMany({
-    where: { isActive: true },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      images: true,
-      courtType: { select: { name: true } },
-      slots: {
-        where: { isActive: true },
-        orderBy: { price: "asc" },
-        take: 1,
-        select: { price: true },
-      },
-    },
-  });
+  const courts = await getActiveCourtsNewestFirst();
 
   const featured = courts.slice(0, 6);
   const today = todayString();
@@ -112,9 +101,9 @@ export default async function HomePage() {
                   court={{
                     id: court.id,
                     name: court.name,
-                    typeName: court.courtType.name,
+                    typeName: court.typeName,
                     image: court.images[0] ?? null,
-                    fromPrice: court.slots[0]?.price.toString() ?? null,
+                    fromPrice: court.fromPrice,
                   }}
                 />
               </li>

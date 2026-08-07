@@ -8,7 +8,7 @@ import { CourtGallery } from "@/components/public/court-gallery";
 import { CourtBookingPanel } from "@/components/public/court-booking-panel";
 import { AvailabilityDatePicker } from "@/components/public/date-picker";
 import { getCourtAvailability } from "@/lib/availability";
-import { prisma } from "@/lib/prisma";
+import { getCourtDetail } from "@/lib/catalogue";
 import { MAX_DURATION_HOURS } from "@/lib/slots";
 import {
   DAY_NAMES,
@@ -31,10 +31,9 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const court = await prisma.court.findFirst({
-    where: { id, isActive: true },
-    select: { name: true, description: true },
-  });
+  // Same cached read the page itself uses, so generating metadata costs no
+  // extra database round trip.
+  const court = await getCourtDetail(id);
 
   if (!court) return { title: "Court not found — Courtside" };
 
@@ -59,22 +58,10 @@ export default async function CourtDetailsPage({
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
 
-  const court = await prisma.court.findFirst({
-    // Inactive courts are hidden from the public site entirely.
-    where: { id, isActive: true },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      images: true,
-      courtType: { select: { name: true, playerOptions: true } },
-      slots: {
-        where: { isActive: true },
-        orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
-        select: { dayOfWeek: true, price: true },
-      },
-    },
-  });
+  // The court's own record (name, photos, type, which weekdays it runs) is
+  // cached and tag-invalidated; inactive courts are hidden from the public site
+  // entirely. Availability below is NOT cached — it is read live, per date.
+  const court = await getCourtDetail(id);
 
   if (!court) notFound();
 
@@ -95,8 +82,7 @@ export default async function CourtDetailsPage({
   // pre-fill the panel so nothing is lost on the round trip. Only clean positive
   // integers are passed through; anything else is dropped and the panel falls
   // back to sensible defaults.
-  const posInt = (v?: string) =>
-    v && /^\d+$/.test(v) ? Number(v) : undefined;
+  const posInt = (v?: string) => (v && /^\d+$/.test(v) ? Number(v) : undefined);
   const initialSelection = {
     slotId: query.slotId,
     duration: posInt(query.duration),
@@ -104,7 +90,7 @@ export default async function CourtDetailsPage({
   };
 
   // Which weekdays this court runs at all — useful when the chosen day is bare.
-  const activeDays = [...new Set(court.slots.map((s) => s.dayOfWeek))].sort();
+  const activeDays = court.activeDays;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8">
@@ -122,13 +108,13 @@ export default async function CourtDetailsPage({
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-4xl leading-none">{court.name}</h1>
-              <Badge variant="secondary">{court.courtType.name}</Badge>
+              <Badge variant="secondary">{court.typeName}</Badge>
             </div>
 
-            {court.courtType.playerOptions.length > 0 && (
+            {court.playerOptions.length > 0 && (
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Users className="size-4" />
-                {court.courtType.playerOptions.join(" or ")} players
+                {court.playerOptions.join(" or ")} players
               </p>
             )}
           </div>
@@ -188,7 +174,7 @@ export default async function CourtDetailsPage({
               courtId={court.id}
               date={date}
               slots={availability.slots}
-              playerOptions={court.courtType.playerOptions}
+              playerOptions={court.playerOptions}
               initial={initialSelection}
             />
           )}

@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 
 import { CourtCard } from "@/components/public/court-card";
-import { prisma } from "@/lib/prisma";
+import { getActiveCourts } from "@/lib/catalogue";
 
+// Still rendered per request — the site header reads the session — but the
+// court list itself now comes from the tagged catalogue cache (lib/catalogue.ts)
+// instead of hitting the database on every navigation.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -11,22 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CourtsPage() {
-  const courts = await prisma.court.findMany({
-    where: { isActive: true },
-    orderBy: [{ courtType: { name: "asc" } }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      images: true,
-      courtType: { select: { name: true } },
-      slots: {
-        where: { isActive: true },
-        orderBy: { price: "asc" },
-        take: 1,
-        select: { price: true },
-      },
-    },
-  });
+  const courts = await getActiveCourts();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-16 sm:px-8">
@@ -52,9 +40,9 @@ export default async function CourtsPage() {
                 court={{
                   id: court.id,
                   name: court.name,
-                  typeName: court.courtType.name,
+                  typeName: court.typeName,
                   image: court.images[0] ?? null,
-                  fromPrice: court.slots[0]?.price.toString() ?? null,
+                  fromPrice: court.fromPrice,
                 }}
               />
             </li>
