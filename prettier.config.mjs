@@ -53,6 +53,27 @@ const config = {
   // forcing one style would rewrite every line of most files the first time
   // the formatter touches them, producing enormous, meaningless diffs.
   endOfLine: "auto",
+
+  // ---- Tailwind class sorting -------------------------------------------
+  // The official Tailwind Prettier plugin. It sorts the utility classes inside
+  // className strings into Tailwind's own recommended order (layout → box →
+  // typography → colors → states) and collapses stray whitespace between them.
+  // It understands Tailwind specifically: it only rewrites places it knows hold
+  // class lists, so ordinary strings (URLs, messages, SQL, PayHere fields) are
+  // left byte-for-byte alone. Sorting is purely cosmetic — CSS specificity in
+  // Tailwind comes from the stylesheet, not from class order.
+  //
+  // This plugin must stay LAST in the plugins array; it wraps whatever other
+  // Prettier plugins run before it.
+  plugins: ["prettier-plugin-tailwindcss"],
+  // Tailwind v4 has no tailwind.config.js — the theme lives in the CSS entry
+  // point, so point the plugin at it. Without this the plugin cannot see the
+  // project's custom utilities/tokens and sorts them as unknown classes.
+  tailwindStylesheet: "./app/globals.css",
+  // Also sort class lists passed to these helpers, not just className="…".
+  // `cn` is this repo's clsx + tailwind-merge helper in lib/utils.ts; `cva` and
+  // `clsx` are used directly by the shadcn/ui components.
+  tailwindFunctions: ["cn", "cva", "clsx"],
 };
 
 export default config;

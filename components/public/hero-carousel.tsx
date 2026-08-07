@@ -42,12 +42,29 @@ export function HeroCarousel() {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
+  /**
+   * Whether the slides past the first two are in the DOM yet.
+   *
+   * All four used to mount at once, so the landing page downloaded four
+   * full-bleed hero photos before it was interactive — and the three the
+   * visitor would not see for another four seconds competed for bandwidth with
+   * the one they were looking at. Only the first two are needed to paint the
+   * hero and run the first crossfade; the rest mount as soon as anything moves,
+   * by which time the page has settled.
+   *
+   * Nothing un-mounts: once a photo is fetched, keeping it costs nothing and
+   * fading back to it stays instant.
+   */
+  const [showAll, setShowAll] = useState(false);
+
   useEffect(() => {
     if (paused) return;
-    const id = setInterval(
-      () => setIndex((i) => (i + 1) % SLIDES.length),
-      INTERVAL_MS
-    );
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % SLIDES.length);
+      // The first advance is also the cue to bring in the remaining slides —
+      // see `showAll` below.
+      setShowAll(true);
+    }, INTERVAL_MS);
     return () => clearInterval(id);
   }, [paused]);
 
@@ -59,21 +76,28 @@ export function HeroCarousel() {
   return (
     <>
       {/* Background layer: slides + overlay, behind the headline (-z-10). */}
-      <div className="absolute inset-0 -z-10 overflow-hidden bg-black" {...pause}>
-        {SLIDES.map((slide, i) => (
-          <Image
-            key={slide.src}
-            src={slide.src}
-            alt=""
-            aria-hidden="true"
-            fill
-            priority={i === 0}
-            sizes="100vw"
-            className={`object-cover transition-opacity duration-[450ms] ease-in-out ${
-              i === index ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        ))}
+      <div
+        className="absolute inset-0 -z-10 overflow-hidden bg-black"
+        {...pause}
+      >
+        {SLIDES.map((slide, i) =>
+          i > 1 && !showAll ? null : (
+            <Image
+              key={slide.src}
+              src={slide.src}
+              alt=""
+              aria-hidden="true"
+              fill
+              // Only the slide actually on screen is worth blocking on. The
+              // second one loads normally, in time for the first crossfade.
+              priority={i === 0}
+              sizes="100vw"
+              className={`object-cover transition-opacity duration-[450ms] ease-in-out ${
+                i === index ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          )
+        )}
 
         {/* Dark overlay — stronger on the left, where the headline sits. */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
@@ -89,7 +113,12 @@ export function HeroCarousel() {
           <button
             key={slide.src}
             type="button"
-            onClick={() => setIndex(i)}
+            onClick={() => {
+              // Mount the rest before jumping, so a dot press cannot land on a
+              // slide that is not in the DOM yet.
+              setShowAll(true);
+              setIndex(i);
+            }}
             aria-label={`Show slide ${i + 1}: ${slide.alt}`}
             aria-current={i === index}
             className={`pointer-events-auto h-1.5 rounded-full transition-all ${

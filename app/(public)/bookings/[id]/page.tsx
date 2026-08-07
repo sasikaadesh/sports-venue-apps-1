@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CalendarDays, CheckCircle2, Clock, CreditCard, Users, XCircle } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  Users,
+  XCircle,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/link-button";
@@ -9,7 +16,12 @@ import { PayNowButton } from "@/components/public/pay-now-button";
 import { requireUser, roleIsAdmin } from "@/lib/auth";
 import { latestPaymentForBooking } from "@/lib/payment-service";
 import { prisma } from "@/lib/prisma";
-import { dateToTimeString, formatDate, formatPrice, isFuture } from "@/lib/time";
+import {
+  dateToTimeString,
+  formatDate,
+  formatPrice,
+  isFuture,
+} from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -36,28 +48,35 @@ export default async function BookingPage({
   const { payment: paymentFlag } = await searchParams;
   const user = await requireUser(`/bookings/${id}`);
 
-  const booking = await prisma.booking.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      bookingDate: true,
-      playerCount: true,
-      durationHours: true,
-      totalPrice: true,
-      status: true,
-      holdExpiresAt: true,
-      userId: true,
-      court: { select: { id: true, name: true } },
-      slots: {
-        orderBy: { slot: { startTime: "asc" } },
-        select: {
-          id: true,
-          price: true,
-          slot: { select: { startTime: true, endTime: true } },
+  // Both reads key on the id from the URL, so they go together rather than one
+  // after the other — two serial round trips to the database was two serial
+  // round trips for nothing. The authorization check below is unaffected: it
+  // still runs before anything is rendered.
+  const [booking, payment] = await Promise.all([
+    prisma.booking.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        bookingDate: true,
+        playerCount: true,
+        durationHours: true,
+        totalPrice: true,
+        status: true,
+        holdExpiresAt: true,
+        userId: true,
+        court: { select: { id: true, name: true } },
+        slots: {
+          orderBy: { slot: { startTime: "asc" } },
+          select: {
+            id: true,
+            price: true,
+            slot: { select: { startTime: true, endTime: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    latestPaymentForBooking(id),
+  ]);
 
   // Authorization, server-side: your own booking, or you are an admin. A uuid
   // is not a capability.
@@ -75,7 +94,6 @@ export default async function BookingPage({
   const holdLive = isPending && isFuture(booking.holdExpiresAt);
   const isOwner = booking.userId === user.id;
 
-  const payment = await latestPaymentForBooking(booking.id);
   const canPay = holdLive && isOwner && booking.totalPrice.greaterThan(0);
 
   return (
@@ -121,7 +139,9 @@ export default async function BookingPage({
           <span className="font-heading text-lg font-bold tracking-tight">
             {booking.court.name}
           </span>
-          <Badge variant={booking.status === "confirmed" ? "default" : "secondary"}>
+          <Badge
+            variant={booking.status === "confirmed" ? "default" : "secondary"}
+          >
             {booking.status}
           </Badge>
         </div>

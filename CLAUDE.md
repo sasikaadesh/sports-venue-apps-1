@@ -64,6 +64,12 @@ npx prisma studio      # inspect the DB
 
 - Use the Next.js `<Image>` component, never raw `<img>`. Whitelist `images.unsplash.com` (dev placeholders) and the Supabase storage domain in `next.config.js`.
 
+## Performance
+
+- Vercel functions are pinned to **`bom1` (Mumbai)** in `vercel.json`, the same AWS region as the Supabase database. Do not remove this — the default (`iad1`) puts ~220 ms of network on every single query.
+- Catalogue reads (courts, court types, slot templates) go through `lib/catalogue.ts`, which is cached and tag-invalidated. Any new admin action that writes one of those must call `revalidateCatalogue()`.
+- **Availability is never cached**, anywhere. See `docs/ARCHITECTURE.md` → "What is cached, and what must never be".
+
 ## Environment variables
 
 Server-only (never `NEXT_PUBLIC_`): `DATABASE_URL`, `DIRECT_URL`, `PAYHERE_MERCHANT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`.
@@ -84,6 +90,6 @@ Follow `docs/DESIGN.md` (direction: **clean & sporty**). Theme shadcn/ui with th
 
 Three helpers are configured in `.claude/`. They are tooling only — none of them affect application behaviour. `.claude/README.md` explains each one in full (it also serves as the comment header for `.claude/settings.json`, which is strict JSON and cannot carry comments of its own).
 
-- **Prettier auto-format hook** — after every Write/Edit, `.claude/hooks/format-with-prettier.mjs` formats the edited file. Config: `prettier.config.mjs`, `.prettierignore`.
+- **Prettier auto-format hook** — after every Write/Edit, `.claude/hooks/format-with-prettier.mjs` formats the edited file. Config: `prettier.config.mjs`, `.prettierignore`. Prettier loads `prettier-plugin-tailwindcss`, which sorts Tailwind class lists in `className` and in `cn()`/`cva()`/`clsx()` calls.
 - **`code-reviewer` sub-agent** (`.claude/agents/code-reviewer.md`) — read-only review of changed code against the payment, authorization and booking rules above. Ask for it by name; it never edits.
 - **`clean-and-sporty-brand` skill** (`.claude/skills/clean-and-sporty-brand/SKILL.md`) — loads automatically for UI work so new components stay on-brand. `docs/DESIGN.md` remains the source of truth.

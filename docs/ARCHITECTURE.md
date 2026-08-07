@@ -408,3 +408,39 @@ Lives under `/app/admin`, gated by `requireAdmin()` in the layout **and** in eve
 - `DATABASE_URL` = Supabase **pooled** connection (runtime).
 - `DIRECT_URL` = Supabase **direct** connection (migrations).
 Getting these swapped is the most common setup error — keep them distinct.
+
+## Deployment region (`vercel.json`)
+
+The Supabase project lives in **AWS `ap-south-1` (Mumbai)** — the pooler host is
+`aws-1-ap-south-1.pooler.supabase.com`. Vercel's default function region is
+`iad1` (Washington DC), which put roughly 13,000 km between the app and its
+database: every Prisma query and every Supabase Auth call cost ~220 ms of pure
+network time, and a page doing three of them spent most of a second waiting.
+
+`vercel.json` therefore pins functions to **`bom1` (Mumbai)**, the same AWS
+region as the database, which takes that per-query cost to single-digit
+milliseconds. It is also nearer the venue's own users than `iad1` is. The file
+is strict JSON and cannot carry comments, hence this note.
+
+Check the region of a deployed response with:
+
+```bash
+curl -sI https://www.sportsvenuebookings.com/ | grep -i x-vercel-id
+# sin1::bom1::…   ← edge PoP :: function region
+```
+
+## What is cached, and what must never be (`lib/catalogue.ts`)
+
+The public pages mix two kinds of data:
+
+- **Catalogue** — which courts exist, their names, photos, type, and the
+  weekdays they run. Changes only when an admin edits it. Cached with
+  `unstable_cache`, tagged `courts`, and invalidated by `revalidateCatalogue()`
+  in every admin action that writes a court, court type or slot template. A
+  five-minute TTL is a safety net only, and is what eventually picks up writes
+  made outside the app (`prisma/seed.mts`, `scripts/*.mts`).
+- **Availability** — which hours are still free on a date. Changes whenever
+  somebody books. **Never cached**, in any layer: `lib/availability.ts` and
+  `/api/availability` read it live on every request, and the booking service
+  re-derives it again before it writes. A cached availability answer would
+  offer hours that are already gone.

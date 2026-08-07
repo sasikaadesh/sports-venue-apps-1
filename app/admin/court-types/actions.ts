@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
+import { revalidateCatalogue } from "@/lib/catalogue";
 import { prisma } from "@/lib/prisma";
 import {
   actionError,
@@ -48,10 +49,13 @@ export async function createCourtType(
 
     revalidatePath("/admin/court-types");
     revalidatePath("/admin/courts");
+    revalidateCatalogue();
     return { ok: true, data: created };
   } catch (e) {
     if (isUniqueViolation(e)) {
-      return actionError(`A court type called "${parsed.data.name}" already exists.`);
+      return actionError(
+        `A court type called "${parsed.data.name}" already exists.`
+      );
     }
     throw e;
   }
@@ -78,10 +82,13 @@ export async function updateCourtType(
 
     revalidatePath("/admin/court-types");
     revalidatePath("/admin/courts");
+    revalidateCatalogue();
     return { ok: true, data: updated };
   } catch (e) {
     if (isUniqueViolation(e)) {
-      return actionError(`A court type called "${parsed.data.name}" already exists.`);
+      return actionError(
+        `A court type called "${parsed.data.name}" already exists.`
+      );
     }
     throw e;
   }
@@ -104,5 +111,6 @@ export async function deleteCourtType(id: string): Promise<ActionResult> {
 
   revalidatePath("/admin/court-types");
   revalidatePath("/admin/courts");
+  revalidateCatalogue();
   return { ok: true };
 }

@@ -89,6 +89,17 @@ npm run format:check   # list files that are not formatted, change nothing
 Configuration lives in `prettier.config.mjs`; exclusions in `.prettierignore`.
 Both are at the project root and both are commented.
 
+### Tailwind class sorting
+
+`prettier.config.mjs` loads `prettier-plugin-tailwindcss`, the official Tailwind
+plugin. It sorts the utility classes inside `className` strings — and inside
+`cn()`, `cva()` and `clsx()` calls — into Tailwind's recommended order and
+collapses stray whitespace between them. It only rewrites places it knows hold
+class lists, so ordinary strings (URLs, messages, SQL) are never touched, and
+class order has no effect on the rendered CSS. Because this project is on
+Tailwind v4 (no `tailwind.config.js`), the config points the plugin at the CSS
+entry point via `tailwindStylesheet: "./app/globals.css"`.
+
 ### Turning it off
 
 Open `/hooks` in Claude Code, or delete the `"PostToolUse"` block from

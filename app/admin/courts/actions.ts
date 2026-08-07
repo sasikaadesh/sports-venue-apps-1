@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
+import { revalidateCatalogue } from "@/lib/catalogue";
 import { prisma } from "@/lib/prisma";
 import {
   deleteAllCourtImages,
@@ -59,7 +60,9 @@ export async function createCourt(
 
   const files = imageFilesFrom(formData);
   if (files.length > MAX_IMAGES_PER_COURT) {
-    return actionError(`A court can have at most ${MAX_IMAGES_PER_COURT} images.`);
+    return actionError(
+      `A court can have at most ${MAX_IMAGES_PER_COURT} images.`
+    );
   }
 
   const type = await prisma.courtType.findUnique({
@@ -94,6 +97,7 @@ export async function createCourt(
   }
 
   revalidatePath("/admin/courts");
+  revalidateCatalogue();
   return { ok: true, data: court };
 }
 
@@ -139,6 +143,7 @@ export async function updateCourt(
 
   revalidatePath("/admin/courts");
   revalidatePath(`/admin/courts/${id}`);
+  revalidateCatalogue();
   return { ok: true, data: { id } };
 }
 
@@ -168,6 +173,7 @@ export async function removeCourtImage(
 
   revalidatePath(`/admin/courts/${courtId}`);
   revalidatePath("/admin/courts");
+  revalidateCatalogue();
   return { ok: true };
 }
 
@@ -194,6 +200,7 @@ export async function deleteCourt(id: string): Promise<ActionResult> {
   await deleteAllCourtImages(court.images);
 
   revalidatePath("/admin/courts");
+  revalidateCatalogue();
   return { ok: true };
 }
 
@@ -209,7 +216,8 @@ export async function createSlotTemplate(
   const parsed = slotTemplateSchema.safeParse(input);
   if (!parsed.success) return actionError(firstIssue(parsed.error));
 
-  const { courtId, dayOfWeek, startTime, endTime, price, isActive } = parsed.data;
+  const { courtId, dayOfWeek, startTime, endTime, price, isActive } =
+    parsed.data;
 
   const court = await prisma.court.findUnique({
     where: { id: courtId },
@@ -236,6 +244,7 @@ export async function createSlotTemplate(
   });
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: created };
 }
 
@@ -248,7 +257,8 @@ export async function updateSlotTemplate(
   const parsed = slotTemplateSchema.safeParse(input);
   if (!parsed.success) return actionError(firstIssue(parsed.error));
 
-  const { courtId, dayOfWeek, startTime, endTime, price, isActive } = parsed.data;
+  const { courtId, dayOfWeek, startTime, endTime, price, isActive } =
+    parsed.data;
 
   const clash = await findOverlap({
     courtId,
@@ -271,12 +281,11 @@ export async function updateSlotTemplate(
   });
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: { id } };
 }
 
-export async function deleteSlotTemplate(
-  id: string
-): Promise<ActionResult> {
+export async function deleteSlotTemplate(id: string): Promise<ActionResult> {
   await requireAdmin();
 
   const slot = await prisma.slotTemplate.findUnique({
@@ -296,6 +305,7 @@ export async function deleteSlotTemplate(
   await prisma.slotTemplate.delete({ where: { id } });
 
   revalidatePath(`/admin/courts/${slot.courtId}`);
+  revalidateCatalogue();
   return { ok: true };
 }
 
@@ -388,6 +398,7 @@ export async function generateDaySchedule(
   await prisma.slotTemplate.createMany({ data });
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: { count: data.length } };
 }
 
@@ -410,13 +421,12 @@ export async function setSlotActive(
   });
 
   revalidatePath(`/admin/courts/${slot.courtId}`);
+  revalidateCatalogue();
   return { ok: true };
 }
 
 /** Override one hour's rate, leaving the rest of the day untouched. */
-export async function updateSlotPrice(
-  input: unknown
-): Promise<ActionResult> {
+export async function updateSlotPrice(input: unknown): Promise<ActionResult> {
   await requireAdmin();
 
   const parsed = slotPriceSchema.safeParse(input);
@@ -434,6 +444,7 @@ export async function updateSlotPrice(
   });
 
   revalidatePath(`/admin/courts/${slot.courtId}`);
+  revalidateCatalogue();
   return { ok: true };
 }
 
@@ -454,6 +465,7 @@ export async function setDayActive(
   });
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: { count: result.count } };
 }
 
@@ -474,6 +486,7 @@ export async function setDayRate(
   });
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: { count: result.count } };
 }
 
@@ -494,6 +507,7 @@ export async function setAllDaysRate(
   });
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: { count: result.count } };
 }
 
@@ -526,6 +540,7 @@ export async function clearDaySchedule(
   });
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: { count: result.count } };
 }
 
@@ -595,5 +610,6 @@ export async function copyDaySchedule(
   ]);
 
   revalidatePath(`/admin/courts/${courtId}`);
+  revalidateCatalogue();
   return { ok: true, data: { days: toDays.length, slots: newRows.length } };
 }
