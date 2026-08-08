@@ -1,7 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { FLAGGED_RATING_MAX, type UserRatingFilter, type UserSort } from "@/lib/validations";
+import type { SortDirection } from "@/lib/admin-filters";
+import { FLAGGED_RATING_MAX, type UserRatingFilter } from "@/lib/validations";
 
 /**
  * Admin conduct ratings — the single module that reads or writes `UserRating`.
@@ -110,49 +111,52 @@ export async function addUserRating(input: {
 }
 
 /**
+ * Count the accounts whose average is at or below the flagged threshold.
+ *
+ * One `groupBy` with a `HAVING`, so the "Flagged" stat on the Users tab does
+ * not depend on having loaded every user first — which it did before the table
+ * was paginated, and which stopped being possible once it was.
+ */
+export async function countFlaggedUsers(): Promise<number> {
+  const rows = await prisma.userRating.groupBy({
+    by: ["userId"],
+    _avg: { rating: true },
+    having: { rating: { _avg: { lte: FLAGGED_RATING_MAX } } },
+  });
+
+  return rows.length;
+}
+
+/**
  * Order a list of users by conduct, in memory.
  *
  * The average lives in a second table, so Postgres cannot order the user query
- * by it without a join Prisma will not express. With a 500-row page cap the
- * sort is trivially cheap, and keeping it here means the average has exactly
- * one definition. If this list ever outgrows one page, this is the thing to
- * replace with a view — not the aggregate above.
+ * by it without a join Prisma will not express. Keeping it here means the
+ * average has exactly one definition — and it is why sorting or filtering by
+ * conduct is the one path in `lib/admin-users.ts` that reads a capped set
+ * rather than a single page. If this list ever outgrows that cap, the thing to
+ * replace is this function with a database view, not the aggregate above.
  *
- * Never-rated users sort *last* under both rating orders. They are not "zero
- * stars"; they are unknown, and burying an unrated newcomer at the top of a
+ * Never-rated users sort *last* in both directions. They are not "zero stars";
+ * they are unknown, and burying an unrated newcomer at the top of a
  * "worst first" list would be actively misleading.
  */
-export function sortUsersByRating<T extends { id: string; name: string | null; email: string }>(
+export function sortUsersByRating<T extends { id: string }>(
   users: T[],
   summaries: Map<string, RatingSummary>,
-  sort: UserSort
+  direction: SortDirection
 ): T[] {
-  if (sort === "recent") return users;
+  const factor = direction === "asc" ? 1 : -1;
 
-  const sorted = [...users];
-
-  if (sort === "name") {
-    sorted.sort((a, b) =>
-      (a.name ?? a.email).localeCompare(b.name ?? b.email, undefined, {
-        sensitivity: "base",
-      })
-    );
-    return sorted;
-  }
-
-  const direction = sort === "rating_low" ? 1 : -1;
-
-  sorted.sort((a, b) => {
+  return [...users].sort((a, b) => {
     const x = summaries.get(a.id)?.average ?? null;
     const y = summaries.get(b.id)?.average ?? null;
 
     if (x === null && y === null) return 0;
     if (x === null) return 1;
     if (y === null) return -1;
-    return (x - y) * direction;
+    return (x - y) * factor;
   });
-
-  return sorted;
 }
 
 /** Narrow a list to the accounts a filter asks for. */
