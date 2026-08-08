@@ -889,6 +889,161 @@ export async function unblockSlot(
 }
 
 /**
+ * Thrown inside `adminDeleteBooking`'s transaction to roll it back when a guard
+ * matches nothing. A real `Error` subclass rather than a sentinel value: Prisma
+ * rethrows what an interactive transaction throws, and only an `Error` survives
+ * that trip with its identity intact. Never escapes the function.
+ */
+class BookingChanged extends Error {}
+
+/**
+ * The statuses an admin may permanently delete.
+ *
+ * `confirmed` is deliberately absent, and so is `blocked`. A confirmed booking
+ * is a payment record — the fix for one of those is a refund, never a delete —
+ * and a block has its own control, "Unblock", which frees the hour and removes
+ * the row in one step.
+ *
+ * Exported because the UI decides which button to *draw* from the same list the
+ * server decides with. Drawing is a courtesy; the guard below is the boundary.
+ */
+export const DELETABLE_STATUSES: BookingStatus[] = [
+  "pending",
+  "cancelled",
+  "expired",
+];
+
+/**
+ * Permanently delete a booking row. Admin-only, and narrower than it looks.
+ *
+ * Cancelling keeps the row as history; this is the other thing an admin
+ * sometimes wants — a test booking, a duplicate, an abandoned hold — gone. It
+ * is refused for anything that represents money:
+ *
+ *   - status must still be one of `DELETABLE_STATUSES`;
+ *   - the booking must have no **successful** payment. Status alone is not
+ *     enough to decide that: `adminCancelBooking` can cancel a *paid* booking
+ *     (the refund happens outside the app) and deliberately leaves the success
+ *     `Payment` behind as the record of what was charged. That row is exactly
+ *     what must never be deleted, so a `cancelled` booking carrying one is
+ *     refused here as firmly as a `confirmed` one.
+ *
+ * Deleting a `pending` booking is also how its hours are released: the
+ * `BookingSlot` rows go with the parent via ON DELETE CASCADE, and those rows
+ * are the hold — the unique index protects (courtId, bookingDate, slotId) and
+ * cannot see the parent's status.
+ *
+ * Unsuccessful payment attempts (pending, failed, cancelled) are deleted with
+ * the booking. `Payment.bookingId` has no cascade, so they would otherwise
+ * block the delete; and an attempt that never took money is not a record worth
+ * keeping once the booking it belonged to is gone.
+ *
+ * ## The race
+ *
+ * The read below and the write after it are separate statements, and the
+ * PayHere webhook is a different request that can confirm this booking in
+ * between — the same race `flipAndReleaseHours` exists for. Deleting a booking
+ * the webhook just confirmed would destroy a paid reservation outright, which
+ * is worse than the double-sell. So the read is only for the error message: the
+ * delete itself is guarded on the status *and* scoped so a success payment
+ * appearing mid-flight cannot be swept up, and if either guard finds nothing
+ * the whole transaction rolls back rather than leaving a confirmed booking
+ * stripped of its payment attempts.
+ */
+export async function adminDeleteBooking(
+  bookingId: string
+): Promise<BookingResult<{ id: string }>> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      status: true,
+      _count: { select: { payments: { where: { status: "success" } } } },
+    },
+  });
+
+  if (!booking) {
+    return { ok: false, error: "Booking not found.", reason: "notfound" };
+  }
+
+  if (booking.status === "blocked") {
+    return {
+      ok: false,
+      error: "Use unblock to remove an admin block.",
+      reason: "invalid",
+    };
+  }
+
+  if (!DELETABLE_STATUSES.includes(booking.status)) {
+    return {
+      ok: false,
+      error:
+        "A confirmed booking is a payment record and cannot be deleted. Cancel it instead, and refund outside the app.",
+      reason: "invalid",
+    };
+  }
+
+  if (booking._count.payments > 0) {
+    return {
+      ok: false,
+      error:
+        "This booking has a successful payment, so it stays as a record. Refund it outside the app rather than deleting it.",
+      reason: "invalid",
+    };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Scoped to the parent's status as well as its own, so an attempt row is
+      // never removed from a booking that has meanwhile been confirmed.
+      await tx.payment.deleteMany({
+        where: {
+          bookingId,
+          status: { not: "success" },
+          booking: { status: { in: DELETABLE_STATUSES } },
+        },
+      });
+
+      const deleted = await tx.booking.deleteMany({
+        where: { id: bookingId, status: { in: DELETABLE_STATUSES } },
+      });
+
+      if (deleted.count === 0) throw new BookingChanged();
+    });
+  } catch (e) {
+    if (e instanceof BookingChanged) {
+      return {
+        ok: false,
+        error:
+          "That booking changed while you were deleting it. Reload the page to see where it stands.",
+        reason: "invalid",
+      };
+    }
+
+    // A success payment created between the check above and the delete leaves
+    // its foreign key behind, and Postgres refuses the delete (P2003). That is
+    // the correct outcome — say so rather than surfacing a driver error.
+    if (
+      typeof e === "object" &&
+      e !== null &&
+      "code" in e &&
+      (e as { code?: unknown }).code === "P2003"
+    ) {
+      return {
+        ok: false,
+        error:
+          "This booking was just paid for, so it stays as a record. Reload the page.",
+        reason: "invalid",
+      };
+    }
+
+    throw e;
+  }
+
+  return { ok: true, data: { id: bookingId } };
+}
+
+/**
  * Admin-initiated cancellation of a real booking, freeing its hours.
  *
  * v1 does not refund money (see PRD "out of scope"), so this only moves the

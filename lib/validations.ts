@@ -41,10 +41,13 @@ const phoneField = z
   .refine((v) => /^\+?[\d\s().-]+$/.test(v), {
     message: "Use digits, spaces, and + ( ) - only.",
   })
-  .refine((v) => {
-    const digits = v.replace(/\D/g, "").length;
-    return digits >= 7 && digits <= 15;
-  }, { message: "That does not look like a complete phone number." });
+  .refine(
+    (v) => {
+      const digits = v.replace(/\D/g, "").length;
+      return digits >= 7 && digits <= 15;
+    },
+    { message: "That does not look like a complete phone number." }
+  );
 
 const nameField = z
   .string()
@@ -101,7 +104,11 @@ const affiliationField = z.enum(
   { message: "Choose how you are connected to the school." }
 );
 
-const emailField = z.string().trim().toLowerCase().email("Enter a valid email address.");
+const emailField = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email("Enter a valid email address.");
 
 const passwordField = z
   .string()
@@ -185,22 +192,19 @@ export const userRatingSchema = z.object({
     .max(1000, "Keep the reason to 1000 characters or fewer."),
 });
 
-/** How the admin Users tab is ordered. `?sort=` is user input; anything else falls back. */
-export const USER_SORTS = [
-  "recent",
-  "rating_low",
-  "rating_high",
-  "name",
+/**
+ * Which accounts the Users tab shows.
+ *
+ * The *ordering* vocabulary lives in `lib/admin-filters.ts` with the other
+ * admin-table query params — it is view state, not a validated form input, and
+ * it is shared with the Bookings table.
+ */
+export const USER_RATING_FILTERS = [
+  "all",
+  "flagged",
+  "rated",
+  "unrated",
 ] as const;
-
-export type UserSort = (typeof USER_SORTS)[number];
-
-export function parseUserSort(value: string | undefined): UserSort {
-  return USER_SORTS.includes(value as UserSort) ? (value as UserSort) : "recent";
-}
-
-/** Which accounts the Users tab shows. */
-export const USER_RATING_FILTERS = ["all", "flagged", "rated", "unrated"] as const;
 
 export type UserRatingFilter = (typeof USER_RATING_FILTERS)[number];
 
@@ -367,7 +371,9 @@ export const createBookingSchema = z.object({
 export type ProfileInput = z.infer<typeof profileSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
-export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetRequestInput = z.infer<
+  typeof passwordResetRequestSchema
+>;
 export type NewPasswordInput = z.infer<typeof newPasswordSchema>;
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
 export type UserRatingInput = z.infer<typeof userRatingSchema>;

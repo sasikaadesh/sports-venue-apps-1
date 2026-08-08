@@ -10,32 +10,60 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState, PageHeader } from "@/components/admin/page-header";
+import { PaginationBar, SortableHeader } from "@/components/admin/table-tools";
 import { UserConductDialog } from "@/components/admin/user-conduct-dialog";
+import { UserFilterBar } from "@/components/admin/user-filter-bar";
 import { UserRowActions } from "@/components/admin/user-row-actions";
-import { UserSortFilter } from "@/components/admin/user-sort-filter";
+import { LinkButton } from "@/components/link-button";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/time";
+import { countFlaggedUsers } from "@/lib/user-ratings";
 import {
-  filterUsersByRating,
-  getRatingSummaries,
-  sortUsersByRating,
-} from "@/lib/user-ratings";
+  hasActiveUserFilters,
+  listAdminUsers,
+  type UserFilters,
+} from "@/lib/admin-users";
+import {
+  ADMIN_PAGE_SIZE,
+  USER_SORT_DEFAULT_DIRECTION,
+  buildAdminHref,
+  flipDirection,
+  parseAffiliationFilter,
+  parsePage,
+  parseRoleFilter,
+  parseSearchParam,
+  parseSortDirection,
+  parseUserSort,
+  type UserSort,
+} from "@/lib/admin-filters";
 import {
   AFFILIATION_LABEL,
   FLAGGED_RATING_MAX,
   parseUserRatingFilter,
-  parseUserSort,
   type AffiliationValue,
 } from "@/lib/validations";
 
 export const metadata = { title: "Users — Admin" };
+
+const PATH = "/admin/users";
 
 const ROLE_LABEL = {
   user: "user",
   admin: "admin",
   super_admin: "super admin",
 } as const;
+
+type UserSearchParams = {
+  denied?: string;
+  q?: string;
+  role?: string;
+  aff?: string;
+  rated?: string;
+  sort?: string;
+  dir?: string;
+  page?: string;
+};
 
 /**
  * Registered accounts.
@@ -44,11 +72,17 @@ const ROLE_LABEL = {
  * *Acting* on an admin account is super-admin only, decided per row below and
  * re-checked from the database inside every action.
  *
+ * Filtering, sorting and paging follow the same pattern as the Bookings tab:
+ * the query string is the whole view state, parsed into a fixed vocabulary by
+ * `lib/admin-filters.ts`, and the work happens in Postgres wherever Postgres
+ * can do it — see `lib/admin-users.ts` for the one thing it cannot, conduct.
+ *
  * Two things on this page never leave it:
  *
  *   - **NIC** is sensitive personal data. It is shown here and on the owner's
  *     own account page, and nowhere else — no public page, no API response, no
- *     other user's view.
+ *     other user's view. It is not searchable from the filter bar either: the
+ *     search box matches name and email only, so an NIC never travels in a URL.
  *   - **Conduct ratings** are private staff notes. The rated user has no
  *     endpoint that returns them, and RLS grants them no access to the table
  *     either (migration 20260803120000).
@@ -56,45 +90,66 @@ const ROLE_LABEL = {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ denied?: string; sort?: string; rated?: string }>;
+  searchParams: Promise<UserSearchParams>;
 }) {
-  const actor = await requireAdmin("/admin/users");
-  const { denied, sort: sortParam, rated } = await searchParams;
+  const actor = await requireAdmin(PATH);
+  const params = await searchParams;
 
-  const sort = parseUserSort(sortParam);
-  const filter = parseUserRatingFilter(rated);
+  const filters: UserFilters = {
+    role: parseRoleFilter(params.role),
+    affiliation: parseAffiliationFilter(params.aff),
+    search: parseSearchParam(params.q),
+    rated: parseUserRatingFilter(params.rated),
+  };
 
-  const users = await prisma.user.findMany({
-    orderBy: [{ role: "desc" }, { createdAt: "desc" }],
-    take: 500,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      nic: true,
-      affiliation: true,
-      role: true,
-      createdAt: true,
-      _count: { select: { bookings: true } },
-    },
-  });
-
-  // One aggregate for the whole page, then sort and filter in memory — see
-  // lib/user-ratings.ts for why the ordering does not live in the query.
-  const summaries = await getRatingSummaries(users.map((u) => u.id));
-  const visible = sortUsersByRating(
-    filterUsersByRating(users, summaries, filter),
-    summaries,
-    sort
+  const sort = parseUserSort(params.sort);
+  const direction = parseSortDirection(
+    params.dir,
+    USER_SORT_DEFAULT_DIRECTION[sort]
   );
+  const page = parsePage(params.page);
+
+  const [
+    { rows, summaries, total, pageCount, truncated },
+    accountCount,
+    adminCount,
+    flaggedCount,
+  ] = await Promise.all([
+    listAdminUsers({ filters, sort, direction, page }),
+    prisma.user.count(),
+    prisma.user.count({ where: { role: { not: "user" } } }),
+    countFlaggedUsers(),
+  ]);
+
+  // The canonical, sanitised view state — every link below is built from it, so
+  // no link can carry a value the parsers would reject. `denied` is left out
+  // deliberately: it is a one-shot message, and it should not follow the admin
+  // around every time they sort a column.
+  const view = {
+    q: filters.search,
+    role: filters.role === "all" ? undefined : filters.role,
+    aff: filters.affiliation === "all" ? undefined : filters.affiliation,
+    rated: filters.rated === "all" ? undefined : filters.rated,
+    sort,
+    dir: direction,
+    page: page > 1 ? page : undefined,
+  };
+
+  function sortHref(column: UserSort): string {
+    const next =
+      column === sort
+        ? flipDirection(direction)
+        : USER_SORT_DEFAULT_DIRECTION[column];
+
+    return buildAdminHref(PATH, view, {
+      sort: column,
+      dir: next,
+      page: undefined,
+    });
+  }
 
   const actorIsSuperAdmin = actor.role === "super_admin";
-  const adminCount = users.filter((u) => u.role !== "user").length;
-  const flaggedCount = users.filter((u) => {
-    const average = summaries.get(u.id)?.average;
-    return average !== undefined && average !== null && average <= FLAGGED_RATING_MAX;
-  }).length;
+  const isFiltered = hasActiveUserFilters(filters);
 
   return (
     <>
@@ -108,7 +163,7 @@ export default async function AdminUsersPage({
       />
 
       <div className="flex flex-col gap-6">
-        {denied === "super_admin" && (
+        {params.denied === "super_admin" && (
           <p
             role="alert"
             className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -121,7 +176,7 @@ export default async function AdminUsersPage({
           </p>
         )}
 
-        {users.length === 0 ? (
+        {accountCount === 0 ? (
           <EmptyState
             icon={<UsersIcon className="size-5" />}
             title="No accounts yet"
@@ -130,7 +185,7 @@ export default async function AdminUsersPage({
         ) : (
           <>
             <dl className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4">
-              <Stat label="Accounts" value={users.length} />
+              <Stat label="Accounts" value={accountCount} />
               <Stat label="Administrators" value={adminCount} />
               <Stat
                 label={`Flagged (≤ ${FLAGGED_RATING_MAX})`}
@@ -139,116 +194,198 @@ export default async function AdminUsersPage({
               <Stat label="Your role" value={ROLE_LABEL[actor.role]} />
             </dl>
 
-            <UserSortFilter sort={sort} filter={filter} />
+            <UserFilterBar
+              filters={filters}
+              sort={sort}
+              direction={direction}
+              resetHref={PATH}
+              isFiltered={isFiltered}
+            />
 
-            {visible.length === 0 ? (
+            {rows.length === 0 ? (
               <EmptyState
                 icon={<UsersIcon className="size-5" />}
-                title="No accounts match that filter"
-                description="Nobody here fits the filter you picked. Switch back to “All” to see every account."
+                title={
+                  total > 0
+                    ? "That page is past the end of the list"
+                    : "No accounts match these filters"
+                }
+                description={
+                  total > 0
+                    ? `There ${total === 1 ? "is 1 account" : `are ${total} accounts`} to show, but not on this page.`
+                    : "Nobody here fits every filter you have set. Use “Reset filters” to see every account again."
+                }
+                action={
+                  total > 0 ? (
+                    <LinkButton
+                      href={buildAdminHref(PATH, view, { page: undefined })}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Back to the first page
+                    </LinkButton>
+                  ) : (
+                    <LinkButton href={PATH} size="sm" variant="secondary">
+                      Reset filters
+                    </LinkButton>
+                  )
+                }
               />
             ) : (
-              <div className="rounded-xl border bg-card">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-5">Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Affiliation</TableHead>
-                      <TableHead>NIC</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Conduct</TableHead>
-                      <TableHead className="text-right">Bookings</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead className="pr-5 text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+              <>
+                <div className="rounded-xl border bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <SortableHeader
+                          label="Name"
+                          href={sortHref("name")}
+                          direction={sort === "name" ? direction : null}
+                          className="pl-5"
+                        />
+                        <TableHead>Email</TableHead>
+                        <TableHead>Affiliation</TableHead>
+                        <TableHead>NIC</TableHead>
+                        <TableHead>Role</TableHead>
+                        <SortableHeader
+                          label="Conduct"
+                          href={sortHref("rating")}
+                          direction={sort === "rating" ? direction : null}
+                        />
+                        <TableHead className="text-right">Bookings</TableHead>
+                        <SortableHeader
+                          label="Joined"
+                          href={sortHref("joined")}
+                          direction={sort === "joined" ? direction : null}
+                        />
+                        <TableHead className="pr-5 text-right">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
 
-                  <TableBody>
-                    {visible.map((u) => {
-                      const isSelf = u.id === actor.id;
-                      // Mirrors `loadTarget` in the actions: a plain admin may
-                      // only act on plain users.
-                      const canManage =
-                        !isSelf && (actorIsSuperAdmin || u.role === "user");
-                      const summary = summaries.get(u.id);
+                    <TableBody>
+                      {rows.map((u) => {
+                        const isSelf = u.id === actor.id;
+                        // Mirrors `loadTarget` in the actions: a plain admin may
+                        // only act on plain users.
+                        const canManage =
+                          !isSelf && (actorIsSuperAdmin || u.role === "user");
+                        const summary = summaries.get(u.id);
 
-                      return (
-                        <TableRow key={u.id}>
-                          <TableCell className="pl-5 font-medium">
-                            {/* The name is the obvious place to click to see a
-                                person, so it opens the same conduct record the
-                                Conduct column does. */}
-                            <UserConductDialog
-                              trigger="name"
-                              triggerLabel={u.name ?? "—"}
-                              userId={u.id}
-                              label={u.name ?? u.email}
-                              average={summary?.average ?? null}
-                              count={summary?.count ?? 0}
-                              canRate={canManage}
-                            />
-                          </TableCell>
-                          <TableCell className="max-w-[20ch] truncate text-muted-foreground">
-                            {u.email}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {u.affiliation ? (
-                              AFFILIATION_LABEL[u.affiliation as AffiliationValue]
-                            ) : (
-                              // Every account created before this field
-                              // existed lands here. Not an error — just not
-                              // filled in yet.
-                              <span className="text-xs italic">not set</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-                            {u.nic ?? <span className="font-sans italic">not set</span>}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                u.role === "user" ? "secondary" : "default"
-                              }
-                            >
-                              {ROLE_LABEL[u.role]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <UserConductDialog
-                              userId={u.id}
-                              label={u.name ?? u.email}
-                              average={summary?.average ?? null}
-                              count={summary?.count ?? 0}
-                              canRate={canManage}
-                            />
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {u._count.bookings}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                            {formatDateTime(u.createdAt)}
-                          </TableCell>
-                          <TableCell className="pr-5 text-right">
-                            <UserRowActions
-                              userId={u.id}
-                              email={u.email}
-                              role={u.role}
-                              isSelf={isSelf}
-                              canManage={canManage}
-                              actorIsSuperAdmin={actorIsSuperAdmin}
-                              bookingCount={u._count.bookings}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                        return (
+                          <TableRow key={u.id}>
+                            <TableCell className="pl-5 font-medium">
+                              {/* The name is the obvious place to click to see a
+                                  person, so it opens the same conduct record the
+                                  Conduct column does. */}
+                              <UserConductDialog
+                                trigger="name"
+                                triggerLabel={u.name ?? "—"}
+                                userId={u.id}
+                                label={u.name ?? u.email}
+                                average={summary?.average ?? null}
+                                count={summary?.count ?? 0}
+                                canRate={canManage}
+                              />
+                            </TableCell>
+                            <TableCell className="max-w-[20ch] truncate text-muted-foreground">
+                              {u.email}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-muted-foreground">
+                              {u.affiliation ? (
+                                AFFILIATION_LABEL[
+                                  u.affiliation as AffiliationValue
+                                ]
+                              ) : (
+                                // Every account created before this field
+                                // existed lands here. Not an error — just not
+                                // filled in yet.
+                                <span className="text-xs italic">not set</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs whitespace-nowrap text-muted-foreground">
+                              {u.nic ?? (
+                                <span className="font-sans italic">
+                                  not set
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  u.role === "user" ? "secondary" : "default"
+                                }
+                              >
+                                {ROLE_LABEL[u.role]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <UserConductDialog
+                                userId={u.id}
+                                label={u.name ?? u.email}
+                                average={summary?.average ?? null}
+                                count={summary?.count ?? 0}
+                                canRate={canManage}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {u._count.bookings}
+                            </TableCell>
+                            <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                              {formatDateTime(u.createdAt)}
+                            </TableCell>
+                            <TableCell className="pr-5 text-right">
+                              <UserRowActions
+                                userId={u.id}
+                                email={u.email}
+                                role={u.role}
+                                isSelf={isSelf}
+                                canManage={canManage}
+                                actorIsSuperAdmin={actorIsSuperAdmin}
+                                bookingCount={u._count.bookings}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <PaginationBar
+                  page={page}
+                  pageCount={pageCount}
+                  total={total}
+                  pageSize={ADMIN_PAGE_SIZE}
+                  noun="accounts"
+                  prevHref={
+                    page > 1
+                      ? // Page 1 is the bare URL, not `?page=1`.
+                        buildAdminHref(PATH, view, {
+                          page: page - 1 > 1 ? page - 1 : undefined,
+                        })
+                      : null
+                  }
+                  nextHref={
+                    page < pageCount
+                      ? buildAdminHref(PATH, view, { page: page + 1 })
+                      : null
+                  }
+                />
+              </>
             )}
 
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
+              {truncated && (
+                <p>
+                  Sorting or filtering by conduct reads a capped slice of the
+                  accounts, because the average lives in another table and
+                  Postgres cannot page by it. That cap was reached here, so the
+                  count above is a floor — narrow the search, role or
+                  affiliation first and it becomes exact.
+                </p>
+              )}
               <p className="flex items-start gap-2">
                 <Lock className="mt-0.5 size-4 shrink-0" />
                 <span>
@@ -277,7 +414,7 @@ export default async function AdminUsersPage({
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-card px-5 py-4">
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </dt>
       <dd className="mt-1 font-heading text-2xl font-bold tabular-nums">
