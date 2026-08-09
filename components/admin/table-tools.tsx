@@ -116,7 +116,8 @@ export function PaginationBar({
   const to = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    // Paging is a screen concept — on paper the sheets are the pages.
+    <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
       <p className="text-sm text-muted-foreground">
         <span className="font-medium text-foreground tabular-nums">
           {from}–{to}

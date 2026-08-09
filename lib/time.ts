@@ -156,6 +156,29 @@ export function isFuture(date: Date | null | undefined): boolean {
   return date != null && date.getTime() > Date.now();
 }
 
+/**
+ * The calendar month a "YYYY-MM-DD" falls in, as an inclusive range.
+ *
+ * `Date.UTC(y, m, 0)` is the last day of month `m - 1`, which is how the end of
+ * the month is found without a table of month lengths or a leap-year rule.
+ */
+export function monthRange(yyyymmdd: string): { from: string; to: string } {
+  const [y, m] = yyyymmdd.split("-").map(Number);
+  return {
+    from: `${y}-${String(m).padStart(2, "0")}-01`,
+    to: dateToDateString(new Date(Date.UTC(y, m, 0))),
+  };
+}
+
+/** The month a "YYYY-MM-DD" falls in, spelled out — "August 2026". */
+export function formatMonth(yyyymmdd: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  }).format(dateStringToDate(yyyymmdd));
+}
+
 /** Add N days to a "YYYY-MM-DD" string, staying on the calendar. */
 export function addDays(yyyymmdd: string, days: number): string {
   const date = dateStringToDate(yyyymmdd);

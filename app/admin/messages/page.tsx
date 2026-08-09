@@ -41,7 +41,7 @@ export default async function AdminMessagesPage() {
         description={
           messages.length === 0
             ? "Submissions from the public Contact us page land here."
-            : `${messages.length} message${messages.length === 1 ? "" : "s"}, ${unread} unread. Each one is also emailed to the sports office — replying to that email answers the sender.`
+            : `${messages.length} message${messages.length === 1 ? "" : "s"}, ${unread} unread — each is emailed to the office too.`
         }
       />
 
@@ -89,7 +89,7 @@ export default async function AdminMessagesPage() {
 
                 {/* whitespace-pre-line so the paragraph breaks the sender typed
                     survive; the text itself is escaped by React. */}
-                <p className="max-w-prose whitespace-pre-line text-sm leading-relaxed">
+                <p className="max-w-prose text-sm leading-relaxed whitespace-pre-line">
                   {m.message}
                 </p>
               </li>

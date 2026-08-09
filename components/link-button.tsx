@@ -12,7 +12,20 @@ import { Button } from "@/components/ui/button";
  */
 export function LinkButton({
   href,
+  target,
+  rel,
   ...props
-}: React.ComponentProps<typeof Button> & { href: string }) {
-  return <Button {...props} nativeButton={false} render={<Link href={href} />} />;
+}: React.ComponentProps<typeof Button> & {
+  href: string;
+  /** Anchor attributes, so they go on the Link — a <button> has neither. */
+  target?: string;
+  rel?: string;
+}) {
+  return (
+    <Button
+      {...props}
+      nativeButton={false}
+      render={<Link href={href} target={target} rel={rel} />}
+    />
+  );
 }

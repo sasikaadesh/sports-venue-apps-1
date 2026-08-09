@@ -53,7 +53,7 @@ export default async function BlocksPage({
       <>
         <PageHeader
           title="Block slots"
-          description="Take a court's slot off the market for a specific date — maintenance, a fixture, bad weather."
+          description="Take a court's slot off the market — maintenance, fixtures, weather."
         />
         <EmptyState
           icon={<Home className="size-5" />}
@@ -138,7 +138,7 @@ export default async function BlocksPage({
     <>
       <PageHeader
         title="Block slots"
-        description="Take a court's slot off the market for a specific date — maintenance, a fixture, bad weather. Blocks are stored as bookings, so availability handles them automatically."
+        description="Take a court's slot off the market — maintenance, fixtures, weather."
       />
 
       <div className="flex flex-col gap-8">

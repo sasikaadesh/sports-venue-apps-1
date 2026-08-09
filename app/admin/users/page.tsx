@@ -157,8 +157,8 @@ export default async function AdminUsersPage({
         title="Users"
         description={
           actorIsSuperAdmin
-            ? "Everyone with an account. As a super admin you can promote a user to admin, demote an admin, and remove accounts."
-            : "Everyone with an account. You can remove user accounts; only a super admin can manage administrators."
+            ? "Everyone with an account — promote, demote or remove them."
+            : "Everyone with an account. Only a super admin manages admins."
         }
       />
 

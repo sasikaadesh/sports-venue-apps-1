@@ -32,7 +32,7 @@ export default async function CourtsPage() {
     <>
       <PageHeader
         title="Courts"
-        description="Each court belongs to a type, carries its own photos, and has its own weekly slot schedule."
+        description="Every court, with its type, its photos and its weekly schedule."
         action={
           courtTypeCount > 0 ? (
             <LinkButton href="/admin/courts/new" className="h-10">
@@ -101,7 +101,7 @@ export default async function CourtsPage() {
 
                 <div className="flex flex-1 flex-col gap-2 px-4 py-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="font-medium leading-tight">
+                    <span className="leading-tight font-medium">
                       {court.name}
                     </span>
                     <Badge variant="secondary">{court.courtType.name}</Badge>
