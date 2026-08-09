@@ -156,6 +156,17 @@ function bookingWhere(filters: BookingFilters): Prisma.BookingWhereInput {
  * the row being sorted. Ordering by "the amount of the most recent payment in a
  * to-many relation" is not something Prisma can express, and doing it in memory
  * would mean loading every booking to sort one page of them.
+ *
+ * **Who sorts by the account, not by what the cell prints.** A block's cell
+ * reads "— admin block —", but the row belongs to the admin who made it, so
+ * blocks sort under that admin's name rather than clumping together. Name first
+ * and email second, because the table shows whichever it has; rows with no
+ * account at all (legacy imports) land at the end of an A–Z sort, where
+ * Postgres puts NULLs.
+ *
+ * **Status sorts by the enum's declared order**, which is the booking
+ * lifecycle — see `BOOKING_SORT_DEFAULT_DIRECTION`. Alphabetical would put
+ * "blocked" before "confirmed" and mean nothing.
  */
 function bookingOrderBy(
   sort: BookingSort,
@@ -168,6 +179,15 @@ function bookingOrderBy(
         { bookingDate: "desc" },
         { id: "asc" },
       ];
+    case "who":
+      return [
+        { user: { name: direction } },
+        { user: { email: direction } },
+        { bookingDate: "desc" },
+        { id: "asc" },
+      ];
+    case "status":
+      return [{ status: direction }, { bookingDate: "desc" }, { id: "asc" }];
     case "amount":
       return [
         { totalPrice: direction },

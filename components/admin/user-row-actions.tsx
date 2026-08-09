@@ -4,26 +4,27 @@ import { useTransition } from "react";
 import { ShieldMinus, ShieldPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  ConfirmRowAction,
+  RowActionNote,
+  RowActions,
+  RowActionSpacer,
+} from "@/components/admin/row-actions";
 import { removeUserAction, setUserRoleAction } from "@/app/admin/users/actions";
 
 /**
- * Row controls for the Users tab.
+ * Row controls for the Users tab — one "Actions" cell, icon buttons only,
+ * matching the Bookings table.
  *
  * Everything here is presentation: `canManage` and `actorIsSuperAdmin` only
  * decide what is *drawn*. The same rules are re-derived from the database in
  * `app/admin/users/actions.ts` on every call, so hiding a button is a courtesy
  * and never the boundary.
+ *
+ * Two slots, in the same order on every row: the role toggle, then Remove. The
+ * role toggle now confirms as well — it did not need to when it was a button
+ * with the word "admin" written on it, but an icon that grants administrator
+ * rights on one click is not something to leave un-guarded.
  */
 export function UserRowActions({
   userId,
@@ -46,28 +47,51 @@ export function UserRowActions({
 
   if (isSelf) {
     return (
-      <span className="text-xs text-muted-foreground">That&rsquo;s you</span>
+      <RowActions columns={2}>
+        <RowActionNote>
+          That is your own account — you cannot act on it here
+        </RowActionNote>
+        <RowActionSpacer />
+      </RowActions>
     );
   }
 
   if (!canManage) {
     return (
-      <span className="text-xs text-muted-foreground">
-        Super admin only
-      </span>
+      <RowActions columns={2}>
+        <RowActionNote>
+          Super admin only — this account is an administrator
+        </RowActionNote>
+        <RowActionSpacer />
+      </RowActions>
     );
   }
 
   const isAdminAccount = role === "admin";
 
   return (
-    <div className="flex items-center justify-end gap-1">
-      {actorIsSuperAdmin && role !== "super_admin" && (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={pending}
-          onClick={() =>
+    <RowActions columns={2}>
+      {/* --- Slot 1: promote or demote --- */}
+      {actorIsSuperAdmin && role !== "super_admin" ? (
+        <ConfirmRowAction
+          icon={isAdminAccount ? <ShieldMinus /> : <ShieldPlus />}
+          label={isAdminAccount ? "Remove admin rights" : "Make admin"}
+          tone={isAdminAccount ? "danger" : "default"}
+          pending={pending}
+          title={
+            isAdminAccount
+              ? `Remove admin rights from ${email}?`
+              : `Make ${email} an administrator?`
+          }
+          description={
+            isAdminAccount
+              ? "They keep their account and their bookings, but lose the admin panel — no courts, no bookings, no other accounts. You can grant it again at any time."
+              : "They get the whole admin panel: courts, bookings, slot blocks and every account on this page. They will not be able to promote anyone else, or touch a super admin."
+          }
+          confirmLabel={isAdminAccount ? "Remove admin rights" : "Make admin"}
+          confirmIcon={isAdminAccount ? <ShieldMinus /> : <ShieldPlus />}
+          cancelLabel="Leave the role as it is"
+          onConfirm={() =>
             startTransition(async () => {
               const result = await setUserRoleAction(
                 userId,
@@ -84,68 +108,49 @@ export function UserRowActions({
               }
             })
           }
-        >
-          {isAdminAccount ? <ShieldMinus /> : <ShieldPlus />}
-          {isAdminAccount ? "Remove admin" : "Make admin"}
-        </Button>
+        />
+      ) : (
+        <RowActionSpacer />
       )}
 
-      {role !== "super_admin" && (
-        <Dialog>
-          <DialogTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                className="text-muted-foreground hover:text-destructive"
-              />
-            }
-          >
-            <Trash2 />
-            Remove
-          </DialogTrigger>
-
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Remove {email}?</DialogTitle>
-              <DialogDescription>
-                This deletes their sign-in permanently — they will not be able
-                to log in again, and there is no undo.
-                {bookingCount > 0 ? (
-                  <>
-                    {" "}
-                    Their {bookingCount} booking
-                    {bookingCount === 1 ? "" : "s"} stay in the records for your
-                    history and payment trail, but stop naming a person.
-                  </>
-                ) : (
-                  " They have no bookings on file."
-                )}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" />}>
-                Keep the account
-              </DialogClose>
-              <Button
-                variant="destructive"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await removeUserAction(userId);
-                    if (result.ok) toast.success(`${email} removed.`);
-                    else toast.error(result.error);
-                  })
-                }
-              >
-                <Trash2 />
-                Remove account
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      {/* --- Slot 2: remove the account --- */}
+      {role !== "super_admin" ? (
+        <ConfirmRowAction
+          icon={<Trash2 />}
+          label="Remove account"
+          tone="danger"
+          pending={pending}
+          title={`Remove ${email}?`}
+          description={
+            <>
+              This deletes their sign-in permanently — they will not be able to
+              log in again, and there is no undo.
+              {bookingCount > 0 ? (
+                <>
+                  {" "}
+                  Their {bookingCount} booking
+                  {bookingCount === 1 ? "" : "s"} stay in the records for your
+                  history and payment trail, but stop naming a person.
+                </>
+              ) : (
+                " They have no bookings on file."
+              )}
+            </>
+          }
+          confirmLabel="Remove account"
+          confirmIcon={<Trash2 />}
+          cancelLabel="Keep the account"
+          onConfirm={() =>
+            startTransition(async () => {
+              const result = await removeUserAction(userId);
+              if (result.ok) toast.success(`${email} removed.`);
+              else toast.error(result.error);
+            })
+          }
+        />
+      ) : (
+        <RowActionSpacer />
       )}
-    </div>
+    </RowActions>
   );
 }
