@@ -17,7 +17,7 @@ import { UserRowActions } from "@/components/admin/user-row-actions";
 import { LinkButton } from "@/components/link-button";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime } from "@/lib/time";
+import { formatDateOnly, formatDateTime } from "@/lib/time";
 import { countFlaggedUsers } from "@/lib/user-ratings";
 import {
   hasActiveUserFilters,
@@ -244,8 +244,15 @@ export default async function AdminUsersPage({
                           className="pl-5"
                         />
                         <TableHead>Email</TableHead>
-                        <TableHead>Affiliation</TableHead>
-                        <TableHead>NIC</TableHead>
+                        {/* Affiliation and NIC fold into the Name cell below
+                            `lg` — see the row for the copy that replaces them.
+                            Nothing is dropped, it just moves. */}
+                        <TableHead className="hidden lg:table-cell">
+                          Affiliation
+                        </TableHead>
+                        <TableHead className="hidden lg:table-cell">
+                          NIC
+                        </TableHead>
                         <TableHead>Role</TableHead>
                         <SortableHeader
                           label="Conduct"
@@ -258,7 +265,7 @@ export default async function AdminUsersPage({
                           href={sortHref("joined")}
                           direction={sort === "joined" ? direction : null}
                         />
-                        <TableHead className="pr-5 text-right">
+                        <TableHead className="w-[4.5rem] pr-5 text-right">
                           Actions
                         </TableHead>
                       </TableRow>
@@ -288,11 +295,28 @@ export default async function AdminUsersPage({
                                 count={summary?.count ?? 0}
                                 canRate={canManage}
                               />
+                              {/* Below `lg` the Affiliation and NIC columns are
+                                  hidden to keep the table inside its container.
+                                  They reappear here rather than being lost —
+                                  NIC is admin-only either way, and this page is
+                                  the only place in the app that prints it. */}
+                              <span className="mt-0.5 block max-w-[22ch] truncate text-xs font-normal text-muted-foreground lg:hidden">
+                                {affiliationLabel(u.affiliation)}
+                                {u.nic ? (
+                                  <>
+                                    {" · "}
+                                    <span className="font-mono">{u.nic}</span>
+                                  </>
+                                ) : null}
+                              </span>
                             </TableCell>
-                            <TableCell className="max-w-[20ch] truncate text-muted-foreground">
+                            <TableCell
+                              title={u.email}
+                              className="max-w-[18ch] truncate text-muted-foreground"
+                            >
                               {u.email}
                             </TableCell>
-                            <TableCell className="whitespace-nowrap text-muted-foreground">
+                            <TableCell className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">
                               {u.affiliation ? (
                                 AFFILIATION_LABEL[
                                   u.affiliation as AffiliationValue
@@ -304,7 +328,7 @@ export default async function AdminUsersPage({
                                 <span className="text-xs italic">not set</span>
                               )}
                             </TableCell>
-                            <TableCell className="font-mono text-xs whitespace-nowrap text-muted-foreground">
+                            <TableCell className="hidden font-mono text-xs whitespace-nowrap text-muted-foreground lg:table-cell">
                               {u.nic ?? (
                                 <span className="font-sans italic">
                                   not set
@@ -332,8 +356,14 @@ export default async function AdminUsersPage({
                             <TableCell className="text-right tabular-nums">
                               {u._count.bookings}
                             </TableCell>
-                            <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
-                              {formatDateTime(u.createdAt)}
+                            {/* Date only — the minute an account was created is
+                                never the question, and the full timestamp is
+                                one hover away in the title. */}
+                            <TableCell
+                              title={formatDateTime(u.createdAt)}
+                              className="text-xs whitespace-nowrap text-muted-foreground"
+                            >
+                              {formatDateOnly(u.createdAt)}
                             </TableCell>
                             <TableCell className="pr-5 text-right">
                               <UserRowActions
@@ -409,6 +439,12 @@ export default async function AdminUsersPage({
       </div>
     </>
   );
+}
+
+/** The Affiliation column's text, for the narrow-screen line under the name. */
+function affiliationLabel(affiliation: string | null): string {
+  if (!affiliation) return "Affiliation not set";
+  return AFFILIATION_LABEL[affiliation as AffiliationValue];
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {

@@ -7,9 +7,11 @@ import {
   SlotBlockList,
   type BlockableSlot,
 } from "@/components/admin/slot-block-list";
+import { PaginationBar } from "@/components/admin/table-tools";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getOccupyingSlots } from "@/lib/booking-service";
+import { buildAdminHref, pageCountFor, parsePage } from "@/lib/admin-filters";
 import {
   DAY_NAMES,
   dateStringToDate,
@@ -23,10 +25,19 @@ export const metadata = { title: "Block slots — Admin" };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Slots per page.
+ *
+ * Ten, not the 25 the admin tables use: these rows are tall (a badge row and a
+ * button each), and a court with a long opening day would otherwise be a
+ * scroll to reach the evening hours.
+ */
+const BLOCKS_PAGE_SIZE = 10;
+
 export default async function BlocksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ courtId?: string; date?: string }>;
+  searchParams: Promise<{ courtId?: string; date?: string; page?: string }>;
 }) {
   await requireAdmin("/admin/blocks");
 
@@ -49,7 +60,11 @@ export default async function BlocksPage({
           title="No courts to block"
           description="Create a court and give it a slot schedule first."
           action={
-            <LinkButton href="/admin/courts" variant="outline" className="mt-1 h-10">
+            <LinkButton
+              href="/admin/courts"
+              variant="outline"
+              className="mt-1 h-10"
+            >
               Go to courts
             </LinkButton>
           }
@@ -59,7 +74,8 @@ export default async function BlocksPage({
   }
 
   // Fall back to the first court and today when the URL says nothing valid.
-  const courtId = courts.find((c) => c.id === params.courtId)?.id ?? courts[0].id;
+  const courtId =
+    courts.find((c) => c.id === params.courtId)?.id ?? courts[0].id;
   const date =
     params.date && DATE_RE.test(params.date) ? params.date : todayString();
 
@@ -104,6 +120,20 @@ export default async function BlocksPage({
     };
   });
 
+  // Page the day's slots. The picker's form carries only `courtId` and `date`,
+  // so changing either drops `page` and lands back on the first page — which is
+  // what you want, since page 2 of Tuesday means nothing on Wednesday.
+  const pageCount = pageCountFor(rows.length, BLOCKS_PAGE_SIZE);
+  const page = Math.min(parsePage(params.page), pageCount);
+  const pageRows = rows.slice(
+    (page - 1) * BLOCKS_PAGE_SIZE,
+    page * BLOCKS_PAGE_SIZE
+  );
+
+  const view = { courtId, date };
+  const pageHref = (n: number) =>
+    buildAdminHref("/admin/blocks", view, { page: n > 1 ? n : undefined });
+
   return (
     <>
       <PageHeader
@@ -138,7 +168,21 @@ export default async function BlocksPage({
               }
             />
           ) : (
-            <SlotBlockList courtId={courtId} date={date} slots={rows} />
+            <>
+              <SlotBlockList courtId={courtId} date={date} slots={pageRows} />
+
+              {pageCount > 1 && (
+                <PaginationBar
+                  page={page}
+                  pageCount={pageCount}
+                  total={rows.length}
+                  pageSize={BLOCKS_PAGE_SIZE}
+                  noun="slots"
+                  prevHref={page > 1 ? pageHref(page - 1) : null}
+                  nextHref={page < pageCount ? pageHref(page + 1) : null}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

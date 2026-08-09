@@ -77,7 +77,13 @@ export function flipDirection(direction: SortDirection): SortDirection {
 }
 
 /** Sortable columns of the Bookings table. */
-export const BOOKING_SORTS = ["date", "court", "amount"] as const;
+export const BOOKING_SORTS = [
+  "date",
+  "court",
+  "who",
+  "status",
+  "amount",
+] as const;
 export type BookingSort = (typeof BOOKING_SORTS)[number];
 
 /** Sortable columns of the Users table. */
@@ -90,6 +96,11 @@ export type UserSort = (typeof USER_SORTS)[number];
  * Dates and money read newest/largest first — that is the question an admin is
  * actually asking when they click them. Names read A–Z. Getting this wrong is
  * not a bug, just an extra click every time, which is worse.
+ *
+ * `status` ascending is the booking lifecycle in order (pending → confirmed →
+ * cancelled → blocked → expired), because that is how the Postgres enum is
+ * declared — so the first click puts the rows that still need a decision at the
+ * top, which is the reason to sort by status at all.
  */
 export const BOOKING_SORT_DEFAULT_DIRECTION: Record<
   BookingSort,
@@ -97,6 +108,8 @@ export const BOOKING_SORT_DEFAULT_DIRECTION: Record<
 > = {
   date: "desc",
   court: "asc",
+  who: "asc",
+  status: "asc",
   amount: "desc",
 };
 

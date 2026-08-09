@@ -139,7 +139,7 @@ export function UserConductDialog({
             <button
               type="button"
               title={`Open ${label}'s conduct record`}
-              className="rounded text-left font-medium underline decoration-dotted decoration-muted-foreground/50 underline-offset-4 transition-colors hover:text-primary hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="rounded text-left font-medium underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 transition-colors hover:text-primary hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             />
           }
         >
@@ -151,8 +151,12 @@ export function UserConductDialog({
             <Button
               variant="outline"
               size="sm"
-              title={`Open ${label}'s conduct record`}
-              className="h-8 gap-2 px-2.5 font-normal hover:border-primary/50 hover:bg-primary/5"
+              title={
+                average === null
+                  ? `Open ${label}'s conduct record — nothing recorded yet`
+                  : `Open ${label}'s conduct record — ${average.toFixed(1)} from ${count} ${count === 1 ? "rating" : "ratings"}`
+              }
+              className="h-8 gap-1.5 px-2 font-normal hover:border-primary/50 hover:bg-primary/5"
             />
           }
         >
@@ -164,8 +168,12 @@ export function UserConductDialog({
           ) : (
             <>
               <StarRating value={average} />
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {average.toFixed(1)} ({count})
+              {/* The average only. How many ratings it came from is in the
+                  button's title and spelled out in the dialog — in the table
+                  it was one more number competing for a column the Users page
+                  cannot spare. */}
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {average.toFixed(1)}
               </span>
             </>
           )}
@@ -236,7 +244,11 @@ export function UserConductDialog({
                   Saved against your name and today&rsquo;s date.
                 </p>
                 <Button size="sm" disabled={pending} onClick={submit}>
-                  {pending ? <Loader2 className="animate-spin" /> : <MessageSquarePlus />}
+                  {pending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <MessageSquarePlus />
+                  )}
                   {pending ? "Saving…" : "Save rating"}
                 </Button>
               </div>
@@ -290,7 +302,9 @@ export function UserConductDialog({
                         })}
                       </span>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap">{entry.comment}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {entry.comment}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {/* Null when that admin's account has since been removed —
                           the note survives, it just stops naming them. */}

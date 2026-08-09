@@ -152,7 +152,7 @@ export default async function BookingsPage({
     <>
       <PageHeader
         title="Bookings"
-        description="Every booking and admin block. Filter and sort to narrow the list — blocks appear here too, as bookings with status 'blocked'."
+        description="All bookings and admin blocks, newest first by default. Use the filters, or click a column heading to sort, to find a particular booking. Slot blocks appear here as rows with the status “blocked”."
       />
 
       <div className="flex flex-col gap-6">
@@ -220,15 +220,27 @@ export default async function BookingsPage({
                       direction={sort === "court" ? direction : null}
                     />
                     <TableHead>Time</TableHead>
-                    <TableHead>Who</TableHead>
+                    <SortableHeader
+                      label="Who"
+                      href={sortHref("who")}
+                      direction={sort === "who" ? direction : null}
+                    />
                     <TableHead className="text-right">Players</TableHead>
-                    <TableHead>Status</TableHead>
+                    <SortableHeader
+                      label="Status"
+                      href={sortHref("status")}
+                      direction={sort === "status" ? direction : null}
+                    />
                     <SortableHeader
                       label="Payment"
                       href={sortHref("amount")}
                       direction={sort === "amount" ? direction : null}
                     />
-                    <TableHead className="pr-5 text-right">Actions</TableHead>
+                    {/* Two icon slots plus the cell padding — fixed so the
+                        column does not breathe as rows gain or lose actions. */}
+                    <TableHead className="w-[4.5rem] pr-5 text-right">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
 

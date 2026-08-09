@@ -172,10 +172,7 @@ export function addDays(yyyymmdd: string, days: number): string {
  * venue's zone; using the UTC accessors here would show a message sent at
  * 02:00 Colombo time as the previous day.
  */
-export function formatDateTime(
-  date: Date,
-  timeZone = VENUE_TIME_ZONE
-): string {
+export function formatDateTime(date: Date, timeZone = VENUE_TIME_ZONE): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone,
     day: "numeric",
@@ -184,6 +181,22 @@ export function formatDateTime(
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
+  }).format(date);
+}
+
+/**
+ * The same instant without the clock — "21 Jul 2026".
+ *
+ * For table cells where the day is the answer and the minute is noise. The
+ * full `formatDateTime` string goes in the cell's `title`, so the time is one
+ * hover away rather than gone.
+ */
+export function formatDateOnly(date: Date, timeZone = VENUE_TIME_ZONE): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   }).format(date);
 }
 
