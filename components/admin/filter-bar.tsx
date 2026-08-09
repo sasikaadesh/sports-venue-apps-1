@@ -82,7 +82,10 @@ export function FilterForm({
 
         if (isImmediate) submit(event.currentTarget);
       }}
-      className="flex flex-col gap-5 rounded-xl border bg-card p-4 sm:p-5"
+      // Controls, not content: hidden when the page itself is printed. The
+      // printed *report* states its filters in words instead — see
+      // /admin/bookings/print.
+      className="flex flex-col gap-5 rounded-xl border bg-card p-4 sm:p-5 print:hidden"
     >
       {children}
     </form>
@@ -94,11 +97,18 @@ export function FilterBarHeader({
   resetHref,
   isFiltered,
   summary,
+  actions,
 }: {
   /** Where "Reset filters" goes — the page with no query string. */
   resetHref: string;
   isFiltered: boolean;
   summary?: string;
+  /**
+   * Extra controls that act on the filtered set — the Bookings bar puts Print
+   * here. They sit before Apply so the two buttons that change the view stay
+   * together at the end of the row.
+   */
+  actions?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -113,6 +123,8 @@ export function FilterBarHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        {actions}
+
         {/* No-JS fallback and the way to commit a typed search term. */}
         <Button type="submit" size="sm" variant="secondary">
           Apply

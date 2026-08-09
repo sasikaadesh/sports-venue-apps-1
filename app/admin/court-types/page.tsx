@@ -22,7 +22,7 @@ export default async function CourtTypesPage() {
     <>
       <PageHeader
         title="Court types"
-        description="Group courts by sport and define how many players each type allows. The player-count options set here drive the booking dropdown."
+        description="Group courts by sport, and set the player counts each type allows."
       />
 
       <CourtTypeManager

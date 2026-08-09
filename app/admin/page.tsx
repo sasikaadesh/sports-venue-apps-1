@@ -19,7 +19,10 @@ export default async function AdminOverviewPage() {
       prisma.court.count({ where: { isActive: true } }),
       prisma.slotTemplate.count(),
       prisma.booking.findMany({
-        where: { bookingDate: { gte: today }, status: { in: ["confirmed", "pending", "blocked"] } },
+        where: {
+          bookingDate: { gte: today },
+          status: { in: ["confirmed", "pending", "blocked"] },
+        },
         orderBy: [{ bookingDate: "asc" }],
         take: 5,
         select: {
@@ -42,7 +45,14 @@ export default async function AdminOverviewPage() {
       href: "/admin/courts",
     },
     { label: "Slots defined", value: slots, href: "/admin/courts" },
-    { label: "Pending holds", value: pendingCount, href: "/admin/bookings?status=pending" },
+    {
+      label: "Pending holds",
+      value: pendingCount,
+      // `dates=set` means "no date range, deliberately": /admin/bookings opens
+      // on the current month unless told otherwise, and this count is of every
+      // pending hold on record. The tile and the list it opens have to agree.
+      href: "/admin/bookings?status=pending&dates=set",
+    },
   ];
 
   const setupIncomplete = courtTypes === 0 || courts === 0 || slots === 0;
@@ -58,7 +68,7 @@ export default async function AdminOverviewPage() {
         <dl className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
             <div key={stat.label} className="bg-card px-5 py-4">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {stat.label}
               </dt>
               <dd className="mt-1 flex items-baseline gap-2">
@@ -115,7 +125,9 @@ export default async function AdminOverviewPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg">Coming up</h2>
             <LinkButton
-              href="/admin/bookings"
+              // "All" means all — see the Pending holds tile above for what
+              // `dates=set` does.
+              href="/admin/bookings?dates=set"
               variant="ghost"
               size="sm"
               className="h-8"
@@ -136,8 +148,12 @@ export default async function AdminOverviewPage() {
                   className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-5 py-3.5"
                 >
                   <span className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className="font-medium">{formatDate(b.bookingDate)}</span>
-                    <span className="text-muted-foreground">{b.court.name}</span>
+                    <span className="font-medium">
+                      {formatDate(b.bookingDate)}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {b.court.name}
+                    </span>
                     <span className="text-muted-foreground">
                       {b.status === "blocked"
                         ? "admin block"

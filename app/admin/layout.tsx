@@ -34,7 +34,9 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
+      {/* Screen chrome only. Printing any admin page — the bookings report
+          above all — should put the content on the sheet and nothing else. */}
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur print:hidden">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
           <div className="flex items-center gap-3">
             <Link
@@ -83,7 +85,9 @@ export default async function AdminLayout({
         <AdminNav unreadMessages={unreadMessages} />
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+      {/* On paper the page box IS the margin (`@page` in globals.css), so the
+          shell's own width cap and padding would only shrink the content. */}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10 print:max-w-none print:p-0">
         {children}
       </main>
 

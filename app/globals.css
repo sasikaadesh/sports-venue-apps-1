@@ -152,6 +152,93 @@
   --sidebar-ring: oklch(0.8 0.2 149.4);
 }
 
+/* Print — one theme, on paper.
+
+   The admin prints reports from this app (see /admin/bookings/print), and a
+   printer has no dark mode: whatever is on screen has to come out black on
+   white. Rather than sprinkling `print:` overrides through the components, the
+   TOKENS are redefined here for the print medium — both `:root` and `.dark`,
+   so an admin working after dark gets the same page as one working at noon.
+   Everything downstream reads tokens, so everything follows.
+
+   Colour is dropped rather than translated. Browsers do not print background
+   fills by default anyway (`print-color-adjust` is left alone deliberately), so
+   a surface that carries meaning only through its fill would print as nothing —
+   hence borders, not washes, and text instead of coloured badges. */
+@media print {
+  :root,
+  .dark {
+    color-scheme: light;
+
+    --background: #ffffff;
+    --foreground: #000000;
+    --card: #ffffff;
+    --card-foreground: #000000;
+    --popover: #ffffff;
+    --popover-foreground: #000000;
+    /* No accent on paper: a filled button prints as an empty rectangle on most
+       printers, and green ink on a monochrome report is either a smudge or a
+       waste of toner. */
+    --primary: #ffffff;
+    --primary-foreground: #000000;
+    --secondary: #ffffff;
+    --secondary-foreground: #000000;
+    --muted: #ffffff;
+    /* Dark enough to survive a low-toner laser printer — the on-screen zinc
+       greys come out as illegible haze. */
+    --muted-foreground: #3f3f46;
+    --accent: #ffffff;
+    --accent-foreground: #000000;
+    --destructive: #000000;
+    --border: #a1a1aa;
+    --input: #a1a1aa;
+    --ring: transparent;
+  }
+
+  /* A4 with a margin wide enough to hole-punch or staple. */
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  body {
+    /* Paper is not a screen: 10pt sets a sensible base for the whole document
+       and keeps a wide table inside the page box. */
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+
+  /* Rounded corners and shadows are screen affordances — on paper they are
+     just a fuzzy grey box around the content. */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Keep a long report readable across sheets: the column headings repeat on
+     every page, and no row is split down the middle by a page break. */
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+  tr,
+  img {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

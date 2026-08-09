@@ -1,3 +1,5 @@
+import { Printer } from "lucide-react";
+
 import {
   FilterBarHeader,
   FilterChips,
@@ -10,6 +12,7 @@ import {
   SortPassthrough,
   type ChipOption,
 } from "@/components/admin/filter-bar";
+import { LinkButton } from "@/components/link-button";
 import type {
   BookingFilters,
   BookingFilterOptions,
@@ -47,6 +50,9 @@ export function BookingFilterBar({
   direction,
   resetHref,
   isFiltered,
+  monthDefault,
+  printHref,
+  printable,
 }: {
   statuses: readonly BookingStatus[];
   options: BookingFilterOptions;
@@ -55,6 +61,12 @@ export function BookingFilterBar({
   direction: SortDirection;
   resetHref: string;
   isFiltered: boolean;
+  /** True while the untouched current-month range is what is being shown. */
+  monthDefault: boolean;
+  /** The print view of exactly this filtered, sorted set. */
+  printHref: string;
+  /** False when there is nothing to print — an empty report helps nobody. */
+  printable: boolean;
 }) {
   const statusOptions: ChipOption[] = [
     { value: "", label: "All" },
@@ -65,7 +77,37 @@ export function BookingFilterBar({
     <FilterForm action="/admin/bookings">
       <SortPassthrough sort={sort} direction={direction} />
 
-      <FilterBarHeader resetHref={resetHref} isFiltered={isFiltered} />
+      {/*
+        "The dates in this URL are deliberate." Every submission of this form
+        carries it, which is what lets an admin clear the range and see every
+        date — without it, empty dates would be re-defaulted to the current
+        month and there would be no way out. See `parseBookingView`.
+      */}
+      <input type="hidden" name="dates" value="set" />
+
+      <FilterBarHeader
+        resetHref={resetHref}
+        isFiltered={isFiltered}
+        summary={monthDefault ? "showing this month" : undefined}
+        actions={
+          printable ? (
+            <LinkButton
+              href={printHref}
+              size="sm"
+              variant="outline"
+              target="_blank"
+              // The report is a separate document, opened alongside the table
+              // rather than navigating away from filters that took a moment to
+              // set. `noopener` because `target="_blank"` without it hands the
+              // new tab a handle on this one.
+              rel="noopener"
+            >
+              <Printer data-icon="inline-start" />
+              Print
+            </LinkButton>
+          ) : undefined
+        }
+      />
 
       <FilterGrid>
         <FilterField label="Court" htmlFor="filter-court">
