@@ -231,3 +231,20 @@ export function formatPrice(amount: number | string): string {
     minimumFractionDigits: 2,
   }).format(Number(amount));
 }
+
+/**
+ * The same money, short — "LKR 128K" rather than "LKR 128,450.00".
+ *
+ * For dashboard tiles and chart axes, where the cent is noise and the full
+ * string is wide enough to wrap a card's heading onto two lines. Anywhere the
+ * exact figure is the point — an invoice, a booking row, a report total —
+ * keeps `formatPrice`.
+ */
+export function formatPriceCompact(amount: number | string): string {
+  return new Intl.NumberFormat("en-LK", {
+    style: "currency",
+    currency: "LKR",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(Number(amount));
+}

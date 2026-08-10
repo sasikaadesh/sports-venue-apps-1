@@ -195,9 +195,12 @@ export function FilterBarHeader({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        {actions}
-
+      {/*
+        Reset comes first so the report actions end flush with the panel's right
+        border — the same edge the filter grid below lines up on. `ml-auto` keeps
+        that true on narrow screens, where this cluster wraps onto its own row.
+      */}
+      <div className="ml-auto flex items-center gap-2">
         {isFiltered ? (
           <LinkButton href={resetHref} size="sm" variant="ghost">
             <RotateCcw data-icon="inline-start" />
@@ -208,6 +211,8 @@ export function FilterBarHeader({
           // the first filter does not shift the report buttons sideways.
           <span aria-hidden className="h-7 w-[7.5rem]" />
         )}
+
+        {actions}
       </div>
     </div>
   );
