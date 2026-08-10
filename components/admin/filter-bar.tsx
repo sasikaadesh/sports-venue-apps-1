@@ -1,10 +1,9 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, RotateCcw, SlidersHorizontal } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/link-button";
 import { cn } from "@/lib/utils";
 
@@ -27,9 +26,19 @@ import { cn } from "@/lib/utils";
  *     admin sorted by instead of silently resetting it.
  *
  * The form works with JavaScript off — it is a real GET form pointed at the
- * page — and the `onSubmit` handler is an upgrade, turning a full document load
- * into a client-side navigation.
+ * page, with a screen-reader-only submit button so Enter still works — and the
+ * `onSubmit` handler is an upgrade, turning a full document load into a
+ * client-side navigation.
  */
+
+/**
+ * How long a typed field waits before it queries.
+ *
+ * Long enough that a name typed at speed is one request rather than eight,
+ * short enough that it reads as "instant" — the table has usually redrawn
+ * before a hand gets back to the keyboard.
+ */
+const TYPING_DEBOUNCE_MS = 300;
 
 export function FilterForm({
   action,
@@ -41,8 +50,52 @@ export function FilterForm({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const currentQuery = searchParams.toString();
 
-  function submit(form: HTMLFormElement) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const timer = useRef<number | null>(null);
+
+  /**
+   * The remount key, and the two values that decide when it advances.
+   *
+   * The controls are uncontrolled (`defaultValue`/`defaultChecked`), which
+   * React sets once and never touches again, so an *external* change of the URL
+   * — "Reset filters", the back button, a bookmarked link — has to remount the
+   * form or the inputs would keep showing the previous selection while the
+   * table below showed the new one.
+   *
+   * A form's *own* submissions must not remount it, though. Filters now apply
+   * as you type, and remounting mid-word would tear the focus out of the search
+   * box after every debounce and drop the caret. So `ownQuery` records the query
+   * string this form last navigated to, and the key advances only when the URL
+   * became something this form did not ask for.
+   *
+   * Adjusting state during render (rather than in an effect) is deliberate: the
+   * key has to be right in the render that first sees the new URL, or the form
+   * flashes the stale values for a frame.
+   */
+  const [ownQuery, setOwnQuery] = useState<string | null>(null);
+  const [seenQuery, setSeenQuery] = useState(currentQuery);
+  const [generation, setGeneration] = useState(0);
+
+  if (currentQuery !== seenQuery) {
+    setSeenQuery(currentQuery);
+    if (ownQuery !== currentQuery) setGeneration((n) => n + 1);
+  }
+
+  const cancelPending = useCallback(() => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+
+  const submit = useCallback(() => {
+    cancelPending();
+
+    const form = formRef.current;
+    if (!form) return;
+
     const params = new URLSearchParams();
 
     for (const [key, value] of new FormData(form).entries()) {
@@ -52,35 +105,45 @@ export function FilterForm({
     }
 
     const query = params.toString();
+    setOwnQuery(query);
     router.push(query ? `${action}?${query}` : action, { scroll: false });
-  }
+  }, [action, cancelPending, router]);
+
+  // A pending keystroke must not fire into an unmounted form.
+  useEffect(() => cancelPending, [cancelPending]);
 
   return (
     <form
-      // Remount when the URL changes. The controls are uncontrolled
-      // (`defaultValue`/`defaultChecked`), which React sets once and never
-      // touches again — so after a "Reset filters" click, or a back button, the
-      // inputs would otherwise still show the previous selection while the
-      // table below showed the new one.
-      key={searchParams.toString()}
+      key={generation}
+      ref={formRef}
       method="GET"
       action={action}
       onSubmit={(event) => {
         event.preventDefault();
-        submit(event.currentTarget);
+        submit();
       }}
-      // Picking from a dropdown, a chip or a date field is a complete decision,
-      // so apply it immediately. Typing in the search box is not — that one
-      // waits for Enter or the Apply button, rather than firing a query per
-      // keystroke.
+      /*
+        Every control applies itself — there is no Apply button. Picking from a
+        dropdown or a chip is one complete decision, so it queries at once.
+        Typing is not: a search term and a date are both entered a character at
+        a time, and a query per keystroke would be eight requests for one name
+        and a flurry of half-typed dates ("2026-08-" is an empty date, which
+        means "all dates"). Those wait out `TYPING_DEBOUNCE_MS` of quiet.
+      */
       onChange={(event) => {
         const target = event.target;
-        const isImmediate =
-          target instanceof HTMLSelectElement ||
-          (target instanceof HTMLInputElement &&
-            (target.type === "radio" || target.type === "date"));
 
-        if (isImmediate) submit(event.currentTarget);
+        const isInstant =
+          target instanceof HTMLSelectElement ||
+          (target instanceof HTMLInputElement && target.type === "radio");
+
+        if (isInstant) {
+          submit();
+          return;
+        }
+
+        cancelPending();
+        timer.current = window.setTimeout(submit, TYPING_DEBOUNCE_MS);
       }}
       // Controls, not content: hidden when the page itself is printed. The
       // printed *report* states its filters in words instead — see
@@ -88,11 +151,21 @@ export function FilterForm({
       className="flex flex-col gap-5 rounded-xl border bg-card p-4 sm:p-5 print:hidden"
     >
       {children}
+
+      {/*
+        With no Apply button, this is what makes Enter submit the form: implicit
+        submission needs a submit button once a form has more than one text
+        field. It is also the whole no-JS story — without JavaScript the debounce
+        never runs, and this posts the form as a plain GET.
+      */}
+      <button type="submit" className="sr-only">
+        Apply filters
+      </button>
     </form>
   );
 }
 
-/** Heading row: the bar's title, and the Apply/Reset controls. */
+/** Heading row: the bar's title, its report actions, and Reset. */
 export function FilterBarHeader({
   resetHref,
   isFiltered,
@@ -104,9 +177,9 @@ export function FilterBarHeader({
   isFiltered: boolean;
   summary?: string;
   /**
-   * Extra controls that act on the filtered set — the Bookings bar puts Print
-   * here. They sit before Apply so the two buttons that change the view stay
-   * together at the end of the row.
+   * Controls that act on the filtered set — the Bookings bar puts Print and
+   * Export PDF here. Nothing in this row applies a filter any more: the filters
+   * apply themselves as they change.
    */
   actions?: React.ReactNode;
 }) {
@@ -125,11 +198,6 @@ export function FilterBarHeader({
       <div className="flex items-center gap-2">
         {actions}
 
-        {/* No-JS fallback and the way to commit a typed search term. */}
-        <Button type="submit" size="sm" variant="secondary">
-          Apply
-        </Button>
-
         {isFiltered ? (
           <LinkButton href={resetHref} size="sm" variant="ghost">
             <RotateCcw data-icon="inline-start" />
@@ -137,7 +205,7 @@ export function FilterBarHeader({
           </LinkButton>
         ) : (
           // Held in the layout even when there is nothing to reset, so applying
-          // a filter does not shift the Apply button sideways.
+          // the first filter does not shift the report buttons sideways.
           <span aria-hidden className="h-7 w-[7.5rem]" />
         )}
       </div>
@@ -276,8 +344,10 @@ export type ComboOption = { id: string; label: string };
  * The text field drops its `name` once a person is resolved, so a submit
  * carries the id alone and the URL never grows a redundant copy of the label.
  *
- * Like the other text inputs it waits for Enter or Apply rather than querying
- * per keystroke — see `FilterForm`.
+ * Like the other typed fields it applies itself, debounced, rather than
+ * querying per keystroke — see `FilterForm`. Its own text is React state, so it
+ * survives the re-render that each debounced query causes and the caret stays
+ * where it was.
  */
 export function FilterCombobox({
   id,

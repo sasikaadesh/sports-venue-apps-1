@@ -15,6 +15,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/**": ["lib/generated/prisma/**"],
   },
+  // react-pdf ships a browser build and a Node build and picks between them
+  // through conditional exports. Left to the bundler it can end up with the
+  // browser one inside a route handler, where `renderToBuffer` does not exist.
+  // Keeping it external makes the function `require()` it at runtime, which
+  // resolves the Node build — and keeps its font machinery out of the bundle.
+  serverExternalPackages: ["@react-pdf/renderer"],
   experimental: {
     serverActions: {
       // Court image uploads post through a server action. The default cap is
