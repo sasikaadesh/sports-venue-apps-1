@@ -4,35 +4,20 @@ import { ArrowLeft } from "lucide-react";
 import { AutoPrint, PrintButton } from "@/components/admin/print-controls";
 import { requireAdmin } from "@/lib/auth";
 import {
-  PRINT_ROW_LIMIT,
-  describeBookingFilters,
-  listAdminBookingsForPrint,
   parseBookingView,
-  summariseAdminBookings,
   type BookingSearchParams,
-  type PrintBookingRow,
 } from "@/lib/admin-bookings";
-import { buildAdminHref } from "@/lib/admin-filters";
 import {
-  dateStringToDate,
-  dateToTimeString,
-  formatDate,
-  formatDateTime,
-  formatPrice,
-} from "@/lib/time";
+  REPORT_COLUMNS,
+  buildBookingReport,
+  type ReportAlign,
+  type ReportRow,
+} from "@/lib/booking-report";
+import { buildAdminHref } from "@/lib/admin-filters";
 
 export const metadata = { title: "Bookings report — Admin" };
 
 const PATH = "/admin/bookings/print";
-
-/** How each sort column reads in the report's header line. */
-const SORT_LABEL = {
-  date: "date",
-  court: "court",
-  who: "who booked",
-  status: "status",
-  amount: "amount",
-} as const;
 
 /**
  * A printable report of the bookings currently filtered on /admin/bookings.
@@ -42,6 +27,12 @@ const SORT_LABEL = {
  * report is by construction the set the admin was looking at — filtered the
  * same way, sorted the same way. The one difference is paging: a report stops
  * at `PRINT_ROW_LIMIT`, not at 25, because a page of a list is not a report.
+ *
+ * The report's *content* — its heading lines, totals and rows — is not built
+ * here. It comes from `buildBookingReport`, which the PDF route renders too, so
+ * printing this page and downloading the PDF cannot produce different reports.
+ * This file is one of the two renderers; `lib/reports/bookings-pdf.tsx` is the
+ * other.
  *
  * Admin-only, like the table: `requireAdmin` here as well as in the layout,
  * since a layout is not a boundary.
@@ -62,23 +53,10 @@ export default async function BookingsPrintPage({
   const params = await searchParams;
   const { filters, sort, direction, view } = parseBookingView(params);
 
-  const [{ rows, truncated }, summary, applied] = await Promise.all([
-    listAdminBookingsForPrint({ filters, sort, direction }),
-    summariseAdminBookings(filters),
-    describeBookingFilters(filters),
-  ]);
+  const report = await buildBookingReport({ filters, sort, direction });
 
   // Back to the table exactly as it was left — same filters, same order.
   const backHref = buildAdminHref("/admin/bookings", view);
-
-  const range =
-    filters.from && filters.to
-      ? `${formatDate(dateStringToDate(filters.from))} – ${formatDate(dateStringToDate(filters.to))}`
-      : filters.from
-        ? `From ${formatDate(dateStringToDate(filters.from))}`
-        : filters.to
-          ? `Up to ${formatDate(dateStringToDate(filters.to))}`
-          : "All dates";
 
   return (
     <>
@@ -100,11 +78,11 @@ export default async function BookingsPrintPage({
         {/* --- Masthead ------------------------------------------------- */}
         <header className="flex flex-col gap-1 border-b pb-4">
           <p className="font-heading text-xs font-bold tracking-widest uppercase">
-            Courtside
+            {report.brand}
           </p>
-          <h1 className="text-2xl leading-none">Bookings report</h1>
+          <h1 className="text-2xl leading-none">{report.title}</h1>
           <p className="text-sm text-muted-foreground">
-            {range} · generated {formatDateTime(new Date())}
+            {report.range} · generated {report.generatedAt}
           </p>
         </header>
 
@@ -113,14 +91,14 @@ export default async function BookingsPrintPage({
           <h2 className="text-xs font-bold tracking-widest uppercase">
             Filters applied
           </h2>
-          {applied.length === 0 ? (
+          {report.applied.length === 0 ? (
             <p className="text-muted-foreground">
               None beyond the date range above — every booking and admin block
               in the period.
             </p>
           ) : (
             <ul className="flex flex-wrap gap-x-6 gap-y-1">
-              {applied.map((item) => (
+              {report.applied.map((item) => (
                 <li key={item.label}>
                   <span className="text-muted-foreground">{item.label}: </span>
                   <span className="font-medium capitalize">{item.value}</span>
@@ -128,10 +106,7 @@ export default async function BookingsPrintPage({
               ))}
             </ul>
           )}
-          <p className="text-muted-foreground">
-            Sorted by {SORT_LABEL[sort]},{" "}
-            {direction === "asc" ? "ascending" : "descending"}.
-          </p>
+          <p className="text-muted-foreground">{report.sortLine}</p>
         </section>
 
         {/* --- Summary --------------------------------------------------
@@ -142,34 +117,15 @@ export default async function BookingsPrintPage({
             Summary
           </h2>
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4 print:gap-0 print:rounded-none print:bg-transparent">
-            <Figure label="Bookings shown" value={summary.total} />
-            <Figure
-              label="Confirmed"
-              value={summary.confirmed}
-              note={`${summary.pending} pending`}
-            />
-            <Figure
-              label="Value of live bookings"
-              value={formatPrice(summary.bookedValue)}
-              note="pending + confirmed, at list price"
-            />
-            <Figure
-              label="Payments received"
-              value={formatPrice(summary.paidValue)}
-              note={`${summary.paidCount} successful ${summary.paidCount === 1 ? "payment" : "payments"}`}
-            />
+            {report.figures.map((figure) => (
+              <Figure key={figure.label} {...figure} />
+            ))}
           </dl>
-          <p className="text-xs text-muted-foreground">
-            Also in the period: {summary.cancelled} cancelled, {summary.expired}{" "}
-            expired, {summary.blocked} admin{" "}
-            {summary.blocked === 1 ? "block" : "blocks"}. Cancelled, expired and
-            blocked rows are excluded from the value figure — a block was never
-            money, and a released booking is not revenue.
-          </p>
+          <p className="text-xs text-muted-foreground">{report.summaryNote}</p>
         </section>
 
         {/* --- The rows -------------------------------------------------- */}
-        {rows.length === 0 ? (
+        {report.rows.length === 0 ? (
           <p className="rounded-xl border border-dashed px-5 py-8 text-sm text-muted-foreground print:rounded-none">
             Nothing matched these filters, so there is nothing to print. Go back
             and widen the date range.
@@ -178,79 +134,55 @@ export default async function BookingsPrintPage({
           <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b-2 border-foreground/70">
-                <Th>Date</Th>
-                <Th>Time</Th>
-                <Th>Court</Th>
-                <Th>Booked by</Th>
-                <Th align="right">Players</Th>
-                <Th>Status</Th>
-                <Th align="right">Value</Th>
-                <Th>Payment</Th>
+                {REPORT_COLUMNS.map((column) => (
+                  <Th key={column.key} align={column.align}>
+                    {column.label}
+                  </Th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((booking) => (
-                <ReportRow key={booking.id} booking={booking} />
+              {report.rows.map((row) => (
+                <tr key={row.id} className="border-b border-border">
+                  {REPORT_COLUMNS.map((column) => (
+                    <Td
+                      key={column.key}
+                      align={column.align}
+                      // Times read as data, statuses read as labels; every
+                      // other cell is prose. Plain text throughout — a printer
+                      // drops background fills, so the screen's colour-coded
+                      // badge would print as a word in a faint box at best.
+                      className={
+                        column.key === "time"
+                          ? "font-mono text-xs"
+                          : column.key === "status"
+                            ? "capitalize"
+                            : ""
+                      }
+                    >
+                      {row[column.key as keyof ReportRow]}
+                    </Td>
+                  ))}
+                </tr>
               ))}
             </tbody>
           </table>
         )}
 
-        {truncated && (
+        {report.truncated && (
           <p className="text-sm font-medium">
-            This report stops at the first {PRINT_ROW_LIMIT} rows. The summary
-            above still covers all {summary.total} — narrow the date range to
-            list every one of them.
+            This report stops at the first {report.rowLimit} rows. The summary
+            above still covers all {report.totalCount} — narrow the date range
+            to list every one of them.
           </p>
         )}
 
         <footer className="border-t pt-3 text-xs text-muted-foreground">
-          Courtside · internal booking report · generated{" "}
-          {formatDateTime(new Date())}. Figures are as at the moment of
-          printing.
+          {report.brand} · internal booking report · generated{" "}
+          {report.generatedAt}. Figures are as at the moment of printing.
         </footer>
       </article>
     </>
-  );
-}
-
-/** One row of the report. */
-function ReportRow({ booking }: { booking: PrintBookingRow }) {
-  const first = booking.slots[0];
-  const last = booking.slots[booking.slots.length - 1];
-  const payment = booking.payments[0];
-  const isBlock = booking.status === "blocked";
-
-  return (
-    <tr className="border-b border-border">
-      <Td>{formatDate(booking.bookingDate)}</Td>
-      <Td className="font-mono text-xs">
-        {first && last
-          ? `${dateToTimeString(first.slot.startTime)}–${dateToTimeString(last.slot.endTime)}`
-          : "released"}
-      </Td>
-      <Td>{booking.court.name}</Td>
-      <Td>
-        {isBlock
-          ? "Admin block"
-          : (booking.user?.name ?? booking.user?.email ?? "—")}
-      </Td>
-      <Td align="right">{isBlock ? "—" : booking.playerCount}</Td>
-      {/* Plain text, not the screen's colour-coded badge: a printer drops
-          background fills, so a badge prints as a word in a faint box at best
-          and an invisible word at worst. */}
-      <Td className="capitalize">{booking.status}</Td>
-      <Td align="right">
-        {isBlock ? "—" : formatPrice(booking.totalPrice.toString())}
-      </Td>
-      <Td>
-        {payment
-          ? `${payment.status} · ${formatPrice(payment.amount.toString())}`
-          : isBlock
-            ? "—"
-            : "unpaid"}
-      </Td>
-    </tr>
   );
 }
 
@@ -259,7 +191,7 @@ function Th({
   align = "left",
 }: {
   children: React.ReactNode;
-  align?: "left" | "right";
+  align?: ReportAlign;
 }) {
   return (
     <th
@@ -279,7 +211,7 @@ function Td({
   className = "",
 }: {
   children: React.ReactNode;
-  align?: "left" | "right";
+  align?: ReportAlign;
   className?: string;
 }) {
   return (
@@ -298,7 +230,7 @@ function Figure({
   note,
 }: {
   label: string;
-  value: string | number;
+  value: string;
   note?: string;
 }) {
   return (

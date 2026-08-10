@@ -1,4 +1,4 @@
-import { Printer } from "lucide-react";
+import { FileDown, Printer } from "lucide-react";
 
 import {
   FilterBarHeader,
@@ -13,6 +13,7 @@ import {
   type ChipOption,
 } from "@/components/admin/filter-bar";
 import { LinkButton } from "@/components/link-button";
+import { buttonVariants } from "@/components/ui/button";
 import type {
   BookingFilters,
   BookingFilterOptions,
@@ -52,6 +53,7 @@ export function BookingFilterBar({
   isFiltered,
   monthDefault,
   printHref,
+  pdfHref,
   printable,
 }: {
   statuses: readonly BookingStatus[];
@@ -65,7 +67,9 @@ export function BookingFilterBar({
   monthDefault: boolean;
   /** The print view of exactly this filtered, sorted set. */
   printHref: string;
-  /** False when there is nothing to print — an empty report helps nobody. */
+  /** The PDF of that same set — the same query string, rendered server-side. */
+  pdfHref: string;
+  /** False when there is nothing to report — an empty report helps nobody. */
   printable: boolean;
 }) {
   const statusOptions: ChipOption[] = [
@@ -91,20 +95,43 @@ export function BookingFilterBar({
         summary={monthDefault ? "showing this month" : undefined}
         actions={
           printable ? (
-            <LinkButton
-              href={printHref}
-              size="sm"
-              variant="outline"
-              target="_blank"
-              // The report is a separate document, opened alongside the table
-              // rather than navigating away from filters that took a moment to
-              // set. `noopener` because `target="_blank"` without it hands the
-              // new tab a handle on this one.
-              rel="noopener"
-            >
-              <Printer data-icon="inline-start" />
-              Print
-            </LinkButton>
+            /*
+              The two ways to get this view off the screen, kept together at the
+              right of the bar. Both carry the *current* query string, so each
+              one reports exactly what is on screen — same filters, same sort.
+            */
+            <div className="flex items-center gap-2">
+              <LinkButton
+                href={printHref}
+                size="sm"
+                variant="outline"
+                target="_blank"
+                // The report is a separate document, opened alongside the table
+                // rather than navigating away from filters that took a moment to
+                // set. `noopener` because `target="_blank"` without it hands the
+                // new tab a handle on this one.
+                rel="noopener"
+              >
+                <Printer data-icon="inline-start" />
+                Print
+              </LinkButton>
+
+              {/*
+                A plain <a>, not next/link: this is a route handler streaming a
+                PDF, not a page, so there is nothing for the client router to
+                render or prefetch. `download` plus the handler's
+                Content-Disposition make it a file in the downloads tray rather
+                than a navigation.
+              */}
+              <a
+                href={pdfHref}
+                download
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                <FileDown data-icon="inline-start" />
+                Export PDF
+              </a>
+            </div>
           ) : undefined
         }
       />

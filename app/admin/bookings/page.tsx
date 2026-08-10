@@ -41,6 +41,7 @@ export const metadata = { title: "Bookings — Admin" };
 
 const PATH = "/admin/bookings";
 const PRINT_PATH = "/admin/bookings/print";
+const PDF_PATH = "/api/admin/bookings/report";
 
 /**
  * The whole table, no date range at all.
@@ -99,8 +100,11 @@ export default async function BookingsPage({
     return buildAdminHref(PATH, view, { sort: column, dir: next });
   }
 
-  // The report is this exact view, unpaged: same filters, same order.
+  // Both reports are this exact view, unpaged: same filters, same order. They
+  // are built from the *parsed* view, like every other link here, so neither
+  // can be handed a filter the table itself is not applying.
   const printHref = buildAdminHref(PRINT_PATH, view);
+  const pdfHref = buildAdminHref(PDF_PATH, view);
 
   // A month with nothing in it is not the same as an empty table, and the way
   // out is different — widen the range rather than reset filters that are not
@@ -128,6 +132,7 @@ export default async function BookingsPage({
           isFiltered={isFiltered}
           monthDefault={monthDefault}
           printHref={printHref}
+          pdfHref={pdfHref}
           printable={total > 0}
         />
 
