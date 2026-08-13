@@ -24,7 +24,7 @@ export function CourtCard({
   return (
     <Link
       href={`/courts/${court.id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="group flex h-full flex-col overflow-hidden rounded-lg border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
       {/* Consistent 4:3 across the grid, per DESIGN.md. */}
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">

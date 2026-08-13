@@ -25,13 +25,14 @@ import { formatPrice, formatPriceCompact } from "@/lib/time";
  *
  * **Colour comes from the theme, never from Recharts.** Each series is a
  * `var(--chart-N)` token — the ramp defined in `app/globals.css`, which runs
- * from the electric-green accent through zinc rather than through a second
- * bright hue (docs/DESIGN.md: one accent, committed). CSS variables resolve at
+ * down the school greens and uses the gold as the single contrasting series,
+ * rather than reaching for a second bright hue (docs/DESIGN.md). CSS variables
+ * resolve at
  * paint time in SVG exactly as they do in HTML, which is what lets these charts
  * follow the light/dark toggle with no JavaScript and no `dark:` classes.
  */
 
-/** Green first, then down the zinc ramp. Beyond five, slices fold into "Other". */
+/** Greens first, then gold, then muted. Beyond five, slices fold into "Other". */
 const SLICE_COLORS = [
   "var(--chart-1)",
   "var(--chart-2)",
@@ -113,8 +114,8 @@ export type TrendDatum = {
  * Two series on two axes, because they are measured in different things and the
  * question management asks is whether they move together — a month where
  * bookings held up but revenue fell is the one worth a meeting. Bookings take
- * the accent and the visual weight; revenue is a thin zinc line over the top,
- * so the chart still reads as one accent rather than two competing colours.
+ * the green and the visual weight; revenue is a thin gold line over the top —
+ * the brand's own two colours, in the brand's own proportion.
  */
 export function BookingsTrendChart({ data }: { data: TrendDatum[] }) {
   return (
@@ -205,7 +206,7 @@ export function CourtMixChart({ data }: { data: MixDatum[] }) {
               innerRadius={54}
               outerRadius={84}
               paddingAngle={2}
-              // The card colour between slices, so adjacent zinc tones stay
+              // The card colour between slices, so adjacent greens stay
               // separable without a stroke that would look like an outline.
               stroke="var(--card)"
               strokeWidth={2}

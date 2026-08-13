@@ -96,7 +96,8 @@ Payment
 ```
 
 Notes:
-- **Slots are fixed 1-hour blocks.** A `SlotTemplate` is exactly one bookable hour. A user picks a *start* slot plus a *duration* of N consecutive hours (minimum 1).
+
+- **Slots are fixed 1-hour blocks.** A `SlotTemplate` is exactly one bookable hour. A user picks a _start_ slot plus a _duration_ of N consecutive hours (minimum 1).
 - **`Booking` is the reservation; `BookingSlot` is the hour.** One booking row, N child rows. The unique constraint lives on the child, so every occupied hour is independently protected — a 3-hour booking holds three protected rows.
 - **`courtId` and `bookingDate` are denormalised onto `BookingSlot`** so the unique constraint can be evaluated within a single row. They must always match the parent `Booking`; treat the parent as the source of truth and write them together in the same transaction. (`UNIQUE (bookingDate, slotId)` would in fact suffice, since a `SlotTemplate` already belongs to exactly one court — the `courtId` is kept to match the constraint named in CLAUDE.md and to keep availability queries on one table.)
 - **Prices are frozen at booking time.** `BookingSlot.price` copies the template's price and `Booking.totalPrice` is their sum. Editing a `SlotTemplate`'s price later must never retroactively change what someone already booked and paid.
@@ -112,17 +113,17 @@ Shipped in migration `20260722120000_multi_hour_bookings`, which moved `slotId` 
 
 The one table that summarises this doc's access rules. "Owner" means the signed-in user the row is about.
 
-| Data | Public / signed-out | Owner | Admin | Super admin |
-| --- | --- | --- | --- | --- |
-| Court, CourtType, SlotTemplate (active) | read | read | read + write | read + write |
-| Booking / BookingSlot | — | own only | all | all |
-| Payment | — | own only | all | all |
-| ContactMessage | write (submit) | — | read + manage | read + manage |
-| User — name, phone, address | — | own, editable | all, read | all, read |
-| **User.nic** | **never** | own, editable | all, read | all, read |
-| **User.affiliation** | **never** | own, editable | all, read | all, read |
-| User.role | — | own, read-only | read | read + assign (`user`/`admin` only) |
-| **UserRating** | **never** | **never — not even rows about them** | read + add | read + add |
+| Data                                    | Public / signed-out | Owner                                | Admin         | Super admin                         |
+| --------------------------------------- | ------------------- | ------------------------------------ | ------------- | ----------------------------------- |
+| Court, CourtType, SlotTemplate (active) | read                | read                                 | read + write  | read + write                        |
+| Booking / BookingSlot                   | —                   | own only                             | all           | all                                 |
+| Payment                                 | —                   | own only                             | all           | all                                 |
+| ContactMessage                          | write (submit)      | —                                    | read + manage | read + manage                       |
+| User — name, phone, address             | —                   | own, editable                        | all, read     | all, read                           |
+| **User.nic**                            | **never**           | own, editable                        | all, read     | all, read                           |
+| **User.affiliation**                    | **never**           | own, editable                        | all, read     | all, read                           |
+| User.role                               | —                   | own, read-only                       | read          | read + assign (`user`/`admin` only) |
+| **UserRating**                          | **never**           | **never — not even rows about them** | read + add    | read + add                          |
 
 `UserRating` is the only row in this table where the owner column is empty. Everywhere else in the schema a user may read the rows that name them; conduct notes are the deliberate exception, and the reason it is worth a table of its own is that the exception is easy to undo by accident.
 
@@ -140,13 +141,13 @@ Slots are defined as templates, not stored per-day. To get availability for a co
 2. Load the `BookingSlot`s for that court + date whose parent `Booking` has status `confirmed`, `pending` (unexpired hold), or `blocked`.
 3. A single hour is **free** if no such `BookingSlot` occupies it.
 
-**Availability for a chosen duration N:** a start slot is bookable at duration N only if *every* hour in the range is free. Concretely, walking forward from the start slot, all N slots must:
+**Availability for a chosen duration N:** a start slot is bookable at duration N only if _every_ hour in the range is free. Concretely, walking forward from the start slot, all N slots must:
 
 - exist as templates for that court and weekday, and be `isActive`;
 - be **contiguous in time** — each slot's `endTime` equals the next slot's `startTime`;
 - be free per step 3.
 
-If any one hour fails, that start slot is not offered at that duration. Contiguity has to be checked against the clock, not against list position: a court with 09:00–10:00 and then 14:00–15:00 has two slots that are adjacent in the ordered list but are *not* two consecutive hours, and must never be sold as a 2-hour booking.
+If any one hour fails, that start slot is not offered at that duration. Contiguity has to be checked against the clock, not against list position: a court with 09:00–10:00 and then 14:00–15:00 has two slots that are adjacent in the ordered list but are _not_ two consecutive hours, and must never be sold as a 2-hour booking.
 
 This keeps the DB small and the admin panel simple.
 
@@ -208,7 +209,7 @@ Three modules, split by who is allowed to call them:
 
 - **`Payment.orderId` is a uuid** and is uniquely indexed, so the webhook resolves an order with one lookup and cannot match two rows. A repeated Pay click reuses the existing `pending` payment at the same amount rather than littering a row per click.
 - **The amount is `Booking.totalPrice`**, read on the server. It is never a parameter, so the "pay for one hour, reserve six" attack has no input to attack.
-- **The webhook's checks are ordered and total**: our merchant id → `md5sig` → known order → amount *and* currency match what we stored → only then does `status_code` mean anything. Failing one of the first two answers 403 (that request is not from PayHere); anything merely unknown answers 200, because PayHere retries non-2xx and retrying will not make an unknown order known.
+- **The webhook's checks are ordered and total**: our merchant id → `md5sig` → known order → amount _and_ currency match what we stored → only then does `status_code` mean anything. Failing one of the first two answers 403 (that request is not from PayHere); anything merely unknown answers 200, because PayHere retries non-2xx and retrying will not make an unknown order known.
 - **Confirmation is a compare-and-set.** `confirmPaidBooking` uses `updateMany` matching `status: 'pending'`, so it races safely against the expiry sweep and is idempotent under PayHere's retries — which is also what stops the confirmation email going out twice.
 - **The hold is extended to 20 minutes when checkout opens** (`PAYMENT_HOLD_MINUTES`), because card entry, OTP and the bank redirect all happen inside it.
 - **Paid-but-unconfirmable is handled explicitly.** If the hold lapsed and the sweep released the hours before the notification arrived, the payment is still recorded `success` but the booking is **not** confirmed — the hours may already belong to someone else. It logs `PAID BUT UNCONFIRMABLE … Refund required`, and both the booking page and the status page tell the user plainly that the office will contact them. Confirming anyway would sell one hour twice.
@@ -218,7 +219,7 @@ Three modules, split by who is allowed to call them:
 
 ## Releasing a booking (holds, cancellations, unblocks)
 
-**A `BookingSlot` row exists only while its booking actually holds that hour.** Releasing a booking — an expired hold, a cancellation, an unblock — *deletes* its `BookingSlot` rows. The parent stays behind as the record, with status `expired` / `cancelled`.
+**A `BookingSlot` row exists only while its booking actually holds that hour.** Releasing a booking — an expired hold, a cancellation, an unblock — _deletes_ its `BookingSlot` rows. The parent stays behind as the record, with status `expired` / `cancelled`.
 
 This is forced by the constraint. `UNIQUE (courtId, bookingDate, slotId)` is evaluated on the `BookingSlot` row alone and cannot consult the parent's status, so a released booking that kept its hour-rows would make those hours permanently unsellable — availability would show them free and every insert would fail with a constraint error. Deleting the rows is what keeps the constraint and the availability view telling the same story.
 
@@ -233,9 +234,9 @@ This is forced by the constraint. `UNIQUE (courtId, bookingDate, slotId)` is eva
 Whether a user can undo their own booking depends entirely on whether money has changed hands:
 
 - **Unpaid (`pending`) — the user may remove it freely.** Nothing has been charged, so a `pending` booking is the user's to cancel at will. Removal follows the release path above: delete its `BookingSlot` rows (freeing the hours immediately) and set the parent to `cancelled`. This is also what an abandoned selection becomes on its own once `holdExpiresAt` passes (`expired`) — a deliberate remove just does it now instead of on the sweep.
-- **Paid (`confirmed`) — the user may *not* self-remove it.** Once payment is verified and the booking is `confirmed`, the hours are genuinely sold; letting the user delete the row would release a paid slot with no money returned and no record of why. Instead the user **requests a refund with a reason**, which an **admin reviews** and approves or declines. Only on an approved refund does the booking release its slots (→ `cancelled`) — so a confirmed slot never frees up without an explicit, audited admin decision.
+- **Paid (`confirmed`) — the user may _not_ self-remove it.** Once payment is verified and the booking is `confirmed`, the hours are genuinely sold; letting the user delete the row would release a paid slot with no money returned and no record of why. Instead the user **requests a refund with a reason**, which an **admin reviews** and approves or declines. Only on an approved refund does the booking release its slots (→ `cancelled`) — so a confirmed slot never frees up without an explicit, audited admin decision.
 
-**Refund flow (implemented after Phase 8).** A confirmed booking gains a user-initiated *refund request* (a reason + status), surfaced to admins for review. On approval the admin issues the refund through **PayHere's Refund API** and the booking is released; on decline the booking stays `confirmed` and the reason is recorded. This reuses the release mechanics above — the only new parts are the request record, the admin review step, and the PayHere refund call. Exact schema (a `RefundRequest` model vs. fields on `Booking`/`Payment`) is decided when the flow is built; until then, `confirmed` bookings are terminal from the user's side.
+**Refund flow (implemented after Phase 8).** A confirmed booking gains a user-initiated _refund request_ (a reason + status), surfaced to admins for review. On approval the admin issues the refund through **PayHere's Refund API** and the booking is released; on decline the booking stays `confirmed` and the reason is recorded. This reuses the release mechanics above — the only new parts are the request record, the admin review step, and the PayHere refund call. Exact schema (a `RefundRequest` model vs. fields on `Booking`/`Payment`) is decided when the flow is built; until then, `confirmed` bookings are terminal from the user's side.
 
 ## Auth & roles
 
@@ -249,18 +250,18 @@ Supabase Auth owns credentials; the app owns the role.
 
 ### The role ladder (`20260726120100_super_admin_role`)
 
-| role | can |
-| --- | --- |
-| `user` | book courts, edit own profile |
-| `admin` | everything about courts, types, slots, bookings, contact messages; remove **user** accounts |
-| `super_admin` | all of `admin`, plus promote a user to admin, demote an admin, remove an admin account |
+| role          | can                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| `user`        | book courts, edit own profile                                                               |
+| `admin`       | everything about courts, types, slots, bookings, contact messages; remove **user** accounts |
+| `super_admin` | all of `admin`, plus promote a user to admin, demote an admin, remove an admin account      |
 
-- **`super_admin` is a strict superset of `admin`.** `is_admin()` in Postgres and `roleIsAdmin()` in TypeScript both mean "admin *or* super admin", so every pre-existing admin gate covers super admins without being touched. Only the genuinely extra powers check for `super_admin` specifically.
+- **`super_admin` is a strict superset of `admin`.** `is_admin()` in Postgres and `roleIsAdmin()` in TypeScript both mean "admin _or_ super admin", so every pre-existing admin gate covers super admins without being touched. Only the genuinely extra powers check for `super_admin` specifically.
 - **A plain admin can never touch an admin.** Enforced three times over, because each layer covers a path the others do not:
-  - **Server actions** (`app/admin/users/actions.ts`) re-read *both* roles from the database on every call — never from the form, never from the row the client claims to be looking at. This is the layer that covers Prisma, which bypasses RLS.
-  - **RLS** narrows the old "any admin may update any profile" policy to `is_super_admin() OR (is_admin() AND role = 'user')`, in `USING` *and* `WITH CHECK`. Checking the pre- and post-update row both closes the escalation: a plain admin can neither modify an existing admin nor turn a user into one. This covers the anon-key path.
+  - **Server actions** (`app/admin/users/actions.ts`) re-read _both_ roles from the database on every call — never from the form, never from the row the client claims to be looking at. This is the layer that covers Prisma, which bypasses RLS.
+  - **RLS** narrows the old "any admin may update any profile" policy to `is_super_admin() OR (is_admin() AND role = 'user')`, in `USING` _and_ `WITH CHECK`. Checking the pre- and post-update row both closes the escalation: a plain admin can neither modify an existing admin nor turn a user into one. This covers the anon-key path.
   - **A trigger**, `protect_last_super_admin`, refuses to demote or delete the last super admin. This is the only layer on the service-role path, which bypasses RLS entirely — and account removal runs there.
-- **`super_admin` is never assignable from the app.** `assignableRoleSchema` is `enum(['user','admin'])`, so the role cannot even be *expressed* in a request. It is granted by migration or `npm run make-admin -- <email> super_admin`, both of which need database access. The panel therefore cannot mint a peer able to remove you.
+- **`super_admin` is never assignable from the app.** `assignableRoleSchema` is `enum(['user','admin'])`, so the role cannot even be _expressed_ in a request. It is granted by migration or `npm run make-admin -- <email> super_admin`, both of which need database access. The panel therefore cannot mint a peer able to remove you.
 - **Nobody may act on their own account** in the Users tab — not demote, not remove. That is what stops the venue locking itself out of its own panel.
 - **Removal deletes the `auth.users` row** (service-role, after the checks above), not the profile row. Deleting only the profile would leave a live auth user who could still sign in and would simply get a fresh profile on the next request; going this way round, the existing `on_auth_user_deleted` trigger clears the profile for us. `Booking.userId` is `ON DELETE SET NULL`, so booking and payment history survives — it just stops naming a person.
 - **`sasikaadesh@gmail.com` is seeded as the first super admin** by the migration. That `UPDATE` is a no-op on a database where the account has not signed up yet, so run the `make-admin` script afterwards in that case.
@@ -271,7 +272,7 @@ Supabase Auth owns credentials; the app owns the role.
 
 - **Email/password signup collects all of them up front.** They are passed as Supabase Auth user metadata and `handle_new_user()` copies them into `public."User"` — so the app still never INSERTs the profile row itself, and profile creation stays unskippable.
 - **`profileIsComplete()` means "has a phone, an address, an NIC and an affiliation"**. `NULLIF(TRIM(...), '')` in the trigger keeps an empty metadata string from counting as filled in, or blanks would walk straight through the gate.
-- **Anything incomplete is routed to `/complete-profile`**, carrying its original destination in `?next=`. Both the OAuth callback and the two password actions check this, so it also catches accounts created before these columns existed. That page guards with `requireUser`, *not* `requireCompleteProfile` — the latter redirects to it, and would loop.
+- **Anything incomplete is routed to `/complete-profile`**, carrying its original destination in `?next=`. Both the OAuth callback and the two password actions check this, so it also catches accounts created before these columns existed. That page guards with `requireUser`, _not_ `requireCompleteProfile` — the latter redirects to it, and would loop.
 - **Users edit their own profile through a server action** (`app/account/actions.ts`), which takes the id from `requireUser()` and never from the form, and whose schema has no `role` field. Users still have **no write policy on `User`**, so the invariant "nobody can promote themselves through the anon key" holds literally: there is no self-UPDATE path to abuse.
 
 ### NIC and affiliation (`20260803120000`)
@@ -281,10 +282,10 @@ Two fields collected from every member: a Sri Lankan **NIC** and an **affiliatio
 - **`affiliation` is a Postgres enum with exactly four values** — `old_boy`, `parent`, `staff`, `outsider`. A closed type rather than a string column, so a fifth value cannot be written by any path: not the app, not psql, not a future import script. The UI labels ("Old Boy", "Parent", …) live once in `AFFILIATIONS` in `lib/validations.ts`, which the signup form, the profile form and the admin table all render from.
 - **`nic` accepts both formats in circulation** — old (9 digits then `V`/`X`) and new (12 digits) — and is **normalised before it is stored**: spaces and dashes stripped, upper-cased. Without the upper-casing, `123456789v` and `123456789V` would be two accounts for one person, which is precisely what the unique constraint exists to prevent.
 - **Three layers agree on the format.** Zod (`nicField`) for the message the user reads, a `CHECK` constraint (`User_nic_format`) so nothing else can write a malformed value, and `UNIQUE` on the column as the one-NIC-one-account guarantee. `updateProfileAction` translates the resulting `P2002` into "that NIC is already registered to another account"; signup additionally pre-checks so the common case reads well, but that read and the insert are not atomic and the index is what actually decides.
-- **A duplicate NIC must never break account creation.** `handle_new_user()` runs inside the transaction that creates the `auth.users` row, so a unique violation there would abort the *signup itself* with a raw database error. The trigger therefore catches `unique_violation` and retries the insert without the NIC: the account is created, the profile reads as incomplete, and `/complete-profile` asks for the NIC again with a sentence the person can act on.
-- **`getCurrentUser`'s fallback upsert deliberately does not set `nic`.** That path runs on every request for a user whose trigger did not fire; a unique collision there would throw on *every* request they make, with no way out. Affiliation is safe (not unique) and is set; the NIC is left for `/complete-profile`.
+- **A duplicate NIC must never break account creation.** `handle_new_user()` runs inside the transaction that creates the `auth.users` row, so a unique violation there would abort the _signup itself_ with a raw database error. The trigger therefore catches `unique_violation` and retries the insert without the NIC: the account is created, the profile reads as incomplete, and `/complete-profile` asks for the NIC again with a sentence the person can act on.
+- **`getCurrentUser`'s fallback upsert deliberately does not set `nic`.** That path runs on every request for a user whose trigger did not fire; a unique collision there would throw on _every_ request they make, with no way out. Affiliation is safe (not unique) and is set; the NIC is left for `/complete-profile`.
 
-**Existing accounts.** Every account created before this migration has `nic` and `affiliation` NULL, and the columns are nullable precisely so that stays true — a `NOT NULL` would have failed the migration against the live database. Those accounts **log in exactly as before**: the completeness gate lives *after* authentication, not inside it. They land on `/complete-profile` once, fill in the two fields, and carry on to wherever they were headed. The unique index tolerates them too — Postgres treats NULLs as distinct, so any number of not-yet-filled-in rows coexist. Everything that renders either field handles the null case explicitly (`not set` in the admin table, an empty field in the forms) rather than assuming a value.
+**Existing accounts.** Every account created before this migration has `nic` and `affiliation` NULL, and the columns are nullable precisely so that stays true — a `NOT NULL` would have failed the migration against the live database. Those accounts **log in exactly as before**: the completeness gate lives _after_ authentication, not inside it. They land on `/complete-profile` once, fill in the two fields, and carry on to wherever they were headed. The unique index tolerates them too — Postgres treats NULLs as distinct, so any number of not-yet-filled-in rows coexist. Everything that renders either field handles the null case explicitly (`not set` in the admin table, an empty field in the forms) rather than assuming a value.
 
 **NIC is sensitive.** It is shown in exactly two places: the owner's own account page (they have to be able to check and correct it) and the admin Users tab. It appears on no public page, in no API response, and in no other user's view — `/api/admin/whoami` returns id/email/role only, and every other `User` read in the codebase selects a narrow explicit field list (`email`, `name`) rather than the whole row. RLS backs this: `user_select_own` already limits `SELECT` on `User` to `id = auth.uid() OR is_admin()`, and `anon` has no grant on the table at all.
 
@@ -295,8 +296,8 @@ Two fields collected from every member: a Sri Lankan **NIC** and an **affiliatio
 **It is private in a way nothing else in this schema is.** The rated user cannot see their score, cannot see the comments, and cannot discover that a rating exists. Three independent layers say so:
 
 1. **The server actions.** `rateUserAction` and `getUserRatingsAction` (`app/admin/users/actions.ts`) both open with `requireAdmin()`. They are the only entry points into the table from the app, and there is no counterpart anywhere under `/app/account` or `/app/(public)` — a user has no endpoint to call, correctly crafted or otherwise. This is the layer that matters most, because **Prisma bypasses RLS**.
-2. **RLS.** All four policies are `public.is_admin()`, granted `TO authenticated`. The thing to notice is what is *absent*: there is no "select own" policy. Every other table in this schema has one; here it would defeat the entire point. A signed-in user querying `UserRating` through the anon key gets zero rows, including for notes written about them.
-3. **The grant.** `anon` is `REVOKE`d from the table outright. Supabase's `ALTER DEFAULT PRIVILEGES` hands `anon` full DML on every new table in `public`, so this table *arrived* with a signed-out role holding `SELECT` — checked against `information_schema` after the first apply rather than assumed. RLS would have refused it anyway; a private conduct file is the wrong place for a single missing policy to be the only thing in the way.
+2. **RLS.** All four policies are `public.is_admin()`, granted `TO authenticated`. The thing to notice is what is _absent_: there is no "select own" policy. Every other table in this schema has one; here it would defeat the entire point. A signed-in user querying `UserRating` through the anon key gets zero rows, including for notes written about them.
+3. **The grant.** `anon` is `REVOKE`d from the table outright. Supabase's `ALTER DEFAULT PRIVILEGES` hands `anon` full DML on every new table in `public`, so this table _arrived_ with a signed-out role holding `SELECT` — checked against `information_schema` after the first apply rather than assumed. RLS would have refused it anyway; a private conduct file is the wrong place for a single missing policy to be the only thing in the way.
 
 Verified end-to-end against the database, not reasoned about: with a rating seeded for a plain user, a `SELECT` under that user's `auth.uid()` returns **0 rows**, the same query under an admin's returns the row, and a non-admin `INSERT` is refused with `42501 row-level security policy`.
 
@@ -304,7 +305,7 @@ Verified end-to-end against the database, not reasoned about: with a rating seed
 - **The comment is required** — in Zod, and as a `CHECK` constraint. A bare star is an unaccountable mark on someone's record, and the admin reading the history in six months has only the words. The 1–5 range is a `CHECK` too: an average is meaningless if a term can sit outside the scale.
 - **Ratings accumulate; nothing edits or replaces one.** The history is the point, and an average over a rewritten past says nothing.
 - **The author is `requireAdmin()`'s id, never the form.** The RLS insert policy pins `adminId = auth.uid()` as well, so a note cannot be signed in someone else's name through either path.
-- **Who may rate whom** follows the existing role ladder exactly (`loadRatingTarget` mirrors `loadTarget`): nobody rates their own account, and a plain admin may only rate plain users — writing a permanent note about a colleague's conduct is very much *acting on* them. Rating a super admin is super-admin-only.
+- **Who may rate whom** follows the existing role ladder exactly (`loadRatingTarget` mirrors `loadTarget`): nobody rates their own account, and a plain admin may only rate plain users — writing a permanent note about a colleague's conduct is very much _acting on_ them. Rating a super admin is super-admin-only.
 - **Deleting the subject cascades; deleting the author does not.** `userId` is `ON DELETE CASCADE` (a note about a closed account has no subject left), `adminId` is `ON DELETE SET NULL` (removing a member of staff must not erase the venue's conduct history — the note survives and stops naming them, which is also how `Booking.userId` behaves).
 
 **In the admin Users tab.** A **Conduct** column shows each user's average as stars plus `4.2 (7)`; clicking it opens the record — the full history most recent first, each entry with its stars, comment, author and timestamp, above the form to add a new one. The history is **fetched when the dialog opens**, not shipped with the page: conduct comments about 500 people have no business sitting in the HTML of a table that shows one line each.
@@ -316,11 +317,11 @@ Verified end-to-end against the database, not reasoned about: with a rating seed
 
 ### Google sign-in (Supabase Auth OAuth)
 
-- `signInWithGoogle` (a server action) calls `supabase.auth.signInWithOAuth`, which only *builds* the provider URL; the action then redirects to it. Doing it server-side means the callback URL is composed on the server and the button works with JS disabled.
+- `signInWithGoogle` (a server action) calls `supabase.auth.signInWithOAuth`, which only _builds_ the provider URL; the action then redirects to it. Doing it server-side means the callback URL is composed on the server and the button works with JS disabled.
 - Google returns to **`/auth/callback`**, the single landing point for every out-of-app auth hop (email confirmation uses it too). It exchanges the code for a session, then sends an incomplete profile to `/complete-profile` and everyone else to `next`.
 - `next` is run through `safeNextPath()` — relative single-slash paths only. An open redirect here would be handed to every new user by email.
 - `siteOrigin()` (`lib/site-url.ts`) prefers `NEXT_PUBLIC_BASE_URL` and falls back to the forwarded host so previews work unconfigured. That fallback is not a security boundary: Supabase only honours a `redirectTo` matching its own Redirect URLs allow list, which is what actually stops a spoofed host header redirecting the callback elsewhere. Keep that list tight.
-- **Setup lives outside the codebase** — Google Cloud OAuth client + Supabase provider config. The authorized redirect URI is Supabase's own callback (`https://<project-ref>.supabase.co/auth/v1/callback`), *not* an app URL; the app URL goes in Supabase's Site URL / Redirect URLs instead.
+- **Setup lives outside the codebase** — Google Cloud OAuth client + Supabase provider config. The authorized redirect URI is Supabase's own callback (`https://<project-ref>.supabase.co/auth/v1/callback`), _not_ an app URL; the app URL goes in Supabase's Site URL / Redirect URLs instead.
 
 ### Password reset
 
@@ -330,11 +331,11 @@ Verified end-to-end against the database, not reasoned about: with a rating seed
 
 **The token arrives in one of three shapes, and the page handles all three**, because which one shows up is decided by the SDK version, the flow type and whether the email template was customised — not by the app:
 
-| shape | when | handled by |
-| --- | --- | --- |
-| `?code=…` | PKCE; `@supabase/ssr` calling `resetPasswordForEmail` on the server | page forwards to `/auth/callback`, which exchanges it |
-| `?token_hash=…&type=recovery` | a template customised to use `{{ .TokenHash }}` | page forwards to `/auth/callback`, which calls `verifyOtp` |
-| `#access_token=…&refresh_token=…` | the implicit flow — **what this project's Supabase instance returns today** (verified by following a generated link) | `components/recovery-hash-handler.tsx`, in the browser |
+| shape                             | when                                                                                                                 | handled by                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `?code=…`                         | PKCE; `@supabase/ssr` calling `resetPasswordForEmail` on the server                                                  | page forwards to `/auth/callback`, which exchanges it      |
+| `?token_hash=…&type=recovery`     | a template customised to use `{{ .TokenHash }}`                                                                      | page forwards to `/auth/callback`, which calls `verifyOtp` |
+| `#access_token=…&refresh_token=…` | the implicit flow — **what this project's Supabase instance returns today** (verified by following a generated link) | `components/recovery-hash-handler.tsx`, in the browser     |
 
 The fragment case is the one that cannot be done on the server at all: a URL fragment is never transmitted in a request, so no route handler, page or proxy can see it. It is read client-side and passed to `setSession`, which — because `createBrowserClient` stores the session in cookies rather than localStorage — makes the server see the user too.
 
@@ -342,7 +343,7 @@ Conversely, `?code=` and `?token_hash=` cannot be handled by the page itself, be
 
 - **Supabase's own rejection** arrives as `?error=access_denied&error_code=otp_expired`, which the page turns into a specific message — most often the link was already opened once, including by a mail scanner that follows links automatically.
 - **On success every session is ended** (`signOut({ scope: 'global' })`) and the user is sent to `/login?reset=1`. A reset usually means someone else knew the old password, so leaving any session alive defeats it.
-- **`authRedirectOrigin()` vs `siteOrigin()`** — auth links use the *request* host, falling back to `NEXT_PUBLIC_BASE_URL`; PayHere and email body links use `NEXT_PUBLIC_BASE_URL` first. `NEXT_PUBLIC_BASE_URL` has to point at production (PayHere's `notify_url` must be publicly reachable), so env-first would email a `localhost` developer a link to the deployed site. Safe only because Supabase's allow list is the real boundary — **never put a wildcard host in it**.
+- **`authRedirectOrigin()` vs `siteOrigin()`** — auth links use the _request_ host, falling back to `NEXT_PUBLIC_BASE_URL`; PayHere and email body links use `NEXT_PUBLIC_BASE_URL` first. `NEXT_PUBLIC_BASE_URL` has to point at production (PayHere's `notify_url` must be publicly reachable), so env-first would email a `localhost` developer a link to the deployed site. Safe only because Supabase's allow list is the real boundary — **never put a wildcard host in it**.
 
 ## Contact Us
 
@@ -363,11 +364,11 @@ Flow, on a successful `submitContactMessage`:
    - **To the address the visitor typed** — a short confirmation echoing their message back.
 3. The action returns `{ ok: true }` and the form shows "Message sent".
 
-- **Email can never fail the submission.** `sendContactEmails` throws nothing and returns nothing the caller acts on. Both failure modes are caught and `console.error`-ed: a thrown error (network, bad key) *and* Resend's returned `error` object, which does not throw and would otherwise pass for success. A missing `RESEND_API_KEY` or `ADMIN_CONTACT_EMAIL` logs a warning and skips that send, so the app runs unconfigured. The consequence of an outage is a row in the panel that nobody was pinged about — never a lost message or a false error shown to a visitor who in fact got through.
+- **Email can never fail the submission.** `sendContactEmails` throws nothing and returns nothing the caller acts on. Both failure modes are caught and `console.error`-ed: a thrown error (network, bad key) _and_ Resend's returned `error` object, which does not throw and would otherwise pass for success. A missing `RESEND_API_KEY` or `ADMIN_CONTACT_EMAIL` logs a warning and skips that send, so the app runs unconfigured. The consequence of an outage is a row in the panel that nobody was pinged about — never a lost message or a false error shown to a visitor who in fact got through.
 - **It is `await`ed, not fired and forgotten.** A serverless function can be frozen the instant it responds, which would kill a floating promise mid-flight.
 - **The two sends are sequential.** Resend's free tier allows 2 requests/second; firing both at once sits exactly on the limit. The admin notification goes first — if only one gets through, it should be the one carrying information nobody else has.
 - **Server-only by construction.** `lib/email/client.ts` carries `import "server-only"`, so `RESEND_API_KEY` cannot reach a client bundle — importing it from a client component is a build error, not a runtime leak.
-- **Templates** live in `lib/email/templates.tsx`: inline style objects, single column, the project palette (`#0A0A0A` ink, `#16DB65` green) written out literally — email clients strip `<style>` blocks and understand nothing of Tailwind or CSS custom properties. Each email also ships a plain-text alternative, which text-only clients render and which lowers the spam score.
+- **Templates** live in `lib/email/templates.tsx`: inline style objects, single column, and the brand palette (`#14231A` ink, `#088020` green, `#E0AB2E` gold) written out literally — email clients strip `<style>` blocks and understand nothing of Tailwind or CSS custom properties. Those constants mirror the `--p-*` palette in `app/globals.css` and are one of the three sanctioned places in the codebase that may hold a colour literal (see `docs/DESIGN.md` → Auditing it). Every message opens with the school masthead: name, motto, gold rule. Each email also ships a plain-text alternative, which text-only clients render and which lowers the spam score.
 - **Sender: Resend's shared test address (`onboarding@resend.dev`) for now.** It needs no DNS setup but **only delivers to the email address that owns the Resend account** — so the visitor confirmation will not arrive for anyone else. **A verified domain is required before production**: add the venue's domain in Resend → Domains, publish the DKIM/SPF (and, once trusted, DMARC) records it prints, then set `CONTACT_FROM_EMAIL` to an address on that domain. Until that is done, treat the confirmation email as untested for real users.
 - **Env vars** (all server-only, none `NEXT_PUBLIC_`): `RESEND_API_KEY`, `ADMIN_CONTACT_EMAIL`, `CONTACT_FROM_EMAIL` (optional; defaults to the shared test sender).
 
@@ -407,7 +408,7 @@ Lives under `/app/admin`, gated by `requireAdmin()` in the layout **and** in eve
 
 - `DATABASE_URL` = Supabase **pooled** connection (runtime).
 - `DIRECT_URL` = Supabase **direct** connection (migrations).
-Getting these swapped is the most common setup error — keep them distinct.
+  Getting these swapped is the most common setup error — keep them distinct.
 
 ## Deployment region (`vercel.json`)
 

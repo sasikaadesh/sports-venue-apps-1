@@ -6,7 +6,7 @@ import { profileIsComplete, requireUser } from "@/lib/auth";
 import { safeNextPath } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-  title: "Complete your profile — Courtside",
+  title: "Complete your profile",
 };
 
 /**

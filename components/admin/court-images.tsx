@@ -59,7 +59,7 @@ export function CourtImages({
             type="button"
             disabled={pending}
             onClick={() => handleRemove(url)}
-            className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-lg bg-background/90 text-foreground shadow-sm transition-colors hover:text-destructive disabled:opacity-50"
+            className="absolute top-1.5 right-1.5 grid size-7 place-items-center bg-background/90 text-foreground shadow-sm transition-colors hover:text-destructive disabled:opacity-50"
             aria-label={`Remove court image ${i + 1}`}
           >
             <Trash2 className="size-4" />

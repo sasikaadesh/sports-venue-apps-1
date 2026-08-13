@@ -17,7 +17,10 @@ export default function AccountLayout({
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">{children}</main>
+      {/* Matches the public shell — see the note in app/(public)/layout.tsx. */}
+      <main className="flex-1 pb-24 has-data-flush-footer:pb-0">
+        {children}
+      </main>
       <SiteFooter />
     </>
   );

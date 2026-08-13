@@ -67,7 +67,7 @@ function PlayerOptionsField({
             <button
               type="button"
               onClick={() => onChange(value.filter((v) => v !== n))}
-              className="grid size-5 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
+              className="grid size-5 place-items-center text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
               aria-label={`Remove ${n} players`}
             >
               <X className="size-3.5" />
@@ -188,7 +188,11 @@ function CourtTypeForm({
   );
 }
 
-export function CourtTypeManager({ courtTypes }: { courtTypes: CourtTypeRow[] }) {
+export function CourtTypeManager({
+  courtTypes,
+}: {
+  courtTypes: CourtTypeRow[];
+}) {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();

@@ -11,7 +11,12 @@ export default function PublicLayout({
   return (
     <>
       <SiteHeader />
-      <main className="flex-1">{children}</main>
+      {/* The breathing room above the footer lives here rather than on the
+          footer itself, so a page that ends in a deep-green CTA band can opt
+          out of it (`data-flush-footer`) and sit flush against the footer. */}
+      <main className="flex-1 pb-24 has-data-flush-footer:pb-0">
+        {children}
+      </main>
       <SiteFooter />
     </>
   );

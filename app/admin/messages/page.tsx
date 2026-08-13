@@ -3,6 +3,7 @@ import { Inbox } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/admin/page-header";
 import { MessageActions } from "@/components/admin/message-actions";
+import { BRAND } from "@/lib/brand";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/time";
@@ -72,7 +73,7 @@ export default async function AdminMessagesPage() {
                       {!isRead && <Badge>New</Badge>}
                     </div>
                     <a
-                      href={`mailto:${m.email}?subject=${encodeURIComponent("Re: your message to Courtside")}`}
+                      href={`mailto:${m.email}?subject=${encodeURIComponent(`Re: your message to ${BRAND.name}`)}`}
                       className="w-fit truncate text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
                     >
                       {m.email}

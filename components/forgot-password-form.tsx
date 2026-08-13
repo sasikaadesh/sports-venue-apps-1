@@ -3,19 +3,34 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
+  MailCheck,
+} from "lucide-react";
 
+import { BRAND } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { GoogleButton } from "@/components/google-button";
-import { requestPasswordReset, type ResetRequestState } from "@/app/(auth)/actions";
+import {
+  requestPasswordReset,
+  type ResetRequestState,
+} from "@/app/(auth)/actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" size="lg" disabled={pending} className="h-11 w-full text-sm">
+    <Button
+      type="submit"
+      size="lg"
+      disabled={pending}
+      className="h-11 w-full text-sm"
+    >
       {pending ? (
         <>
           <Loader2 className="animate-spin" />
@@ -49,7 +64,11 @@ function BackToLogin() {
  * Three end states, each replacing the form rather than sitting under it:
  * sent, Google-only, and error (the only one you can retry from in place).
  */
-export function ForgotPasswordForm({ initialError }: { initialError?: string }) {
+export function ForgotPasswordForm({
+  initialError,
+}: {
+  initialError?: string;
+}) {
   const [state, formAction] = useActionState<ResetRequestState, FormData>(
     requestPasswordReset,
     { error: initialError }
@@ -66,7 +85,9 @@ export function ForgotPasswordForm({ initialError }: { initialError?: string }) 
             </p>
             <p className="text-sm text-muted-foreground">
               We sent it to{" "}
-              <span className="font-medium text-foreground">{state.sentTo}</span>
+              <span className="font-medium text-foreground">
+                {state.sentTo}
+              </span>
               . The link works once and expires in about an hour.
             </p>
           </div>
@@ -96,8 +117,9 @@ export function ForgotPasswordForm({ initialError }: { initialError?: string }) 
             That account signs in with Google
           </p>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            There is no Courtside password to reset — Google handles it. Use the
-            button below, and change your password with Google if you need to.
+            There is no {BRAND.shortName} password to reset — Google handles it.
+            Use the button below, and change your password with Google if you
+            need to.
           </p>
         </div>
 

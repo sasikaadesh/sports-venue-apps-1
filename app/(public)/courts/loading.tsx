@@ -20,10 +20,7 @@ export default function CourtsLoading() {
 
       <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (
-          <li
-            key={i}
-            className="overflow-hidden rounded-xl border bg-card"
-          >
+          <li key={i} className="overflow-hidden rounded-lg border bg-card">
             <div className="aspect-[4/3] w-full bg-muted" />
             <div className="flex flex-col gap-2 px-5 py-4">
               <div className="h-5 w-32 rounded bg-muted" />

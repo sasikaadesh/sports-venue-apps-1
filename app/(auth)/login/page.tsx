@@ -6,7 +6,7 @@ import { signIn } from "@/app/(auth)/actions";
 import { getCurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Log in — Courtside",
+  title: "Log in",
 };
 
 export default async function LoginPage({

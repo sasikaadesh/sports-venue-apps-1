@@ -8,6 +8,7 @@ import {
   type BookingFilters,
 } from "@/lib/admin-bookings";
 import type { BookingSort, SortDirection } from "@/lib/admin-filters";
+import { BRAND } from "@/lib/brand";
 import {
   dateStringToDate,
   dateToTimeString,
@@ -194,7 +195,7 @@ export async function buildBookingReport({
   const generatedAt = formatDateTime(new Date());
 
   return {
-    brand: "Courtside",
+    brand: BRAND.name,
     title: "Bookings report",
     range: describeRange(filters),
     generatedAt,

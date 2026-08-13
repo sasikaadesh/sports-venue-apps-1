@@ -28,7 +28,7 @@ export default function CourtDetailLoading() {
             <div className="h-4 w-32 rounded bg-muted/70" />
           </div>
 
-          <div className="aspect-[16/10] w-full rounded-xl bg-muted" />
+          <div className="aspect-[16/10] w-full rounded-lg bg-muted" />
 
           <div className="flex flex-col gap-2">
             <div className="h-5 w-40 rounded bg-muted" />

@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { RecoveryGate } from "@/components/recovery-gate";
-import { ResetLinkExpired, describeResetError } from "@/components/reset-link-expired";
+import {
+  ResetLinkExpired,
+  describeResetError,
+} from "@/components/reset-link-expired";
 import { ResetPasswordForm } from "@/components/reset-password-form";
 import { getCurrentUser } from "@/lib/auth";
 import { RESET_PASSWORD_PATH } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-  title: "Set a new password — Courtside",
+  title: "Set a new password",
 };
 
 // The whole point of this page is reading a just-set session cookie. Anything
@@ -57,7 +60,10 @@ export default async function ResetPasswordPage({
   if (params.error || params.error_code) {
     return (
       <ResetLinkExpired
-        message={describeResetError(params.error_code, params.error_description)}
+        message={describeResetError(
+          params.error_code,
+          params.error_description
+        )}
       />
     );
   }
