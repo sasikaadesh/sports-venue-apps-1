@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { CONTACT_DETAILS, CONTACT_PHONE_HREF } from "@/lib/contact-details";
 
 export const metadata: Metadata = {
-  title: "Contact us — Courtside",
+  title: "Contact us",
   description:
     "Get in touch with the sports office about court bookings, availability and events.",
 };
@@ -106,7 +106,7 @@ function Detail({
         {icon}
       </span>
       <div className="flex min-w-0 flex-col gap-1">
-        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {label}
         </dt>
         <dd className="text-sm">{children}</dd>

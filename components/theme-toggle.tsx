@@ -52,7 +52,8 @@ export function ThemeToggle({ className }: { className?: string }) {
       role="radiogroup"
       aria-label="Color theme"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5",
+        // Square, like every other button in the app.
+        "inline-flex items-center gap-0.5 border border-border bg-muted/50 p-0.5",
         className
       )}
     >
@@ -68,7 +69,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             title={`${label} theme`}
             onClick={() => setTheme(value)}
             className={cn(
-              "grid size-7 place-items-center rounded-md text-muted-foreground transition-colors outline-none",
+              "grid size-7 place-items-center text-muted-foreground transition-colors outline-none",
               "hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
               active && "bg-background text-foreground shadow-sm"
             )}

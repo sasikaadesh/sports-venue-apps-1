@@ -9,7 +9,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-space-grotesk);
+  /* The serif IS the brand — see `.claude/skills/brand`. */
+  --font-heading: var(--font-lora);
+  --font-serif: var(--font-lora);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +41,41 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Brand-specific semantic colours, on top of the shadcn set.
+     These exist because the brand has signature surfaces shadcn has no name
+     for: the gold accent, the deep-green anchor band, and the tinted section
+     wash. Exposing them here is what lets components say `bg-band` /
+     `text-gold` instead of reaching for a literal. */
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-band: var(--band);
+  --color-band-foreground: var(--band-foreground);
+  --color-band-muted: var(--band-muted);
+  --color-band-border: var(--band-border);
+  --color-tint: var(--tint);
+  --color-tint-strong: var(--tint-strong);
+
+  /* The footer is its own surface, one step deeper than the CTA band, so the
+     two never read as the same slab when they stack. It carries a full set of
+     roles rather than borrowing the band's: an off-white foreground, a pale
+     *green* muted (the copyright line), and the medium green of the
+     green/white/gold top rule. */
+  --color-footer: var(--footer);
+  --color-footer-foreground: var(--footer-foreground);
+  --color-footer-muted: var(--footer-muted);
+  --color-footer-border: var(--footer-border);
+  --color-footer-rule: var(--footer-rule);
+
+  /* Colour painted OVER photography, which must be identical in both themes —
+     the hero scrim and the auth split-screen. These deliberately point at the
+     raw palette rather than at a semantic token: a themed scrim inverts in dark
+     mode, turning white and washing the photograph out (docs/DESIGN.md rule 3).
+     They are still brand values, so a rebrand still reaches them; they simply
+     do not participate in theming. */
+  --color-photo-scrim: var(--p-green-deepest);
+  --color-photo-gold: var(--p-gold);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -48,16 +85,76 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Clean & Sporty tokens — see docs/DESIGN.md.
-   Accent: electric green #16DB65 = oklch(0.78 0.214 149.4)
-   Ink:    near-black #0A0A0A = oklch(0.145 0 0)
-   Neutrals: zinc grays. One accent only — no second bright color.
+/* ==========================================================================
+   BRAND PALETTE — St. Sebastian's College, Moratuwa (green & gold)
+   ==========================================================================
 
-   Both themes are defined here and nowhere else: every component reads these
-   tokens, so a screen is themed by construction rather than by remembering to
-   add a `dark:` class. The only literal colors left in the app are the ones
-   painted over photography (see the hero and the auth split-screen), which are
-   deliberately fixed in both themes. */
+   THIS BLOCK IS THE REBRAND SURFACE. To re-skin the app for another school or
+   club, change the values here (and swap `public/logo.png` plus the strings in
+   `lib/brand.ts`). Nothing below this block, and no component anywhere in the
+   app, contains a literal colour — everything is derived from these names, so
+   a rebrand does not require touching a single component file.
+
+   The ramp is stated once, in hex, for both themes. The `:root` and `.dark`
+   blocks that follow only *assign* these to semantic roles; they never
+   introduce a new colour. That separation is the whole point: palette here,
+   meaning there.
+
+   Provenance: the greens and gold are eyedropped from the school crest
+   (`public/logo.png`) and reconciled with the brand skill's published values.
+   `--p-green` is the crest green measured at #088020; it is also, usefully,
+   the lightest green that still carries white text at WCAG AA (5.10:1). The
+   brand skill's #1F9D55 sits at 3.49:1 and cannot legally hold a white button
+   label, which is why the crest value is the one that ships. The gold is
+   pulled between the crest's print gold (#F8B800) and the skill's antique gold
+   (#D4A029) — bright enough to read as the crest's gold, restrained enough to
+   stay "dignified, not playful". */
+:root {
+  /* --- Greens --- */
+  --p-green: #088020; /* crest green — primary actions, links, active states */
+  --p-green-deep: #19532a; /* CTA bands, strong emphasis, the "serious" anchor */
+  --p-green-deepest: #163a24; /* footer base, deepest backgrounds */
+
+  /* --- Gold (a RARE accent: buttons and the footer hairline, nothing more) --- */
+  --p-gold: #e0ab2e;
+
+  /* --- Tinted surfaces (the calm, spacious feel) --- */
+  --p-mint: #eaf5ef;
+  --p-mint-soft: #f2f9f5;
+
+  /* --- Neutrals, all carrying a green undertone so nothing reads as grey --- */
+  --p-ink: #14231a;
+  --p-muted: #5b6b62;
+  --p-white: #ffffff;
+  --p-border: #d9e7df;
+
+  /* --- Dark-theme ramp ---
+     Deep green near-blacks rather than neutral zinc: in dark mode the identity
+     has to survive in the *background*, not just the accents. Surfaces step up
+     in lightness with elevation (see rule 1 in docs/DESIGN.md). The accents are
+     lifted, because the same green and gold read duller against a dark field. */
+  --p-night: oklch(0.175 0.026 150); /* background */
+  --p-night-raised: oklch(0.222 0.028 150); /* card */
+  --p-night-high: oklch(0.262 0.03 150); /* popover / dialog */
+  --p-night-band: oklch(0.245 0.05 150); /* CTA band + footer after dark */
+  --p-night-fg: oklch(0.965 0.006 150);
+  --p-night-muted-fg: oklch(0.74 0.018 150);
+  --p-green-lift: oklch(0.72 0.15 150); /* primary, after dark */
+  --p-gold-lift: oklch(0.82 0.13 84); /* gold, after dark */
+
+  /* --- Non-brand signal colour. Red means "destructive" in every brand. --- */
+  --p-danger: oklch(0.577 0.245 27.325);
+  --p-danger-lift: oklch(0.7 0.19 22.2);
+}
+
+/* ==========================================================================
+   SEMANTIC TOKENS — light
+   ==========================================================================
+   Every component reads these, so a screen is themed by construction rather
+   than by remembering to add a `dark:` class. The only literal colours left in
+   the app are the ones painted over photography (the home hero and the auth
+   split-screen), which are deliberately fixed in both themes — see rule 3 in
+   docs/DESIGN.md. */
 :root {
   /* Tells the browser to render native controls — <select> popups, the
      <input type="date"> calendar, scrollbars, spinners — in the light scheme.
@@ -65,95 +162,158 @@
      in dark mode, which is the one thing tokens alone cannot fix. */
   color-scheme: light;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* Electric green is the primary action color; ink text sits on top of it. */
-  --primary: oklch(0.78 0.214 149.4);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.145 0 0);
-  --muted: oklch(0.967 0.001 286.375);
-  /* Zinc-500 (#71717A) lands at 4.83:1 on white — over the line, but only just.
-     Nudged darker so secondary text clears AA with room to spare. */
-  --muted-foreground: oklch(0.53 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.145 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.78 0.214 149.4);
-  --chart-1: oklch(0.78 0.214 149.4);
-  --chart-2: oklch(0.68 0.17 149.4);
-  --chart-3: oklch(0.552 0.016 285.938);
-  --chart-4: oklch(0.42 0.012 285.9);
-  --chart-5: oklch(0.269 0 0);
+  --background: var(--p-white);
+  --foreground: var(--p-ink);
+  --card: var(--p-white);
+  --card-foreground: var(--p-ink);
+  --popover: var(--p-white);
+  --popover-foreground: var(--p-ink);
+
+  /* Crest green carrying white text — 5.10:1. */
+  --primary: var(--p-green);
+  --primary-foreground: var(--p-white);
+
+  /* Secondary is a mint wash, not a grey: a secondary button should still feel
+     like it belongs to the school, not to shadcn. */
+  --secondary: var(--p-mint);
+  --secondary-foreground: var(--p-green-deep);
+
+  --muted: var(--p-mint);
+  --muted-foreground: var(--p-muted); /* 5.64:1 on white, 5.05:1 on mint */
+  --accent: var(--p-mint);
+  --accent-foreground: var(--p-green-deep);
+
+  --destructive: var(--p-danger);
+  --border: var(--p-border);
+  --input: var(--p-border);
+  --ring: var(--p-green);
+
+  /* Brand-specific roles. */
+  --gold: var(--p-gold);
+  --gold-foreground: var(--p-ink); /* 7.81:1 */
+  --band: var(--p-green-deep);
+  --band-foreground: var(--p-white); /* 9.08:1 */
+  /* Supporting text on a deep-green band. Mixed toward the band rather than
+     set to a fixed grey, so it stays legible when --band changes. */
+  --band-muted: color-mix(in oklab, var(--p-white) 78%, var(--p-green-deep));
+  --band-border: color-mix(in oklab, var(--p-white) 30%, transparent);
+
+  /* The footer, one step deeper than the band. */
+  --footer: var(--p-green-deepest);
+  /* Off-white rather than pure white: on a large field of deep green, #fff
+     glares. A trace of the ground mixed in settles it and still clears 11:1
+     (pure white on this green is 12.6:1). */
+  --footer-foreground: color-mix(in oklab, var(--p-white) 94%, var(--footer));
+  /* The copyright line — pale *green*, not grey, and still ~5.8:1. */
+  --footer-muted: color-mix(in oklab, var(--p-white) 60%, var(--footer));
+  --footer-border: color-mix(in oklab, var(--p-white) 20%, transparent);
+  /* The medium-green segment of the green/white/gold top rule. */
+  --footer-rule: var(--p-green);
+
+  --tint: var(--p-mint-soft); /* very light section wash */
+  --tint-strong: var(--p-mint); /* the calm tinted section */
+
+  /* Charts: a green ramp with the gold as the single contrasting series, so
+     admin dashboards read as the same brand as the public site. */
+  --chart-1: var(--p-green);
+  --chart-2: var(--p-green-deep);
+  --chart-3: oklch(0.68 0.09 150);
+  --chart-4: var(--p-gold);
+  --chart-5: var(--p-muted);
+
   --radius: 0.75rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.78 0.214 149.4);
-  --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.145 0 0);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.78 0.214 149.4);
+
+  --sidebar: var(--p-mint-soft);
+  --sidebar-foreground: var(--p-ink);
+  --sidebar-primary: var(--p-green);
+  --sidebar-primary-foreground: var(--p-white);
+  --sidebar-accent: var(--p-mint);
+  --sidebar-accent-foreground: var(--p-green-deep);
+  --sidebar-border: var(--p-border);
+  --sidebar-ring: var(--p-green);
 }
 
-/* Dark theme — same Clean & Sporty direction, inverted.
-   Near-black zinc surfaces, light zinc text, the SAME single green accent
-   (nudged brighter so it stays vivid against a dark field). No second accent,
-   no gray-on-gray: every pairing below clears WCAG AA. */
+/* ==========================================================================
+   SEMANTIC TOKENS — dark
+   ==========================================================================
+   Not a different design: the same one after dark. Deep-green surfaces keep
+   the identity in the background; green and gold accents are lifted so they
+   stay vivid. Every pairing below clears WCAG AA. */
 .dark {
   color-scheme: dark;
 
   /* Surfaces step up in lightness with elevation:
-     background (0.145) < card (0.196) < popover/dialog (0.216).
-     That ordering is what makes a dropdown read as floating above a card
-     instead of dissolving into it — dark mode has no shadows to lean on. */
-  --background: oklch(0.145 0.004 285.8);
-  --foreground: oklch(0.98 0.001 286);
-  --card: oklch(0.196 0.004 285.8);
-  --card-foreground: oklch(0.98 0.001 286);
-  --popover: oklch(0.216 0.005 285.8);
-  --popover-foreground: oklch(0.98 0.001 286);
-  /* Brighter than the light-mode green (0.78 -> 0.80): the same hue reads
-     duller against black, and this is the one color carrying the brand.
-     Near-black text on top of it, as in light mode — 9.2:1. */
-  --primary: oklch(0.8 0.2 149.4);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.265 0.006 285.8);
-  --secondary-foreground: oklch(0.98 0.001 286);
-  --muted: oklch(0.255 0.006 285.8);
-  /* 7.4:1 on the background — secondary text stays genuinely readable. */
-  --muted-foreground: oklch(0.72 0.012 286);
-  --accent: oklch(0.28 0.006 285.8);
-  --accent-foreground: oklch(0.98 0.001 286);
-  --destructive: oklch(0.7 0.19 22.2);
+     background (0.175) < card (0.222) < popover/dialog (0.262). That ordering
+     is what makes a dropdown read as floating above a card instead of
+     dissolving into it — dark mode has no shadows to lean on. */
+  --background: var(--p-night);
+  --foreground: var(--p-night-fg); /* 17.3:1 */
+  --card: var(--p-night-raised);
+  --card-foreground: var(--p-night-fg); /* 15.8:1 */
+  --popover: var(--p-night-high);
+  --popover-foreground: var(--p-night-fg);
+
+  /* Lifted green with deep ink on top — 6.98:1. Inverting the light-mode
+     pairing (white on green) is deliberate: a green dark enough to hold white
+     text would be indistinguishable from the background it sits on. */
+  --primary: var(--p-green-lift);
+  --primary-foreground: var(--p-ink);
+
+  --secondary: var(--p-night-high);
+  --secondary-foreground: var(--p-night-fg);
+  --muted: var(--p-night-raised);
+  --muted-foreground: var(--p-night-muted-fg); /* 8.3:1 on background */
+  --accent: var(--p-night-high);
+  --accent-foreground: var(--p-night-fg);
+
+  --destructive: var(--p-danger-lift);
   /* Slightly stronger than the shadcn default (10%/15%): on these surfaces a
      fainter border makes card and table edges disappear. */
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 18%);
-  --ring: oklch(0.8 0.2 149.4);
-  --chart-1: oklch(0.8 0.2 149.4);
-  --chart-2: oklch(0.68 0.17 149.4);
-  --chart-3: oklch(0.72 0.012 286);
-  --chart-4: oklch(0.556 0.008 286);
-  --chart-5: oklch(0.439 0.006 286);
-  --sidebar: oklch(0.196 0.004 285.8);
-  --sidebar-foreground: oklch(0.98 0.001 286);
-  --sidebar-primary: oklch(0.8 0.2 149.4);
-  --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.28 0.006 285.8);
-  --sidebar-accent-foreground: oklch(0.98 0.001 286);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.8 0.2 149.4);
+  --border: color-mix(in oklab, var(--p-night-fg) 14%, transparent);
+  --input: color-mix(in oklab, var(--p-night-fg) 20%, transparent);
+  --ring: var(--p-green-lift);
+
+  --gold: var(--p-gold-lift);
+  --gold-foreground: var(--p-ink); /* 9.32:1 */
+  --band: var(--p-night-band);
+  --band-foreground: var(--p-night-fg);
+  --band-muted: color-mix(in oklab, var(--p-night-fg) 74%, var(--p-night-band));
+  --band-border: color-mix(in oklab, var(--p-night-fg) 22%, transparent);
+
+  /* The footer keeps its own forest green after dark rather than becoming
+     another night surface. It is the one band on the page whose colour is the
+     point, and against the near-black background it still reads as the
+     deepest, most anchored block — just from the other direction. */
+  --footer: var(--p-green-deepest);
+  --footer-foreground: var(--p-night-fg);
+  --footer-muted: color-mix(in oklab, var(--p-night-fg) 62%, var(--footer));
+  --footer-border: color-mix(in oklab, var(--p-night-fg) 20%, transparent);
+  /* Lifted, like every other accent after dark. */
+  --footer-rule: var(--p-green-lift);
+
+  /* After dark the "tint" is a lift, not a wash — but it stays green. */
+  --tint: var(--p-night-raised);
+  --tint-strong: var(--p-night-high);
+
+  --chart-1: var(--p-green-lift);
+  --chart-2: oklch(0.58 0.13 150);
+  --chart-3: oklch(0.83 0.11 150);
+  --chart-4: var(--p-gold-lift);
+  --chart-5: var(--p-night-muted-fg);
+
+  --sidebar: var(--p-night-raised);
+  --sidebar-foreground: var(--p-night-fg);
+  --sidebar-primary: var(--p-green-lift);
+  --sidebar-primary-foreground: var(--p-ink);
+  --sidebar-accent: var(--p-night-high);
+  --sidebar-accent-foreground: var(--p-night-fg);
+  --sidebar-border: color-mix(in oklab, var(--p-night-fg) 14%, transparent);
+  --sidebar-ring: var(--p-green-lift);
 }
 
-/* Print — one theme, on paper.
-
+/* ==========================================================================
+   Print — one theme, on paper.
+   ==========================================================================
    The admin prints reports from this app (see /admin/bookings/print), and a
    printer has no dark mode: whatever is on screen has to come out black on
    white. Rather than sprinkling `print:` overrides through the components, the
@@ -164,7 +324,8 @@
    Colour is dropped rather than translated. Browsers do not print background
    fills by default anyway (`print-color-adjust` is left alone deliberately), so
    a surface that carries meaning only through its fill would print as nothing —
-   hence borders, not washes, and text instead of coloured badges. */
+   hence borders, not washes, and text instead of coloured badges. Green and
+   gold are no exception: the brand lives on screen, the report lives on paper. */
 @media print {
   :root,
   .dark {
@@ -184,8 +345,8 @@
     --secondary: #ffffff;
     --secondary-foreground: #000000;
     --muted: #ffffff;
-    /* Dark enough to survive a low-toner laser printer — the on-screen zinc
-       greys come out as illegible haze. */
+    /* Dark enough to survive a low-toner laser printer — the on-screen tinted
+       greens come out as illegible haze. */
     --muted-foreground: #3f3f46;
     --accent: #ffffff;
     --accent-foreground: #000000;
@@ -193,6 +354,22 @@
     --border: #a1a1aa;
     --input: #a1a1aa;
     --ring: transparent;
+
+    /* The brand surfaces flatten too, or the deep-green band prints as a black
+       slab (or, with backgrounds off, as invisible white-on-white text). */
+    --gold: #ffffff;
+    --gold-foreground: #000000;
+    --band: #ffffff;
+    --band-foreground: #000000;
+    --band-muted: #3f3f46;
+    --band-border: #a1a1aa;
+    --footer: #ffffff;
+    --footer-foreground: #000000;
+    --footer-muted: #3f3f46;
+    --footer-border: #a1a1aa;
+    --footer-rule: #a1a1aa;
+    --tint: #ffffff;
+    --tint-strong: #ffffff;
   }
 
   /* A4 with a margin wide enough to hole-punch or staple. */
@@ -249,10 +426,15 @@
   html {
     @apply font-sans;
   }
-  /* Big, confident headings — geometric sans, heavy, tight tracking. */
+  /* Elegant serif headings — the single strongest brand signal, and the thing
+     that makes this read as a 170-year-old institution rather than a startup.
+     Deliberately NOT `font-bold tracking-tight`: a serif at heavy weight and
+     negative tracking turns muddy. Semibold with normal tracking and a
+     generous line-height is what gives it the dignified, unhurried feel. */
   h1,
   h2,
   h3 {
-    @apply font-heading font-bold tracking-tight;
+    @apply font-heading font-semibold tracking-normal;
+    line-height: 1.2;
   }
 }

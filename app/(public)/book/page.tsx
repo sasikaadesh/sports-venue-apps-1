@@ -21,7 +21,7 @@ import { createBookingSchema } from "@/lib/validations";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Review your booking — Courtside",
+  title: "Review your booking",
 };
 
 /**

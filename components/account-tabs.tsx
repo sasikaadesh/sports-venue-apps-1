@@ -55,7 +55,8 @@ export function AccountTabs({
 
     event.preventDefault();
     const index = ACCOUNT_TABS.indexOf(active);
-    const next = ACCOUNT_TABS[(index + delta + ACCOUNT_TABS.length) % ACCOUNT_TABS.length];
+    const next =
+      ACCOUNT_TABS[(index + delta + ACCOUNT_TABS.length) % ACCOUNT_TABS.length];
     select(next);
     document.getElementById(`account-tab-${next}`)?.focus();
   }
@@ -66,7 +67,7 @@ export function AccountTabs({
         role="tablist"
         aria-label="Account sections"
         onKeyDown={onKeyDown}
-        className="inline-flex items-center gap-1 rounded-xl border bg-muted/50 p-1"
+        className="inline-flex items-center gap-1 border bg-muted/50 p-1"
       >
         {ACCOUNT_TABS.map((tab) => {
           const { label, Icon } = TAB_META[tab];
@@ -83,7 +84,7 @@ export function AccountTabs({
               aria-controls={`account-panel-${tab}`}
               tabIndex={isActive ? 0 : -1}
               onClick={() => select(tab)}
-              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
                 // On a near-black surface a flat tint alone is invisible, so the
                 // selected segment carries a ring too (docs/DESIGN.md).
                 isActive

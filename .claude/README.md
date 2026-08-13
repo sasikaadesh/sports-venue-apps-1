@@ -20,11 +20,11 @@
 
 Three features are configured here. None of them touch application behaviour.
 
-| What                  | File                                     | Runs                                         |
-| --------------------- | ---------------------------------------- | -------------------------------------------- |
-| Prettier auto-format  | `settings.json` + `hooks/`               | automatically, after every file Claude edits |
-| `code-reviewer` agent | `agents/code-reviewer.md`                | only when you ask for a review               |
-| Brand / theme skill   | `skills/clean-and-sporty-brand/SKILL.md` | automatically, whenever UI work is happening |
+| What                  | File                       | Runs                                         |
+| --------------------- | -------------------------- | -------------------------------------------- |
+| Prettier auto-format  | `settings.json` + `hooks/` | automatically, after every file Claude edits |
+| `code-reviewer` agent | `agents/code-reviewer.md`  | only when you ask for a review               |
+| Brand / theme skill   | `skills/brand/SKILL.md`    | automatically, whenever UI work is happening |
 
 ---
 
@@ -123,19 +123,27 @@ _"review this before I commit"_.
 
 ---
 
-## 3. `skills/clean-and-sporty-brand/SKILL.md` — the brand skill
+## 3. `skills/brand/SKILL.md` — the brand skill
 
-The project's visual identity, distilled from `docs/DESIGN.md`: the color
-tokens (one electric-green accent), Space Grotesk headings with Inter body, the
+The project's visual identity: the colour tokens (St. Sebastian's green & gold),
+the elegant serif headings with Inter body, the four signature components, the
 spacing and shape rules, how to theme shadcn/ui, dark-mode rules, and the
 anti-generic checklist.
 
 Claude loads it by itself whenever UI work is happening, so new components come
 out on-brand without being reminded. You can also load it deliberately with
-`/clean-and-sporty-brand`.
+`/brand`.
 
-`docs/DESIGN.md` stays the source of truth — if the design changes, update that
-first, then bring the skill in line.
+**The skill is the source of truth for the brand**, and it is deliberately
+generic in name so a rebrand is an edit rather than a new file — change the
+values there, swap `public/logo.png` and the strings in `lib/brand.ts`, and
+re-skin from the palette block at the top of `app/globals.css`. `docs/DESIGN.md`
+records how that brand is _applied_ in this codebase (tokens, contrast ratios,
+the rules that keep both themes honest); when the brand changes, update the
+skill first, then bring `docs/DESIGN.md` and the palette block in line.
+
+There is exactly one brand skill. Never add a second — that is how two
+half-brands end up fighting.
 
 ---
 

@@ -17,7 +17,7 @@ export function CourtGallery({
 
   if (images.length === 0) {
     return (
-      <div className="grid aspect-[16/10] place-items-center rounded-xl border border-dashed bg-muted text-muted-foreground">
+      <div className="grid aspect-[16/10] place-items-center rounded-lg border border-dashed bg-muted text-muted-foreground">
         <span className="flex flex-col items-center gap-2 text-sm">
           <ImageOff className="size-6" />
           No photos yet
@@ -28,7 +28,8 @@ export function CourtGallery({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative aspect-[16/10] overflow-hidden rounded-xl border bg-muted">
+      {/* Same radius as the court cards this photo was clicked through from. */}
+      <div className="relative aspect-[16/10] overflow-hidden rounded-lg border bg-muted">
         <Image
           src={images[active]}
           alt={`${courtName} — photo ${active + 1} of ${images.length}`}

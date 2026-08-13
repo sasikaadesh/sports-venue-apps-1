@@ -26,7 +26,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Your booking — Courtside",
+  title: "Your booking",
 };
 
 /**

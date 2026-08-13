@@ -12,7 +12,7 @@ import { formatDate, formatPrice } from "@/lib/time";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Payment status — Courtside",
+  title: "Payment status",
 };
 
 /**
@@ -145,7 +145,8 @@ function describe(
 
   if (paymentStatus === "cancelled" || paymentStatus === "failed") {
     return {
-      title: paymentStatus === "cancelled" ? "Payment cancelled" : "Payment failed",
+      title:
+        paymentStatus === "cancelled" ? "Payment cancelled" : "Payment failed",
       body: "Nothing was charged and the hours have been released. You can book them again if they are still free.",
       icon: <XCircle className="size-6" />,
       iconClass: "bg-muted text-muted-foreground",

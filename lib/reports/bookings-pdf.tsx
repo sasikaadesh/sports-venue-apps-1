@@ -41,7 +41,7 @@ import {
  * `@media print` block in globals.css) restated in the only vocabulary this
  * renderer has — black text, grey rules, no accent, no fills.
  *
- * Fonts are the PDF standard Helvetica rather than the site's Space Grotesk.
+ * Fonts are the PDF standard Helvetica rather than the site's Lora.
  * Registering a webfont means fetching a TTF at request time inside the
  * function, which is a network call and a failure mode on the path of a
  * download; Helvetica is embedded in every PDF reader and is the same kind of

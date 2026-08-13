@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ForgotPasswordForm } from "@/components/forgot-password-form";
 
 export const metadata: Metadata = {
-  title: "Reset your password — Courtside",
+  title: "Reset your password",
 };
 
 export default async function ForgotPasswordPage({

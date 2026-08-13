@@ -2,6 +2,8 @@ import "server-only";
 
 import { Resend } from "resend";
 
+import { BRAND } from "@/lib/brand";
+
 /**
  * Resend client and mail configuration.
  *
@@ -36,7 +38,7 @@ export function resendClient(): Resend | null {
 export function fromAddress(): string {
   return (
     process.env.CONTACT_FROM_EMAIL?.trim() ||
-    "Courtside <onboarding@resend.dev>"
+    `${BRAND.shortName} <onboarding@resend.dev>`
   );
 }
 

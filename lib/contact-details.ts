@@ -6,16 +6,23 @@
  * the footer can never disagree, and so swapping them for the next club that
  * buys this app is a one-file change.
  */
+import { BRAND } from "@/lib/brand";
+
 export const CONTACT_DETAILS = {
-  organisation: "Courtside — School Sports Facilities",
-  addressLines: ["Courtside Sports Complex", "12 Galle Road", "Colombo 03", "Sri Lanka"],
-  phone: "+94 11 234 5678",
+  organisation: `${BRAND.name} — Sports Complex`,
+  addressLines: [
+    `${BRAND.name}`,
+    "Old Galle Road",
+    "Moratuwa 10400",
+    "Sri Lanka",
+  ],
+  phone: "+94 11 264 5411",
   /**
    * The address shown to visitors. Purely display — where contact-form
    * notifications are actually delivered is `ADMIN_CONTACT_EMAIL`, so the
    * public address can differ from the inbox that receives them.
    */
-  email: "sports@school.lk",
+  email: "sports@stsebastians.lk",
   openingHours: [
     { days: "Monday – Friday", hours: "06:00 – 22:00" },
     { days: "Saturday & Sunday", hours: "07:00 – 20:00" },

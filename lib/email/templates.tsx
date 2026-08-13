@@ -13,6 +13,7 @@ import {
   Text,
 } from "@react-email/components";
 
+import { BRAND } from "@/lib/brand";
 import { CONTACT_DETAILS } from "@/lib/contact-details";
 
 /**
@@ -20,22 +21,31 @@ import { CONTACT_DETAILS } from "@/lib/contact-details";
  *
  * Email clients strip <style> blocks and understand roughly 2005-era CSS, so
  * everything is inline style objects and a single-column table layout — no
- * Tailwind classes and no design tokens here. The palette is the project's
- * (ink `#0A0A0A`, electric green `#16DB65`) written out literally, because a
- * CSS custom property has nothing to resolve against in an inbox.
+ * Tailwind classes and no design tokens here. The brand palette is written out
+ * literally below, because a CSS custom property has nothing to resolve against
+ * in an inbox. This block is the ONE place in the app outside
+ * `app/globals.css` that legitimately holds colour values; it mirrors the
+ * palette there, so a rebrand touches both and nothing else.
+ *
+ * The gold is used only for the rule under the masthead — the same restraint
+ * as on the site, where gold is a hairline and a button and nothing more.
  *
  * There is no dark-mode variant on purpose: clients that force dark simply
  * invert these, and hand-rolled `prefers-color-scheme` blocks are unreliable
  * across Outlook/Gmail. Plain ink-on-white survives both.
  */
 
-const INK = "#0A0A0A";
-const MUTED = "#71717A";
-const ACCENT = "#16DB65";
-const BORDER = "#E4E4E7";
+/** Mirrors the `--p-*` palette in app/globals.css. */
+const INK = "#14231A";
+const MUTED = "#5B6B62";
+const GREEN = "#088020";
+const GREEN_DEEPEST = "#163A24";
+const GOLD = "#E0AB2E";
+const BORDER = "#D9E7DF";
+const MINT = "#EAF5EF";
 
 const body = {
-  backgroundColor: "#F4F4F5",
+  backgroundColor: MINT,
   margin: 0,
   padding: "24px 0",
   fontFamily:
@@ -51,20 +61,41 @@ const container = {
   padding: "32px",
 };
 
-const accentBar = {
-  backgroundColor: ACCENT,
-  borderRadius: "999px",
-  height: "4px",
+/** School name above the gold rule — the masthead, as on printed letterhead. */
+const masthead = {
+  color: GREEN_DEEPEST,
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: "15px",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  margin: "0 0 10px",
+};
+
+const mottoLine = {
+  color: MUTED,
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: "12px",
+  fontStyle: "italic" as const,
+  margin: "0 0 12px",
+};
+
+/** The gold hairline. The only gold in the message. */
+const goldRule = {
+  backgroundColor: GOLD,
+  height: "3px",
   margin: "0 0 24px",
-  width: "48px",
+  width: "56px",
 };
 
 const heading = {
   color: INK,
+  // Georgia is the closest thing to the site's Lora that an inbox reliably
+  // has — a webfont in email is a coin flip, so this falls back gracefully
+  // while still reading as a serif for the great majority of recipients.
+  fontFamily: "Georgia, 'Times New Roman', serif",
   fontSize: "22px",
-  fontWeight: 700,
-  letterSpacing: "-0.02em",
-  lineHeight: "28px",
+  fontWeight: 600,
+  lineHeight: "30px",
   margin: "0 0 16px",
 };
 
@@ -93,8 +124,8 @@ const value = {
 
 /** `pre-wrap` so the sender's own line breaks survive into the inbox. */
 const quotedMessage = {
-  backgroundColor: "#F4F4F5",
-  borderLeft: `3px solid ${ACCENT}`,
+  backgroundColor: MINT,
+  borderLeft: `3px solid ${GREEN}`,
   borderRadius: "6px",
   color: INK,
   fontSize: "15px",
@@ -129,9 +160,29 @@ const detailValue = {
 
 const rule = { borderColor: BORDER, margin: "24px 0" };
 
-const footer = { color: MUTED, fontSize: "13px", lineHeight: "20px", margin: 0 };
+const footer = {
+  color: MUTED,
+  fontSize: "13px",
+  lineHeight: "20px",
+  margin: 0,
+};
 
-const link = { color: INK, textDecoration: "underline" };
+const link = { color: GREEN, textDecoration: "underline" };
+
+/**
+ * Letterhead: school name, motto, gold rule. Opens every message so an email
+ * from the booking system is recognisably from the school, the same way the
+ * footer signs off the website.
+ */
+function Masthead() {
+  return (
+    <>
+      <Text style={masthead}>{BRAND.name}</Text>
+      <Text style={mottoLine}>{BRAND.motto}</Text>
+      <Section style={goldRule} />
+    </>
+  );
+}
 
 export type ContactEmailProps = {
   name: string;
@@ -147,7 +198,7 @@ export function ContactAdminEmail({ name, email, message }: ContactEmailProps) {
       <Preview>{`${name} sent a message via the contact form`}</Preview>
       <Body style={body}>
         <Container style={container}>
-          <Section style={accentBar} />
+          <Masthead />
           <Heading style={heading}>New contact message</Heading>
 
           <Text style={label}>From</Text>
@@ -165,8 +216,8 @@ export function ContactAdminEmail({ name, email, message }: ContactEmailProps) {
 
           <Hr style={rule} />
           <Text style={footer}>
-            Reply directly to this email to answer {name}. The message is also in
-            the admin panel under Messages.
+            Reply directly to this email to answer {name}. The message is also
+            in the admin panel under Messages.
           </Text>
         </Container>
       </Body>
@@ -205,7 +256,10 @@ export function BookingConfirmationEmail({
   const rows: [string, string][] = [
     ["Court", courtName],
     ["Date", date],
-    ["Time", `${timeRange} (${durationHours} ${durationHours === 1 ? "hour" : "hours"})`],
+    [
+      "Time",
+      `${timeRange} (${durationHours} ${durationHours === 1 ? "hour" : "hours"})`,
+    ],
     ["Players", String(playerCount)],
     ["Paid", total],
   ];
@@ -216,12 +270,12 @@ export function BookingConfirmationEmail({
       <Preview>{`Your ${courtName} booking is confirmed`}</Preview>
       <Body style={body}>
         <Container style={container}>
-          <Section style={accentBar} />
+          <Masthead />
           <Heading style={heading}>Your booking is confirmed</Heading>
 
           <Text style={paragraph}>
-            Hi {name}, your payment went through and the court is yours. Here are
-            the details.
+            Hi {name}, your payment went through and the court is yours. Here
+            are the details.
           </Text>
 
           <Section style={detailTable}>
@@ -265,7 +319,7 @@ export function ContactConfirmationEmail({ name, message }: ContactEmailProps) {
       <Preview>We received your message</Preview>
       <Body style={body}>
         <Container style={container}>
-          <Section style={accentBar} />
+          <Masthead />
           <Heading style={heading}>Thanks — we have your message</Heading>
 
           <Text style={paragraph}>

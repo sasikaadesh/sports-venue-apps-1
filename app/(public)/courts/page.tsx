@@ -9,7 +9,7 @@ import { getActiveCourts } from "@/lib/catalogue";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Courts — Courtside",
+  title: "Courts",
   description: "Browse every court available to book.",
 };
 
@@ -28,7 +28,7 @@ export default async function CourtsPage() {
       </div>
 
       {courts.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-6 py-10 text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed px-6 py-10 text-sm text-muted-foreground">
           Nothing to show yet.
         </p>
       ) : (

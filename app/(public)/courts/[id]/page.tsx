@@ -35,10 +35,10 @@ export async function generateMetadata({
   // extra database round trip.
   const court = await getCourtDetail(id);
 
-  if (!court) return { title: "Court not found — Courtside" };
+  if (!court) return { title: "Court not found" };
 
   return {
-    title: `${court.name} — Courtside`,
+    title: `${court.name}`,
     description:
       court.description ?? `Check availability and book ${court.name}.`,
   };

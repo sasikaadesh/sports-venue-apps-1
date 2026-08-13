@@ -4,13 +4,14 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { Wordmark } from "@/components/brand/crest";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/app/(auth)/actions";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const metadata = {
-  title: "Admin — Courtside",
+  title: "Admin",
 };
 
 /**
@@ -38,17 +39,10 @@ export default async function AdminLayout({
           above all — should put the content on the sheet and nothing else. */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur print:hidden">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 font-heading text-base font-bold tracking-tight"
-            >
-              <span className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground">
-                <ShieldCheck className="size-3.5" />
-              </span>
-              Courtside
-            </Link>
-            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-3">
+            <Wordmark size={32} />
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+              <ShieldCheck className="size-3" />
               {admin.role === "super_admin" ? "Super admin" : "Admin"}
             </span>
           </div>

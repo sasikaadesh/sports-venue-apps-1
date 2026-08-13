@@ -77,7 +77,12 @@ Prisma uses the **pooled** connection for `DATABASE_URL` (runtime) and the **dir
 
 ## Design
 
-Follow `docs/DESIGN.md` (direction: **clean & sporty**). Theme shadcn/ui with the project's tokens — do not ship default shadcn styling. No purple/blue gradients, no emoji icons, no everything-centered layouts.
+Follow the **`brand` skill** (`.claude/skills/brand/SKILL.md`) for the visual identity and `docs/DESIGN.md` for how it is applied here. Direction: **St. Sebastian's College — traditional/institutional, green & gold**.
+
+- **Never hardcode a colour.** Every colour in the app resolves from the palette block at the top of `app/globals.css`; that block, `public/logo.png` and `lib/brand.ts` are the entire rebrand surface. The only sanctioned exceptions are `lib/email/templates.tsx` (an inbox cannot resolve a CSS variable) and `lib/reports/bookings-pdf.tsx` (paper), both of which mirror the palette and say so.
+- Elegant serif headings (Lora) over Inter body — the serif _is_ the brand, do not swap it for a sans.
+- Gold is a _rare_ accent: buttons for the single most important action, and the footer hairline. Do not flood the page with it.
+- Theme shadcn/ui with the project's tokens — do not ship default shadcn styling. No purple/blue gradients, no emoji icons, no everything-centered layouts.
 
 ## Workflow
 
@@ -92,4 +97,4 @@ Three helpers are configured in `.claude/`. They are tooling only — none of th
 
 - **Prettier auto-format hook** — after every Write/Edit, `.claude/hooks/format-with-prettier.mjs` formats the edited file. Config: `prettier.config.mjs`, `.prettierignore`. Prettier loads `prettier-plugin-tailwindcss`, which sorts Tailwind class lists in `className` and in `cn()`/`cva()`/`clsx()` calls.
 - **`code-reviewer` sub-agent** (`.claude/agents/code-reviewer.md`) — read-only review of changed code against the payment, authorization and booking rules above. Ask for it by name; it never edits.
-- **`clean-and-sporty-brand` skill** (`.claude/skills/clean-and-sporty-brand/SKILL.md`) — loads automatically for UI work so new components stay on-brand. `docs/DESIGN.md` remains the source of truth.
+- **`brand` skill** (`.claude/skills/brand/SKILL.md`) — loads automatically for UI work so new components stay on-brand. It is the source of truth for the visual identity (currently St. Sebastian's College, Moratuwa — green & gold); `docs/DESIGN.md` records how that identity is applied in this codebase. Keep exactly one brand skill.

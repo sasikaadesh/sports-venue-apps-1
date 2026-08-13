@@ -164,7 +164,10 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
         )}
       </Field>
 
-      <Field orientation="horizontal" className="items-center justify-between rounded-xl border px-4 py-3">
+      <Field
+        orientation="horizontal"
+        className="items-center justify-between rounded-xl border px-4 py-3"
+      >
         <span className="flex flex-col gap-0.5">
           <FieldLabel htmlFor="court-active" className="text-sm font-medium">
             Active
@@ -208,7 +211,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
                 <button
                   type="button"
                   onClick={() => setFiles(files.filter((_, j) => j !== i))}
-                  className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-lg bg-background/90 text-foreground shadow-sm transition-colors hover:text-destructive"
+                  className="absolute top-1.5 right-1.5 grid size-7 place-items-center bg-background/90 text-foreground shadow-sm transition-colors hover:text-destructive"
                   aria-label={`Remove selected image ${i + 1}`}
                 >
                   <X className="size-4" />
@@ -248,11 +251,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
       <div className="flex items-center gap-2 border-t pt-6">
         <Button type="submit" disabled={pending} className="h-10">
           <Save />
-          {pending
-            ? "Saving…"
-            : isEdit
-              ? "Save changes"
-              : "Create court"}
+          {pending ? "Saving…" : isEdit ? "Save changes" : "Create court"}
         </Button>
         <Button
           type="button"

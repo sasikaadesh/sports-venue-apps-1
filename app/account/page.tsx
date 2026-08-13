@@ -15,7 +15,7 @@ import { profileIsComplete, requireUser, roleIsAdmin } from "@/lib/auth";
 import type { CurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Your account — Courtside",
+  title: "Your account",
 };
 
 // Booking status changes underneath the user — the PayHere webhook confirms a
@@ -151,13 +151,13 @@ function DetailsPanel({
     <section className="flex flex-col gap-8">
       <dl className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2">
         <div className="bg-card px-5 py-4">
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Email
           </dt>
           <dd className="mt-1 truncate text-sm">{user.email}</dd>
         </div>
         <div className="bg-card px-5 py-4">
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Role
           </dt>
           <dd className="mt-1 flex items-center gap-2 text-sm">
@@ -172,7 +172,7 @@ function DetailsPanel({
           </dd>
         </div>
         <div className="bg-card px-5 py-4 sm:col-span-2">
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             User ID
           </dt>
           <dd className="mt-1 font-mono text-xs text-muted-foreground">

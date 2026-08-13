@@ -14,7 +14,12 @@ import { LinkButton } from "@/components/link-button";
 import { LinkPending } from "@/components/link-pending";
 import { RemoveAccountBookingButton } from "@/components/remove-account-booking-button";
 import { prisma } from "@/lib/prisma";
-import { dateToTimeString, formatDate, formatPrice, isFuture } from "@/lib/time";
+import {
+  dateToTimeString,
+  formatDate,
+  formatPrice,
+  isFuture,
+} from "@/lib/time";
 import type { BookingStatus } from "@/lib/generated/prisma/enums";
 
 /** How many bookings one page of the list shows. */
@@ -306,7 +311,7 @@ function PageLink({
   children: React.ReactNode;
 }) {
   const classes =
-    "inline-flex h-9 items-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors [&_svg]:size-4";
+    "inline-flex h-9 items-center gap-1 border px-3 text-sm font-medium transition-colors [&_svg]:size-4";
 
   if (disabled) {
     return (

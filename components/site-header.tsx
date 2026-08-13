@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ShieldCheck, Zap } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
+import { Wordmark } from "@/components/brand/crest";
 import { LinkButton } from "@/components/link-button";
 import { LinkPending } from "@/components/link-pending";
 import { LogoutButton } from "@/components/logout-button";
@@ -11,18 +12,13 @@ export async function SiteHeader() {
   const user = await getCurrentUser();
 
   return (
-    <header className="border-b">
+    <header className="border-b bg-background">
       <nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-6 px-6 py-4 sm:px-8">
-        <div className="flex items-center gap-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight"
-          >
-            <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <Zap className="size-4" />
-            </span>
-            Courtside
-          </Link>
+        <div className="flex items-center gap-7">
+          {/* The crest replaces the old lightning-bolt mark entirely — it is
+              the school's identity, not a decorative glyph, so it is never
+              recoloured or boxed on a coloured plate. */}
+          <Wordmark priority />
 
           <Link
             href="/courts"
