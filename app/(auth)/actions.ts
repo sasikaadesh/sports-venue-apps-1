@@ -59,7 +59,8 @@ export async function signUp(
     return { error: firstIssue(parsed.error) };
   }
 
-  const { email, password, name, phone, address, nic, affiliation } = parsed.data;
+  const { email, password, name, phone, address, nic, affiliation } =
+    parsed.data;
 
   // A taken NIC is caught here only so the person gets a sentence they can act
   // on. The guarantee is the UNIQUE index — this read and the insert are not
@@ -75,11 +76,17 @@ export async function signUp(
   const supabase = await createClient();
   const origin = await authRedirectOrigin();
 
+  // Carried onto the confirmation link so a booking survives the email hop:
+  // someone who starts at /book, signs up, and confirms from their inbox lands
+  // back on the same selection instead of on /account. `safeNextPath` has
+  // already reduced this to a relative path, and /auth/callback re-checks it.
+  const next = safeNextPath(formData.get("next"));
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
       // Handed to the on_auth_user_created trigger, which copies these into
       // public."User". The app still never INSERTs the profile row itself, so
       // profile creation cannot be skipped — see the migration for the trigger.
@@ -99,7 +106,7 @@ export async function signUp(
   }
 
   revalidatePath("/", "layout");
-  redirect(await destinationAfterAuth(safeNextPath(formData.get("next"))));
+  redirect(await destinationAfterAuth(next));
 }
 
 export async function signIn(
@@ -192,7 +199,6 @@ export async function requestPasswordReset(
 
 export type UpdatePasswordState = {
   error?: string;
-  done?: boolean;
 };
 
 /**
@@ -201,6 +207,14 @@ export type UpdatePasswordState = {
  * Reached with the short-lived session that the recovery link created. The
  * session is the authorization — `getUser()` revalidates it against Supabase,
  * so an expired or forged cookie cannot change anybody's password.
+ *
+ * Success **redirects**; it never returns a flag for the form to render. Every
+ * server action ships a re-render of the current route along with its result,
+ * and a successful reset signs every session out — so that re-render of
+ * /reset-password found no session, no token in the URL, and fell through to
+ * `RecoveryGate`, which announced "That link has expired" over a reset that had
+ * just succeeded. Redirecting hands the outcome to a URL, which no re-render
+ * can second-guess.
  */
 export async function updatePassword(
   _prev: UpdatePasswordState,
@@ -243,7 +257,7 @@ export async function updatePassword(
   await supabase.auth.signOut({ scope: "global" });
 
   revalidatePath("/", "layout");
-  return { done: true };
+  redirect(`${RESET_PASSWORD_PATH}?done=1`);
 }
 
 /**
@@ -276,7 +290,8 @@ export async function signInWithGoogle(
 
   if (error || !data?.url) {
     return {
-      error: "Could not reach Google right now. Try again, or use your email and password.",
+      error:
+        "Could not reach Google right now. Try again, or use your email and password.",
     };
   }
 

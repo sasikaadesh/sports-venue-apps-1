@@ -126,6 +126,9 @@ function CourtTypeForm({
   const [pending, startTransition] = useTransition();
 
   const form = useForm<CourtTypeInput>({
+    // Flag a field as it is left, then re-check on each keystroke. The server
+    // action re-validates with the same schema.
+    mode: "onTouched",
     resolver: zodResolver(courtTypeSchema),
     defaultValues,
   });

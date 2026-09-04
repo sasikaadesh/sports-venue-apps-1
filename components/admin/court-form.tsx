@@ -42,6 +42,9 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
   const remainingSlots = MAX_IMAGES_PER_COURT - (court?.imageCount ?? 0);
 
   const form = useForm<CourtInput>({
+    // Flag a field as it is left, then re-check on each keystroke. The server
+    // action re-validates with the same schema.
+    mode: "onTouched",
     resolver: zodResolver(courtSchema),
     defaultValues: {
       name: court?.name ?? "",

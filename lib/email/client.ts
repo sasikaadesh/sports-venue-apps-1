@@ -29,17 +29,31 @@ export function resendClient(): Resend | null {
 }
 
 /**
- * The From address.
+ * The From address used by *every* email this app sends — contact-form
+ * notifications and booking confirmations alike. One variable per customer:
+ * point `EMAIL_FROM` at an address on that customer's Resend-verified domain
+ * and nothing else needs touching.
  *
- * Defaults to Resend's shared test sender, which works with no DNS setup but
- * will only deliver to the address that owns the Resend account. A verified
- * domain is required before go-live — see docs/ARCHITECTURE.md → Contact Us.
+ * Accepts either a bare address (`noreply@example.com`) or a full mailbox
+ * (`Name <noreply@example.com>`); a bare address is wrapped in the brand's
+ * short name so recipients see a sender, not a string.
+ *
+ * `CONTACT_FROM_EMAIL` is the old name of this variable and is still read so
+ * an existing deployment keeps working; prefer `EMAIL_FROM` in new setups.
+ *
+ * The final fallback is Resend's shared test sender, which needs no DNS but
+ * only delivers to the address that owns the Resend account — fine for local
+ * dev, never correct in production.
  */
 export function fromAddress(): string {
-  return (
-    process.env.CONTACT_FROM_EMAIL?.trim() ||
-    `${BRAND.shortName} <onboarding@resend.dev>`
-  );
+  const configured =
+    process.env.EMAIL_FROM?.trim() || process.env.CONTACT_FROM_EMAIL?.trim();
+
+  if (!configured) return `${BRAND.shortName} <onboarding@resend.dev>`;
+
+  return configured.includes("<")
+    ? configured
+    : `${BRAND.shortName} <${configured}>`;
 }
 
 /** Where contact enquiries are delivered. `null` when unset. */

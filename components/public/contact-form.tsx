@@ -27,6 +27,10 @@ export function ContactForm({
   const [sent, setSent] = useState(false);
 
   const form = useForm<ContactMessageInput>({
+    // Tell the user about a field as they leave it, then re-check on each
+    // keystroke so a corrected field clears immediately. The server action
+    // re-validates with the same schema regardless.
+    mode: "onTouched",
     resolver: zodResolver(contactMessageSchema),
     defaultValues: { name: defaultName, email: defaultEmail, message: "" },
   });
@@ -46,7 +50,10 @@ export function ContactForm({
         : "";
 
     startTransition(async () => {
-      const result = await submitContactMessage({ ...values, website: honeypot });
+      const result = await submitContactMessage({
+        ...values,
+        website: honeypot,
+      });
 
       if (!result.ok) {
         setServerError(result.error);
@@ -73,7 +80,11 @@ export function ContactForm({
             you at {form.getValues("email")}.
           </p>
         </div>
-        <Button variant="outline" className="h-10" onClick={() => setSent(false)}>
+        <Button
+          variant="outline"
+          className="h-10"
+          onClick={() => setSent(false)}
+        >
           Send another
         </Button>
       </div>
@@ -81,7 +92,10 @@ export function ContactForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5">
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="flex flex-col gap-5"
+    >
       {serverError && (
         <p
           role="alert"
