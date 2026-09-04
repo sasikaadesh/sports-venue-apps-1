@@ -19,15 +19,15 @@ import {
 } from "@/lib/validations";
 
 /**
- * Edit your own name, phone, address, NIC and affiliation.
+ * Edit your own name, phone, address and affiliation.
  *
  * Shared by the account page and the "Complete your profile" step so the two
  * cannot drift — same fields, same schema, same server action. Feedback is
  * inline rather than a toast because neither page mounts a Toaster.
  *
  * Every field starts empty-tolerant (`?? ""`): an account created before the
- * NIC and affiliation columns existed simply arrives with them blank, and the
- * form asks for them like any other missing value.
+ * affiliation column existed simply arrives with it blank, and the form asks
+ * for it like any other missing value.
  */
 export function ProfileForm({
   defaultValues,
@@ -53,7 +53,6 @@ export function ProfileForm({
       name: defaultValues.name ?? "",
       phone: defaultValues.phone ?? "",
       address: defaultValues.address ?? "",
-      nic: defaultValues.nic ?? "",
       // No default option: an unset affiliation must read as "not answered
       // yet", not as a silent "Old Boy" for every legacy account.
       affiliation:
@@ -159,30 +158,6 @@ export function ProfileForm({
         />
         {form.formState.errors.address && (
           <FieldError>{form.formState.errors.address.message}</FieldError>
-        )}
-      </Field>
-
-      <Field data-invalid={!!form.formState.errors.nic}>
-        <FieldLabel htmlFor="profile-nic" className="text-sm font-medium">
-          NIC number
-        </FieldLabel>
-        <Input
-          id="profile-nic"
-          inputMode="text"
-          autoCapitalize="characters"
-          autoComplete="off"
-          placeholder="123456789V or 199012345678"
-          aria-describedby="profile-nic-hint"
-          className="h-11 rounded-xl px-3.5 font-mono tracking-wide uppercase"
-          {...form.register("nic")}
-        />
-        {form.formState.errors.nic ? (
-          <FieldError>{form.formState.errors.nic.message}</FieldError>
-        ) : (
-          <p id="profile-nic-hint" className="text-xs text-muted-foreground">
-            Old format (9 digits and a V) or new (12 digits). Held privately for
-            the sports office — it is never shown on the site.
-          </p>
         )}
       </Field>
 

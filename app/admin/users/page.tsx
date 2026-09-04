@@ -77,15 +77,9 @@ type UserSearchParams = {
  * `lib/admin-filters.ts`, and the work happens in Postgres wherever Postgres
  * can do it — see `lib/admin-users.ts` for the one thing it cannot, conduct.
  *
- * Two things on this page never leave it:
- *
- *   - **NIC** is sensitive personal data. It is shown here and on the owner's
- *     own account page, and nowhere else — no public page, no API response, no
- *     other user's view. It is not searchable from the filter bar either: the
- *     search box matches name and email only, so an NIC never travels in a URL.
- *   - **Conduct ratings** are private staff notes. The rated user has no
- *     endpoint that returns them, and RLS grants them no access to the table
- *     either (migration 20260803120000).
+ * One thing on this page never leaves it: **conduct ratings** are private
+ * staff notes. The rated user has no endpoint that returns them, and RLS
+ * grants them no access to the table either (migration 20260803120000).
  */
 export default async function AdminUsersPage({
   searchParams,
@@ -244,14 +238,11 @@ export default async function AdminUsersPage({
                           className="pl-5"
                         />
                         <TableHead>Email</TableHead>
-                        {/* Affiliation and NIC fold into the Name cell below
-                            `lg` — see the row for the copy that replaces them.
-                            Nothing is dropped, it just moves. */}
+                        {/* Affiliation folds into the Name cell below `lg` —
+                            see the row for the copy that replaces it. Nothing
+                            is dropped, it just moves. */}
                         <TableHead className="hidden lg:table-cell">
                           Affiliation
-                        </TableHead>
-                        <TableHead className="hidden lg:table-cell">
-                          NIC
                         </TableHead>
                         <TableHead>Role</TableHead>
                         <SortableHeader
@@ -295,19 +286,11 @@ export default async function AdminUsersPage({
                                 count={summary?.count ?? 0}
                                 canRate={canManage}
                               />
-                              {/* Below `lg` the Affiliation and NIC columns are
-                                  hidden to keep the table inside its container.
-                                  They reappear here rather than being lost —
-                                  NIC is admin-only either way, and this page is
-                                  the only place in the app that prints it. */}
+                              {/* Below `lg` the Affiliation column is hidden to
+                                  keep the table inside its container. It
+                                  reappears here rather than being lost. */}
                               <span className="mt-0.5 block max-w-[22ch] truncate text-xs font-normal text-muted-foreground lg:hidden">
                                 {affiliationLabel(u.affiliation)}
-                                {u.nic ? (
-                                  <>
-                                    {" · "}
-                                    <span className="font-mono">{u.nic}</span>
-                                  </>
-                                ) : null}
                               </span>
                             </TableCell>
                             <TableCell
@@ -326,13 +309,6 @@ export default async function AdminUsersPage({
                                 // existed lands here. Not an error — just not
                                 // filled in yet.
                                 <span className="text-xs italic">not set</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="hidden font-mono text-xs whitespace-nowrap text-muted-foreground lg:table-cell">
-                              {u.nic ?? (
-                                <span className="font-sans italic">
-                                  not set
-                                </span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -419,10 +395,10 @@ export default async function AdminUsersPage({
               <p className="flex items-start gap-2">
                 <Lock className="mt-0.5 size-4 shrink-0" />
                 <span>
-                  NIC numbers and conduct ratings on this page are internal.
-                  They appear nowhere on the public site, and a user cannot read
-                  their own rating — the server refuses it and the database
-                  policies refuse it independently.
+                  Conduct ratings on this page are internal. They appear nowhere
+                  on the public site, and a user cannot read their own rating —
+                  the server refuses it and the database policies refuse it
+                  independently.
                 </span>
               </p>
               <p>

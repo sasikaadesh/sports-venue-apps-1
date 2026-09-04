@@ -17,7 +17,6 @@ User
   name          string?   # nullable — see "Profile fields" below
   phone         string?
   address       string?
-  nic           string?   UNIQUE   # Sri Lankan NIC — SENSITIVE, admin + self only
   affiliation   enum('old_boy','parent','staff','outsider')?
   role          enum('user','admin','super_admin')  default 'user'
   createdAt
@@ -107,7 +106,7 @@ Notes:
 
 Shipped in migration `20260722120000_multi_hour_bookings`, which moved `slotId` and the unique constraint off `Booking` and onto the new `BookingSlot` table, carrying any existing one-hour bookings across as single child rows.
 
-`nic`, `affiliation` and `UserRating` shipped in `20260803120000_nic_affiliation_and_user_ratings` — see "Profile fields", "NIC and affiliation" and "Conduct ratings" below.
+`affiliation` and `UserRating` shipped in `20260803120000_nic_affiliation_and_user_ratings` — see "Profile fields", "Affiliation" and "Conduct ratings" below. That migration also added a `nic` column; `20260905120000_remove_nic` dropped it again (see "The NIC, and its removal").
 
 ### Who can see what
 
@@ -120,7 +119,6 @@ The one table that summarises this doc's access rules. "Owner" means the signed-
 | Payment                                 | —                   | own only                             | all           | all                                 |
 | ContactMessage                          | write (submit)      | —                                    | read + manage | read + manage                       |
 | User — name, phone, address             | —                   | own, editable                        | all, read     | all, read                           |
-| **User.nic**                            | **never**           | own, editable                        | all, read     | all, read                           |
 | **User.affiliation**                    | **never**           | own, editable                        | all, read     | all, read                           |
 | User.role                               | —                   | own, read-only                       | read          | read + assign (`user`/`admin` only) |
 | **UserRating**                          | **never**           | **never — not even rows about them** | read + add    | read + add                          |
@@ -271,26 +269,29 @@ Supabase Auth owns credentials; the app owns the role.
 
 ### Profile fields and the "complete your profile" gate
 
-`name`, `phone`, `address`, `nic` and `affiliation` are all nullable on `User`, which is a consequence of where the row comes from rather than a preference: the row is created by a database trigger the instant Supabase Auth creates the user, and **Google supplies none of them**.
+`name`, `phone`, `address` and `affiliation` are all nullable on `User`, which is a consequence of where the row comes from rather than a preference: the row is created by a database trigger the instant Supabase Auth creates the user, and **Google supplies none of them**.
 
 - **Email/password signup collects all of them up front.** They are passed as Supabase Auth user metadata and `handle_new_user()` copies them into `public."User"` — so the app still never INSERTs the profile row itself, and profile creation stays unskippable.
-- **`profileIsComplete()` means "has a phone, an address, an NIC and an affiliation"**. `NULLIF(TRIM(...), '')` in the trigger keeps an empty metadata string from counting as filled in, or blanks would walk straight through the gate.
+- **`profileIsComplete()` means "has a phone, an address and an affiliation"**. `NULLIF(TRIM(...), '')` in the trigger keeps an empty metadata string from counting as filled in, or blanks would walk straight through the gate.
 - **Anything incomplete is routed to `/complete-profile`**, carrying its original destination in `?next=`. Both the OAuth callback and the two password actions check this, so it also catches accounts created before these columns existed. That page guards with `requireUser`, _not_ `requireCompleteProfile` — the latter redirects to it, and would loop.
 - **Users edit their own profile through a server action** (`app/account/actions.ts`), which takes the id from `requireUser()` and never from the form, and whose schema has no `role` field. Users still have **no write policy on `User`**, so the invariant "nobody can promote themselves through the anon key" holds literally: there is no self-UPDATE path to abuse.
 
-### NIC and affiliation (`20260803120000`)
+### Affiliation (`20260803120000`)
 
-Two fields collected from every member: a Sri Lankan **NIC** and an **affiliation** to the school.
+One field collected from every member: an **affiliation** to the school.
 
 - **`affiliation` is a Postgres enum with exactly four values** — `old_boy`, `parent`, `staff`, `outsider`. A closed type rather than a string column, so a fifth value cannot be written by any path: not the app, not psql, not a future import script. The UI labels ("Old Boy", "Parent", …) live once in `AFFILIATIONS` in `lib/validations.ts`, which the signup form, the profile form and the admin table all render from.
-- **`nic` accepts both formats in circulation** — old (9 digits then `V`/`X`) and new (12 digits) — and is **normalised before it is stored**: spaces and dashes stripped, upper-cased. Without the upper-casing, `123456789v` and `123456789V` would be two accounts for one person, which is precisely what the unique constraint exists to prevent.
-- **Three layers agree on the format.** Zod (`nicField`) for the message the user reads, a `CHECK` constraint (`User_nic_format`) so nothing else can write a malformed value, and `UNIQUE` on the column as the one-NIC-one-account guarantee. `updateProfileAction` translates the resulting `P2002` into "that NIC is already registered to another account"; signup additionally pre-checks so the common case reads well, but that read and the insert are not atomic and the index is what actually decides.
-- **A duplicate NIC must never break account creation.** `handle_new_user()` runs inside the transaction that creates the `auth.users` row, so a unique violation there would abort the _signup itself_ with a raw database error. The trigger therefore catches `unique_violation` and retries the insert without the NIC: the account is created, the profile reads as incomplete, and `/complete-profile` asks for the NIC again with a sentence the person can act on.
-- **`getCurrentUser`'s fallback upsert deliberately does not set `nic`.** That path runs on every request for a user whose trigger did not fire; a unique collision there would throw on _every_ request they make, with no way out. Affiliation is safe (not unique) and is set; the NIC is left for `/complete-profile`.
+- **Not unique**, so `getCurrentUser`'s fallback upsert sets it freely — there is no collision that could throw on every request a user makes.
 
-**Existing accounts.** Every account created before this migration has `nic` and `affiliation` NULL, and the columns are nullable precisely so that stays true — a `NOT NULL` would have failed the migration against the live database. Those accounts **log in exactly as before**: the completeness gate lives _after_ authentication, not inside it. They land on `/complete-profile` once, fill in the two fields, and carry on to wherever they were headed. The unique index tolerates them too — Postgres treats NULLs as distinct, so any number of not-yet-filled-in rows coexist. Everything that renders either field handles the null case explicitly (`not set` in the admin table, an empty field in the forms) rather than assuming a value.
+**Existing accounts.** Every account created before this migration has `affiliation` NULL, and the column is nullable precisely so that stays true — a `NOT NULL` would have failed the migration against the live database. Those accounts **log in exactly as before**: the completeness gate lives _after_ authentication, not inside it. They land on `/complete-profile` once, fill the field in, and carry on to wherever they were headed. Everything that renders it handles the null case explicitly (`not set` in the admin table, an empty field in the forms) rather than assuming a value.
 
-**NIC is sensitive.** It is shown in exactly two places: the owner's own account page (they have to be able to check and correct it) and the admin Users tab. It appears on no public page, in no API response, and in no other user's view — `/api/admin/whoami` returns id/email/role only, and every other `User` read in the codebase selects a narrow explicit field list (`email`, `name`) rather than the whole row. RLS backs this: `user_select_own` already limits `SELECT` on `User` to `id = auth.uid() OR is_admin()`, and `anon` has no grant on the table at all.
+### The NIC, and its removal (`20260905120000`)
+
+`20260803120000` also added a **NIC** column — a Sri Lankan identity number, `UNIQUE`, with a format `CHECK` and a collision fallback in the signup trigger. **`20260905120000_remove_nic` dropped it.** The venue no longer collects it, and the migration destroys the stored values rather than merely hiding them; there is no down migration that can bring them back.
+
+What went with it: `nicField` in `lib/validations.ts`, the field on the signup form, the profile form and `/complete-profile`, the NIC column on the admin Users table, `profileIsComplete`'s third condition, the signup pre-check and the `P2002` translation in `updateProfileAction` (nothing a user may write is unique any more), the `unique_violation` retry inside `handle_new_user()`, and the `nic` key in `auth.users.raw_user_meta_data`, which the migration strips so a copy does not survive in the auth schema.
+
+**Affiliation was kept.** Only the NIC is gone.
 
 ### Conduct ratings (admin-only, private)
 
@@ -381,7 +382,7 @@ Flow, on a successful `submitContactMessage`:
 Lives under `/app/admin`, gated by `requireAdmin()` in the layout **and** in every page **and** in every server action — an action is its own HTTP endpoint and never runs the layout that guards the pages.
 
 - **Tabs:** Overview, Court types, Courts, Block slots, Bookings, **Users**, **Messages**. The header carries the signed-in email (linked to `/account`) and a **Log out** control on a single row.
-- **Users** lists every account and is where the role ladder above is applied. What a row draws (`canManage`, `actorIsSuperAdmin`) is presentation only; the same rules are re-derived from the database inside each action. It also carries the two admin-only fields — **NIC** and **Conduct** — plus the affiliation; see "NIC and affiliation" and "Conduct ratings" above for what may leave this page (nothing).
+- **Users** lists every account and is where the role ladder above is applied. What a row draws (`canManage`, `actorIsSuperAdmin`) is presentation only; the same rules are re-derived from the database inside each action. It also carries the one admin-only field — **Conduct** — plus the affiliation; see "Conduct ratings" above for what may leave this page (nothing).
 
 - **Booking writes** — `/lib/booking-service.ts` is the only module that writes `Booking` or `BookingSlot`. Admin actions (block, unblock, cancel) validate and authorize, then delegate. `blockSlot` rejects a slot that belongs to another court or does not recur on the chosen weekday, and translates the unique-constraint violation (Prisma `P2002`) into "already booked or blocked".
 - **Slot templates are strictly one hour.** A `SlotTemplate` is exactly one bookable hour; the admin never hand-builds an oversized range. Per weekday the admin sets an operating range and one hourly rate, and the server (`generateDaySchedule`) expands it into individual 1-hour slots — 06:00–22:00 → sixteen slots. Rates are adjustable afterwards: bulk for a weekday (`setDayRate`) or per hour (`updateSlotPrice`). Generation refuses to run on a weekday that already has slots, so a day is always either empty or a clean hourly grid. The migration `20260723120000_hourly_slot_templates` removed the legacy multi-hour seed template so no oversized block survives.

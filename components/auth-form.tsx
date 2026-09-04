@@ -225,29 +225,6 @@ export function AuthForm({
                 )}
               </Field>
 
-              <Field data-invalid={!!errors.nic}>
-                <FieldLabel htmlFor="nic" className="text-sm font-medium">
-                  NIC number
-                </FieldLabel>
-                <Input
-                  id="nic"
-                  type="text"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  placeholder="123456789V or 199012345678"
-                  aria-describedby="nic-hint"
-                  required
-                  maxLength={20}
-                  className="h-11 rounded-xl px-3.5 font-mono tracking-wide uppercase"
-                  {...form.register("nic")}
-                />
-                {errors.nic && <FieldError>{errors.nic.message}</FieldError>}
-                <p id="nic-hint" className="text-xs text-muted-foreground">
-                  Old format (9 digits and a V) or new (12 digits). Kept private
-                  to the sports office.
-                </p>
-              </Field>
-
               <Field data-invalid={!!errors.affiliation}>
                 <FieldLabel
                   htmlFor="affiliation"

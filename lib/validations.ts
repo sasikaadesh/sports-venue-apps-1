@@ -61,28 +61,6 @@ const addressField = z
   .min(5, "Enter your address.")
   .max(300, "Address must be 300 characters or fewer.");
 
-/**
- * Sri Lankan NIC, in either of the two formats in circulation:
- *
- *   old — 9 digits then V or X   e.g. 123456789V
- *   new — 12 digits              e.g. 199012345678
- *
- * Normalised before it is checked: spaces stripped (people write "123456789 V")
- * and upper-cased, so `123456789v` and `123456789V` cannot become two accounts
- * for one person. The column is UNIQUE and carries the same regex as a CHECK
- * constraint, so this is the friendly layer, not the guarantee.
- *
- * SENSITIVE — see ARCHITECTURE.md. Never rendered on a public page.
- */
-const nicField = z
-  .string()
-  .trim()
-  .transform((v) => v.replace(/[\s-]/g, "").toUpperCase())
-  .refine((v) => v.length > 0, { message: "Enter your NIC number." })
-  .refine((v) => /^(\d{9}[VX]|\d{12})$/.test(v), {
-    message: "Enter a valid NIC — 9 digits and a V (123456789V), or 12 digits.",
-  });
-
 /** The four options, and the only four. Mirrors the `Affiliation` enum. */
 export const AFFILIATIONS = [
   { value: "old_boy", label: "Old Boy" },
@@ -127,7 +105,6 @@ export const profileSchema = z.object({
   name: nameField,
   phone: phoneField,
   address: addressField,
-  nic: nicField,
   affiliation: affiliationField,
 });
 
@@ -162,7 +139,7 @@ export const newPasswordSchema = z
 
 /**
  * The Google path collects everything Google cannot give us — which is now
- * phone, address, NIC and affiliation. `name` is included because the OIDC
+ * phone, address and affiliation. `name` is included because the OIDC
  * claim can be absent or unhelpful, and the user should be able to correct it.
  * The same schema also catches accounts created before a field existed: they
  * are simply incomplete profiles and are asked for the missing values here.

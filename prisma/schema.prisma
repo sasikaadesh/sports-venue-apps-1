@@ -62,8 +62,8 @@ enum PaymentStatus {
 /// Every profile field is nullable because a profile row is created by a
 /// database trigger the moment Supabase Auth makes the user, and an OAuth
 /// (Google) sign-in supplies none of them. The app treats a row missing any of
-/// phone / address / nic / affiliation as an *incomplete* profile and routes
-/// the user through /complete-profile — see `profileIsComplete` in lib/auth.ts.
+/// phone / address / affiliation as an *incomplete* profile and routes the
+/// user through /complete-profile — see `profileIsComplete` in lib/auth.ts.
 /// Accounts that predate a field simply arrive incomplete and are asked for it.
 model User {
   id      String  @id @db.Uuid
@@ -72,10 +72,6 @@ model User {
   phone   String?
   address String?
 
-  /// Sri Lankan NIC — old format (9 digits + V/X, stored upper-cased) or new
-  /// (12 digits). SENSITIVE: admin-visible and self-visible only, never
-  /// rendered on a public page. Unique, so one NIC means one account.
-  nic         String?      @unique
   affiliation Affiliation?
 
   role      Role      @default(user)

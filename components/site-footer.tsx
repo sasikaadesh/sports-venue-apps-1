@@ -24,6 +24,12 @@ const LINK_COLUMNS = [
   },
 ];
 
+/** Policy pages, shown in the quiet bottom row rather than in a link column. */
+const LEGAL_LINKS = [
+  { href: "/privacy", label: "Privacy policy" },
+  { href: "/terms", label: "Terms of service" },
+];
+
 /**
  * Signature component 4 — the footer.
  *
@@ -146,10 +152,30 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-2 border-t border-footer-border pt-6 text-xs text-footer-muted sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col gap-3 border-t border-footer-border pt-6 text-xs text-footer-muted sm:flex-row sm:items-center sm:justify-between">
           <p>
             &copy; {new Date().getFullYear()} {BRAND.name}. All rights reserved.
           </p>
+
+          {/* The policies. They live in the quiet bottom row rather than in a
+              gold-labelled column: they must be reachable from every page (the
+              Google OAuth consent screen links straight to them), but they are
+              not something we are inviting anyone to click. */}
+          <nav
+            aria-label="Legal"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2"
+          >
+            {LEGAL_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="transition-colors hover:text-footer-foreground"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
           {/* City and country, read off the address rather than written out
               again — the rebrand surface is `lib/contact-details.ts`. */}
           <p>{CONTACT_DETAILS.addressLines.slice(-2).join(", ")}</p>
