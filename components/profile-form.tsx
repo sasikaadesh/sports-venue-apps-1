@@ -45,6 +45,9 @@ export function ProfileForm({
   const [saved, setSaved] = useState(false);
 
   const form = useForm<ProfileInput>({
+    // Validate a field when it is left, then on each keystroke once it has
+    // been flagged. The server action re-validates with the same schema.
+    mode: "onTouched",
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: defaultValues.name ?? "",
@@ -53,7 +56,8 @@ export function ProfileForm({
       nic: defaultValues.nic ?? "",
       // No default option: an unset affiliation must read as "not answered
       // yet", not as a silent "Old Boy" for every legacy account.
-      affiliation: defaultValues.affiliation ?? ("" as ProfileInput["affiliation"]),
+      affiliation:
+        defaultValues.affiliation ?? ("" as ProfileInput["affiliation"]),
     },
   });
 
@@ -83,7 +87,10 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5">
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="flex flex-col gap-5"
+    >
       {serverError && (
         <p
           role="alert"
@@ -180,7 +187,10 @@ export function ProfileForm({
       </Field>
 
       <Field data-invalid={!!form.formState.errors.affiliation}>
-        <FieldLabel htmlFor="profile-affiliation" className="text-sm font-medium">
+        <FieldLabel
+          htmlFor="profile-affiliation"
+          className="text-sm font-medium"
+        >
           Affiliation
         </FieldLabel>
         <NativeSelect

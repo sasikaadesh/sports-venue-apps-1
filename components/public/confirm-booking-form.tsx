@@ -69,7 +69,8 @@ export function ConfirmBookingForm({
         </Button>
 
         <p className="text-sm text-muted-foreground">
-          Held for {holdMinutes} minutes. Payment arrives in the next release.
+          Held for {holdMinutes} minutes — complete payment to confirm your
+          booking.
         </p>
       </div>
     </div>

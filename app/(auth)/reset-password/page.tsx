@@ -7,6 +7,7 @@ import {
   describeResetError,
 } from "@/components/reset-link-expired";
 import { ResetPasswordForm } from "@/components/reset-password-form";
+import { ResetSuccess } from "@/components/reset-success";
 import { getCurrentUser } from "@/lib/auth";
 import { RESET_PASSWORD_PATH } from "@/lib/site-url";
 
@@ -37,9 +38,15 @@ export const dynamic = "force-dynamic";
  *
  * **The page only asserts what it can prove.** It renders "expired" in exactly
  * one case: Supabase itself came back with an error. A missing session is *not*
- * evidence of a bad link — it is the normal first render of case 3 — so that
- * branch hands over to `RecoveryGate` rather than guessing. Guessing was the
- * false "Link Expired".
+ * evidence of a bad link — it is the normal first render of case 3, and also
+ * what a *successful* reset leaves behind, since changing the password signs
+ * every session out. So that branch hands over to `RecoveryGate` rather than
+ * guessing. Guessing was the false "Link Expired".
+ *
+ * `?done=1` is the fourth shape, and it is ours, not Supabase's: it is where
+ * `updatePassword` redirects after the password was actually changed. It is
+ * checked before everything else because at that moment the session is
+ * deliberately gone, and every other branch would read that absence as failure.
  */
 export default async function ResetPasswordPage({
   searchParams,
@@ -48,12 +55,20 @@ export default async function ResetPasswordPage({
     code?: string;
     token_hash?: string;
     type?: string;
+    done?: string;
     error?: string;
     error_code?: string;
     error_description?: string;
   }>;
 }) {
   const params = await searchParams;
+
+  // The password was just changed. Nothing below may run: the reset signed
+  // every session out, so every other branch would mistake that for a dead
+  // link — which is exactly the false "expired" this flow used to show.
+  if (params.done === "1") {
+    return <ResetSuccess />;
+  }
 
   // Supabase rejected the token before it ever reached us — the one case the
   // server can call expired on its own authority.

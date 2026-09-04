@@ -1,42 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { LinkButton } from "@/components/link-button";
 import { updatePassword, type UpdatePasswordState } from "@/app/(auth)/actions";
-
-/** `?reset=1` is what makes the login form say the password was changed. */
-const LOGIN_AFTER_RESET = "/login?reset=1";
-
-/**
- * Send the user to the login form a moment after the success panel appears —
- * long enough to read it, short enough not to feel stuck. The button below is
- * the same destination for anyone who does not want to wait, so the redirect
- * is a convenience and never the only way out.
- */
-function RedirectToLogin() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const timer = setTimeout(() => router.replace(LOGIN_AFTER_RESET), 2500);
-    return () => clearTimeout(timer);
-  }, [router]);
-
-  return null;
-}
 
 function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" size="lg" disabled={pending} className="h-11 w-full text-sm">
+    <Button
+      type="submit"
+      size="lg"
+      disabled={pending}
+      className="h-11 w-full text-sm"
+    >
       {pending ? (
         <>
           <Loader2 className="animate-spin" />
@@ -52,37 +35,22 @@ function SubmitButton() {
   );
 }
 
-/** Step two: set the new password with the session the recovery link created. */
+/**
+ * Step two: set the new password with the session the recovery link created.
+ *
+ * This component only ever renders the form or an inline error. Success is not
+ * a state here — `updatePassword` redirects to `/reset-password?done=1` — and
+ * that is deliberate: a successful reset signs every session out, so the
+ * re-render that comes back with any server action's result would find this
+ * page signed out and replace the whole subtree, taking a client-held success
+ * panel with it. Whatever replaced it then read the missing session as a dead
+ * link. See `components/reset-success.tsx`.
+ */
 export function ResetPasswordForm() {
   const [state, formAction] = useActionState<UpdatePasswordState, FormData>(
     updatePassword,
     {}
   );
-
-  if (state.done) {
-    return (
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-4">
-          <CheckCircle2 className="size-5 text-primary" />
-          <div className="flex flex-col gap-1.5">
-            <p role="status" className="font-medium">
-              Password updated
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Every device that was signed in has been logged out. Log in again
-              with your new password — taking you there now.
-            </p>
-          </div>
-        </div>
-
-        <RedirectToLogin />
-
-        <LinkButton href={LOGIN_AFTER_RESET} size="lg" className="h-11 w-full text-sm">
-          Go to log in
-        </LinkButton>
-      </div>
-    );
-  }
 
   return (
     <form action={formAction} className="flex flex-col gap-6">

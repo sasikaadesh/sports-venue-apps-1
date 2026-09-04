@@ -7,6 +7,7 @@ import {
   LogIn,
   Pencil,
   TriangleAlert,
+  UserPlus,
   Users,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ import { LinkButton } from "@/components/link-button";
 import { ConfirmBookingForm } from "@/components/public/confirm-booking-form";
 import { RemoveBookingButton } from "@/components/public/remove-booking-button";
 import { getCurrentUser } from "@/lib/auth";
+import { bookingReviewPath, courtSelectionPath } from "@/lib/booking-url";
 import { quoteBooking, HOLD_MINUTES } from "@/lib/booking-service";
 import { dateStringToDate, formatDate, formatPrice } from "@/lib/time";
 import { createBookingSchema } from "@/lib/validations";
@@ -82,13 +84,21 @@ export default async function BookPage({
   const booking = quote.data;
   const user = await getCurrentUser();
 
+  const selection = {
+    courtId: booking.courtId,
+    bookingDate: booking.dateString,
+    startSlotId: booking.hours[0].slotId,
+    durationHours: booking.durationHours,
+    playerCount: booking.playerCount,
+  };
+
   // Where to come back to after signing in — the whole selection is in the URL,
-  // so nothing is lost on the round trip.
-  const returnTo = `/book?courtId=${booking.courtId}&date=${booking.dateString}&slotId=${booking.hours[0].slotId}&duration=${booking.durationHours}&players=${booking.playerCount}`;
+  // so nothing is lost on the round trip and nothing is reserved during it.
+  const returnTo = bookingReviewPath(selection);
 
   // "Change" goes back to the court's availability with every field preserved,
   // so the user can adjust date, start time, duration or players and come back.
-  const changeHref = `/courts/${booking.courtId}?date=${booking.dateString}&slotId=${booking.hours[0].slotId}&duration=${booking.durationHours}&players=${booking.playerCount}`;
+  const changeHref = courtSelectionPath(selection);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-12 sm:px-8">
@@ -187,16 +197,32 @@ export default async function BookPage({
         ) : (
           <div className="flex flex-col items-start gap-4 rounded-xl border border-dashed px-5 py-6">
             <p className="text-sm text-muted-foreground">
-              Sign in to hold these hours. Your selection is kept.
+              Sign in to hold these hours. Your selection is kept — you will
+              come straight back here.
             </p>
-            <LinkButton
-              href={`/login?next=${encodeURIComponent(returnTo)}`}
-              size="lg"
-              className="h-10"
-            >
-              <LogIn />
-              Sign in to confirm
-            </LinkButton>
+            {/* Both routes carry the same return URL, so a visitor without an
+                account is not made to choose between keeping their selection
+                and creating one. Nothing is reserved until they confirm on the
+                way back. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <LinkButton
+                href={`/login?next=${encodeURIComponent(returnTo)}`}
+                size="lg"
+                className="h-10"
+              >
+                <LogIn />
+                Sign in to confirm
+              </LinkButton>
+              <LinkButton
+                href={`/signup?next=${encodeURIComponent(returnTo)}`}
+                variant="outline"
+                size="lg"
+                className="h-10"
+              >
+                <UserPlus />
+                Create an account
+              </LinkButton>
+            </div>
           </div>
         )}
       </div>
