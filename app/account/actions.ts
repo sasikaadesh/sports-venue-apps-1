@@ -13,7 +13,7 @@ import {
 } from "@/lib/validations";
 
 /**
- * Save the signed-in user's own profile — name, phone, address, NIC and
+ * Save the signed-in user's own profile — name, phone, address and
  * affiliation.
  *
  * Used by both the account page and the "Complete your profile" step after a
@@ -34,41 +34,19 @@ export async function updateProfileAction(
   const parsed = profileSchema.safeParse(input);
   if (!parsed.success) return actionError(firstIssue(parsed.error));
 
-  try {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        address: parsed.data.address,
-        nic: parsed.data.nic,
-        affiliation: parsed.data.affiliation,
-      },
-    });
-  } catch (e) {
-    // The UNIQUE index on `nic` is the one thing here that can fail on
-    // otherwise-valid input, and it is the guarantee that one NIC means one
-    // account. Translate it rather than showing a constraint name.
-    if (isUniqueViolation(e)) {
-      return actionError(
-        "That NIC is already registered to another account. Check the number, or contact the sports office."
-      );
-    }
-    throw e;
-  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      name: parsed.data.name,
+      phone: parsed.data.phone,
+      address: parsed.data.address,
+      affiliation: parsed.data.affiliation,
+    },
+  });
 
   revalidatePath("/account");
   revalidatePath("/complete-profile");
   return { ok: true };
-}
-
-/** Postgres unique-constraint violation, surfaced by Prisma as P2002. */
-function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    (e as { code?: unknown }).code === "P2002"
-  );
 }
 
 /**

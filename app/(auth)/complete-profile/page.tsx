@@ -12,14 +12,14 @@ export const metadata: Metadata = {
 /**
  * The step a Google sign-in lands on.
  *
- * Google returns an email and usually a name, but no phone number, address,
- * NIC or affiliation — and the venue needs all four. Rather than block the
+ * Google returns an email and usually a name, but no phone number, address
+ * or affiliation — and the venue needs all three. Rather than block the
  * OAuth flow, we let the sign-in finish and collect the missing fields here,
  * then continue to wherever they were headed.
  *
  * This is also where **accounts that predate a field** are topped up. Anyone
- * who registered before NIC and affiliation existed has them NULL, which reads
- * as an incomplete profile; they sign in exactly as before and are asked once,
+ * who registered before affiliation existed has it NULL, which reads as an
+ * incomplete profile; they sign in exactly as before and are asked once,
  * here. Nothing about their login breaks.
  *
  * Guards `requireUser`, NOT `requireCompleteProfile` — the latter redirects to
@@ -55,7 +55,6 @@ export default async function CompleteProfilePage({
           name: user.name ?? "",
           phone: user.phone ?? "",
           address: user.address ?? "",
-          nic: user.nic ?? "",
           affiliation: user.affiliation ?? undefined,
         }}
         submitLabel="Save and continue"

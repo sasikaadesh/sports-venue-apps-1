@@ -23,8 +23,8 @@ import type { UserRatingFilter } from "@/lib/validations";
  *
  * **Admin-only, like everything it touches.** `import "server-only"` keeps it
  * out of every client bundle, and its one caller sits behind `requireAdmin()`.
- * It selects `nic` and joins conduct ratings — see `lib/user-ratings.ts` for
- * why neither ever leaves this half of the app.
+ * It joins conduct ratings — see `lib/user-ratings.ts` for why they never
+ * leave this half of the app.
  *
  * ## Why there are two paths through `listAdminUsers`
  *
@@ -119,7 +119,6 @@ const USER_SELECT = {
   email: true,
   name: true,
   phone: true,
-  nic: true,
   affiliation: true,
   role: true,
   createdAt: true,

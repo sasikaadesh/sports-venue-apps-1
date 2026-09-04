@@ -87,7 +87,7 @@ export default async function AccountPage({
           <UserIcon className="mt-0.5 size-4 shrink-0 text-primary" />
           <span>
             Complete your details under <strong>Details</strong> — we need a
-            phone number, address, NIC and affiliation before you can book.
+            phone number, address and affiliation before you can book.
           </span>
         </p>
       )}
@@ -190,15 +190,11 @@ function DetailsPanel({
           </p>
         </div>
 
-        {/* The user's own NIC is shown back to them because they have to be
-            able to check and correct it. It goes no further: no other user,
-            and no public page, can reach it. */}
         <ProfileForm
           defaultValues={{
             name: user.name ?? "",
             phone: user.phone ?? "",
             address: user.address ?? "",
-            nic: user.nic ?? "",
             affiliation: user.affiliation ?? undefined,
           }}
         />
