@@ -87,7 +87,29 @@ export function PayNowButton({
     };
 
     sdk.onError = (message: string) => {
-      setError(message || "PayHere reported an error. Please try again.");
+      // payhere.js does one synchronous XHR to `<host>/pay/checkoutJ` — that
+      // request IS the onsite-checkout integration, not something this app
+      // makes. When PayHere refuses the checkout it answers with an HTML error
+      // page and drops its `Access-Control-Allow-Origin` header, so the browser
+      // blocks the response and the SDK sees an empty body. It then reports its
+      // catch-all "Error occurred in PayHere" and the console shows only a CORS
+      // violation, with PayHere's real reason nowhere in sight.
+      //
+      // Almost always a merchant-account problem rather than a payload one:
+      // this domain is not approved under PayHere > Settings > Domains &
+      // Credentials, or the merchant id and secret are from a different
+      // (live vs sandbox) account than the one the domain is approved for.
+      console.error(
+        "[payhere] startPayment failed:",
+        message,
+        "— if the console also shows a CORS error against /pay/checkout, PayHere rejected the checkout itself. Check that this domain is approved in the PayHere merchant portal and that the merchant id/secret match it."
+      );
+
+      setError(
+        /error occurred in payhere/i.test(message ?? "")
+          ? "PayHere could not start this payment. This usually means the site is not yet approved in the PayHere account — please contact the office."
+          : message || "PayHere reported an error. Please try again."
+      );
       setPending(false);
     };
 
@@ -97,7 +119,14 @@ export function PayNowButton({
   return (
     <div className="flex flex-col gap-3">
       <Script
-        src={process.env.NEXT_PUBLIC_PAYHERE_JS ?? "https://www.payhere.lk/lib/payhere.js"}
+        // Always PayHere's own current library, for both sandbox and live —
+        // which environment is used is decided by the `sandbox` flag in the
+        // payment object, never by the script URL. Deliberately not
+        // configurable: an older or self-hosted copy of this file posts to
+        // `/pay/checkout` instead of `/pay/checkoutJ`, and only the latter
+        // answers cross-origin, so a stale copy fails as an unexplained CORS
+        // error. (`sandbox.payhere.lk/lib/payhere.js` does not exist — it 404s.)
+        src="https://www.payhere.lk/lib/payhere.js"
         strategy="afterInteractive"
         onReady={() => {
           scriptReady.current = true;
@@ -115,11 +144,7 @@ export function PayNowButton({
           disabled={pending}
           onClick={pay}
         >
-          {pending ? (
-            <LoaderCircle className="animate-spin" />
-          ) : (
-            <CreditCard />
-          )}
+          {pending ? <LoaderCircle className="animate-spin" /> : <CreditCard />}
           {pending ? "Opening PayHere" : `Pay now — ${amountLabel}`}
         </Button>
 

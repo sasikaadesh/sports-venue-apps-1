@@ -198,6 +198,20 @@ The atomicity in step 4 is the reason the insert must be a single transaction ra
 
 **Dev note:** `notify_url` must be publicly reachable, so test against the deployed Vercel URL or a tunnel (ngrok/cloudflared), not `localhost`. Merchant Secret is domain-specific.
 
+**A CORS error is not a CORS bug.** Step 3 is `payhere.startPayment(...)`, and the popup is opened by PayHere's own library: `payhere.js` makes one synchronous `XMLHttpRequest` to `https://[sandbox.]payhere.lk/pay/checkoutJ` and opens an iframe at the URL that comes back. **That XHR _is_ the integration** — nothing in this app posts to PayHere from the browser, and nothing should.
+
+When PayHere refuses the checkout it answers that XHR with an HTML error page ("Something went wrong. Error code: …") and **omits `Access-Control-Allow-Origin`**, so the browser blocks the response and the only thing visible in the console is:
+
+> Access to XMLHttpRequest at 'https://sandbox.payhere.lk/pay/checkout…' has been blocked by CORS policy
+
+PayHere's actual reason never reaches the page, and the SDK falls back to its catch-all "Error occurred in PayHere". The successful path _does_ send the CORS header, so a CORS failure here means **PayHere rejected the request**, essentially always for merchant-account reasons rather than payload ones. In order of likelihood:
+
+1. The domain is not added **and approved** under PayHere → Settings → **Domains & Credentials**. Approval is manual and not instant.
+2. The Merchant Secret in use was issued for a different domain (it is per-domain), or the id/secret pair mixes the live and sandbox accounts.
+3. `notify_url` is not publicly reachable — `startCheckout()` now refuses this case up front so it fails with a real message instead of an opaque CORS error.
+
+Load the library only from `https://www.payhere.lk/lib/payhere.js`, for sandbox as well as live — sandbox is selected by the `sandbox` flag in the payment object, never by the script URL. An older or self-hosted copy posts to `/pay/checkout` instead of `/pay/checkoutJ`, and only the latter answers cross-origin at all.
+
 ### As built (Phase 8)
 
 Three modules, split by who is allowed to call them:
