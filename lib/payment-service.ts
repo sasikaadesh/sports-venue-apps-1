@@ -49,6 +49,48 @@ export const PAYHERE_RETURN_PATH = "/payments/return";
 const DEFAULT_CITY = "Colombo";
 const DEFAULT_COUNTRY = "Sri Lanka";
 
+/**
+ * Can PayHere actually reach the callbacks we are about to hand it?
+ *
+ * PayHere fetches `notify_url` from its own servers, so a `localhost` or
+ * plain-http origin is not merely useless — PayHere rejects the whole checkout.
+ * It rejects it by rendering an HTML error page from `/pay/checkoutJ` **with no
+ * `Access-Control-Allow-Origin` header**, which the browser can only report as
+ * a CORS failure on `sandbox.payhere.lk/pay/checkout`. The real reason never
+ * reaches the page.
+ *
+ * So the check happens here instead, where the reason is still visible. This is
+ * a misconfiguration of `NEXT_PUBLIC_BASE_URL`, not something a user can fix,
+ * hence the loud server log next to the polite message.
+ */
+function unreachableCallbackOrigin(origin: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return `NEXT_PUBLIC_BASE_URL is not a valid URL: ${origin}`;
+  }
+
+  const host = url.hostname.toLowerCase();
+  const isLoopback =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "[::1]" ||
+    host === "0.0.0.0" ||
+    host.endsWith(".local") ||
+    host.endsWith(".localhost");
+
+  if (isLoopback) {
+    return `PayHere cannot reach ${origin} — notify_url must be a public URL. Set NEXT_PUBLIC_BASE_URL to the deployed origin, or tunnel the dev server.`;
+  }
+
+  if (url.protocol !== "https:") {
+    return `PayHere requires https callbacks; got ${origin}.`;
+  }
+
+  return null;
+}
+
 /** Exactly the fields handed to `payhere.startPayment()` in the browser. */
 export type PayHereCheckoutParams = {
   sandbox: boolean;
@@ -104,6 +146,22 @@ export async function startCheckout(
     return {
       ok: false,
       error: "Online payment is not configured yet. Please contact the office.",
+      reason: "invalid",
+    };
+  }
+
+  // Resolved up front, before any row is written: if PayHere cannot call us
+  // back, the checkout is dead on arrival and there is no point holding hours
+  // or creating a payment for it.
+  const origin = await siteOrigin();
+  const originProblem = unreachableCallbackOrigin(origin);
+
+  if (originProblem) {
+    console.error(`[payhere] refusing to start checkout — ${originProblem}`);
+    return {
+      ok: false,
+      error:
+        "Online payment is not configured correctly. Please contact the office.",
       reason: "invalid",
     };
   }
@@ -186,7 +244,11 @@ export async function startCheckout(
   // stale row at a different amount (the booking changed) is left alone as
   // history and a fresh one is created.
   const existing = await prisma.payment.findFirst({
-    where: { bookingId: booking.id, status: "pending", amount: booking.totalPrice },
+    where: {
+      bookingId: booking.id,
+      status: "pending",
+      amount: booking.totalPrice,
+    },
     orderBy: { createdAt: "desc" },
     select: { id: true, orderId: true },
   });
@@ -207,7 +269,6 @@ export async function startCheckout(
       select: { id: true, orderId: true },
     }));
 
-  const origin = await siteOrigin();
   const [firstName, lastName] = splitName(user.name, "Customer");
 
   const first = booking.slots[0]?.slot;
@@ -228,7 +289,8 @@ export async function startCheckout(
       cancel_url: `${origin}/bookings/${booking.id}?payment=cancelled`,
       notify_url: `${origin}${PAYHERE_NOTIFY_PATH}`,
       order_id: payment.orderId,
-      items: `${booking.court.name} ${dateToDateString(booking.bookingDate)} ${timeRange}`.trim(),
+      items:
+        `${booking.court.name} ${dateToDateString(booking.bookingDate)} ${timeRange}`.trim(),
       amount,
       currency: PAYHERE_CURRENCY,
       // The one value derived from the merchant secret that is allowed out of
@@ -278,7 +340,9 @@ export async function applyPayHereNotification(
   const config = payhereConfig();
 
   if (!config) {
-    console.error("[payhere] notification received but PayHere is not configured");
+    console.error(
+      "[payhere] notification received but PayHere is not configured"
+    );
     return { status: 500, message: "Not configured" };
   }
 
@@ -296,7 +360,9 @@ export async function applyPayHereNotification(
   }
 
   if (merchantId !== config.merchantId) {
-    console.warn(`[payhere] notification for a foreign merchant id: ${merchantId}`);
+    console.warn(
+      `[payhere] notification for a foreign merchant id: ${merchantId}`
+    );
     return { status: 403, message: "Bad merchant" };
   }
 
@@ -349,7 +415,12 @@ export async function applyPayHereNotification(
 
   switch (outcome) {
     case "success":
-      return settleSuccess(payment.id, payment.bookingId, paymentId, payment.status);
+      return settleSuccess(
+        payment.id,
+        payment.bookingId,
+        paymentId,
+        payment.status
+      );
 
     case "cancelled":
     case "failed":
@@ -380,7 +451,9 @@ export async function applyPayHereNotification(
       return { status: 200, message: "Payment pending" };
 
     default:
-      console.warn(`[payhere] unrecognised status_code ${statusCode} on order ${orderId}`);
+      console.warn(
+        `[payhere] unrecognised status_code ${statusCode} on order ${orderId}`
+      );
       return { status: 200, message: "Ignored" };
   }
 }
