@@ -193,7 +193,7 @@ The atomicity in step 4 is the reason the insert must be a single transaction ra
 4. PayHere calls the **`notify_url`** webhook server-to-server. The webhook:
    - verifies `md5sig`,
    - on success: marks `Payment` `success` and flips the `Booking` to `confirmed`,
-   - on failure/cancel: marks `Payment` accordingly and leaves/returns the slot.
+   - on failure/cancel: marks `Payment` accordingly and **leaves the `Booking` alone** — it stays `pending` and keeps its hours until the hold lapses, so the user can retry with another card.
 5. `return_url` only shows the user a status page — it never confirms the booking.
 
 **Dev note:** `notify_url` must be publicly reachable, so test against the deployed Vercel URL or a tunnel (ngrok/cloudflared), not `localhost`. Merchant Secret is domain-specific.
@@ -218,7 +218,7 @@ Three modules, split by who is allowed to call them:
 
 - **`lib/payhere.ts`** — config plus the two digests. `payhereConfig()` returns `null` when unconfigured (the button reports it rather than the page crashing) and treats anything that is not literally `live` as sandbox, so a typo cannot start taking real money. `verifyNotificationSignature` compares in constant time. MD5 is PayHere's specification, not a choice.
 - **`lib/payment-service.ts`** — the only writer of `Payment`. `startCheckout()` for a signed-in owner; `applyPayHereNotification()` for the webhook.
-- **`lib/booking-service.ts`** gained the three booking transitions payment needs — `extendHoldForPayment`, `confirmPaidBooking`, `releaseUnpaidBooking` — because every `Booking` write goes through that one module (CLAUDE.md).
+- **`lib/booking-service.ts`** gained the two booking transitions payment needs — `extendHoldForPayment` and `confirmPaidBooking` — because every `Booking` write goes through that one module (CLAUDE.md). There is deliberately no third one for the failure path: see below.
 
 **Routes.** `POST /api/payhere/notify` (server-to-server) and `/payments/return?booking=<id>` (the browser). The return page reads booking + payment status and renders it; it has no write path at all, and "the webhook has not landed yet" is a first-class state there, polled by `router.refresh()` for up to a minute.
 
@@ -228,6 +228,7 @@ Three modules, split by who is allowed to call them:
 - **Confirmation is a compare-and-set.** `confirmPaidBooking` uses `updateMany` matching `status: 'pending'`, so it races safely against the expiry sweep and is idempotent under PayHere's retries — which is also what stops the confirmation email going out twice.
 - **The hold is extended to 20 minutes when checkout opens** (`PAYMENT_HOLD_MINUTES`), because card entry, OTP and the bank redirect all happen inside it.
 - **Paid-but-unconfirmable is handled explicitly.** If the hold lapsed and the sweep released the hours before the notification arrived, the payment is still recorded `success` but the booking is **not** confirmed — the hours may already belong to someone else. It logs `PAID BUT UNCONFIRMABLE … Refund required`, and both the booking page and the status page tell the user plainly that the office will contact them. Confirming anyway would sell one hour twice.
+- **A declined payment does not end the booking.** `-1`/`-2` writes the `Payment` row (`cancelled` / `failed`) and touches nothing else: the booking stays `pending` and keeps its hours until `holdExpiresAt` passes, and "Pay now" stays on the booking page, the account list and the return page so another card can be tried. An earlier version released the hours here, which meant one insufficient-funds attempt cancelled the booking outright and the user could not retry — the slot had to be found and re-booked, if it was still free. **Only two things end a hold: the user releasing it, or the hold expiring.** A decline is neither. Not writing the booking also removes a race for free — a late `-1` for attempt #1 arriving after attempt #2 confirmed the booking now cannot strip the hours off a paid booking, because the failure path addresses its own `Payment` row and never a `Booking`.
 - **A chargeback (`-3`) is recorded, not acted on.** It arrives against a booking that is usually already `confirmed`, and releasing paid hours automatically is exactly the decision that belongs to an admin with a refund trail (see the paid/unpaid divide above).
 - **Email** on confirmation goes through `lib/email/booking.ts`, which — like the contact emails — never throws and never reports failure upward. A Resend outage must not make the webhook return non-2xx, or PayHere would retry a notification we have already acted on.
 - **Verified without PayHere.** A harness POSTed signed notifications at the running webhook: success, retry/replay, forged `md5sig`, a tampered amount, a correctly-signed underpayment, cancel, fail, foreign merchant id, unknown order, and the lapsed-hold case. Only the correctly signed success confirmed anything, and the replay was a no-op.

@@ -752,43 +752,16 @@ export async function confirmPaidBooking(
   return { ok: true, data: { id: bookingId, confirmed: true } };
 }
 
-/**
- * Release a hold whose payment did not go through (cancelled or failed at
- * PayHere). Deleting the hour-rows is what frees the time, exactly as for an
- * expired hold.
+/*
+ * There is deliberately no `releaseUnpaidBooking` here any more.
  *
- * Guarded on `status: 'pending'`, so a webhook arriving late for a booking
- * that has since been confirmed by a *successful* retry cannot release a paid
- * slot.
+ * It existed for one caller — the webhook's `-1`/`-2` branch — and it flipped
+ * the booking to `cancelled`, which meant a single declined card destroyed the
+ * hold and left the user unable to retry. A failed payment attempt is not a
+ * release: the only two things that end a hold are the user releasing it
+ * (`removeOwnBooking`) and `holdExpiresAt` passing (`releaseExpiredHolds`).
+ * See the comment on `settleUnpaid` in lib/payment-service.ts.
  */
-export async function releaseUnpaidBooking(
-  bookingId: string
-): Promise<BookingResult<{ id: string; released: boolean }>> {
-  const booking = await prisma.booking.findUnique({
-    where: { id: bookingId },
-    select: { id: true, status: true },
-  });
-
-  if (!booking) {
-    return { ok: false, error: "Booking not found.", reason: "notfound" };
-  }
-
-  if (booking.status !== "pending") {
-    // Already expired, cancelled or confirmed — nothing to release.
-    return { ok: true, data: { id: bookingId, released: false } };
-  }
-
-  // The status guard now covers the hour-rows too. A `-1`/`-2` notification
-  // arriving after a successful retry already confirmed this booking releases
-  // nothing at all, rather than stripping the hours off a paid booking.
-  const released = await flipAndReleaseHours({
-    ids: [bookingId],
-    guard: { status: "pending" },
-    status: "cancelled",
-  });
-
-  return { ok: true, data: { id: bookingId, released: released > 0 } };
-}
 
 /**
  * Block a court + date + slot so nobody can book it (maintenance, a match,

@@ -115,6 +115,15 @@ export async function AccountBookings({
               orderBy: { slot: { startTime: "asc" } },
               select: { slot: { select: { startTime: true, endTime: true } } },
             },
+            // Just the most recent attempt, so a row whose card was declined
+            // can say so. A failed payment no longer touches the booking
+            // (lib/payment-service.ts → settleUnpaid), which means the booking
+            // row alone can no longer tell you an attempt went wrong.
+            payments: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { status: true },
+            },
           },
         });
 
@@ -181,6 +190,10 @@ export async function AccountBookings({
           // there is actually something to pay.
           const canPay = holdLive && booking.totalPrice.greaterThan(0);
 
+          const lastPayment = booking.payments[0]?.status;
+          const failedAttempt =
+            canPay && (lastPayment === "failed" || lastPayment === "cancelled");
+
           const removable = REMOVABLE_STATUSES.includes(booking.status);
 
           return (
@@ -224,6 +237,15 @@ export async function AccountBookings({
                     {booking.playerCount === 1 ? "player" : "players"}
                   </span>
                 </div>
+
+                {failedAttempt && (
+                  <p className="text-xs font-medium text-destructive">
+                    {lastPayment === "cancelled"
+                      ? "Payment cancelled — please try again."
+                      : "Payment failed — please try again."}{" "}
+                    Nothing was charged and your slot is still held.
+                  </p>
+                )}
 
                 {holdLive && (
                   <p className="text-xs font-medium text-foreground">
