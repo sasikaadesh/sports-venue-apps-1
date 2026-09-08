@@ -37,13 +37,22 @@ declare global {
  * the popup reports back is used for navigation only. The booking is confirmed
  * by the `notify_url` webhook or not at all, so `onCompleted` sends the user to
  * a status page rather than claiming success.
+ *
+ * Two presentations, one payment path. `full` is the booking page's primary
+ * call to action; `compact` is the row-sized version used in the account
+ * bookings list, where the button sits beside "View details" and the amount is
+ * already printed next to it. They differ in chrome only — the checkout, the
+ * server action behind it and every guard on it are the same code, which is
+ * the point: there is exactly one way to pay in this app.
  */
 export function PayNowButton({
   bookingId,
   amountLabel,
+  variant = "full",
 }: {
   bookingId: string;
   amountLabel: string;
+  variant?: "full" | "compact";
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -116,25 +125,61 @@ export function PayNowButton({
     sdk.startPayment({ ...result.data });
   }, [bookingId, router]);
 
+  // One <Script> per button on the page looks wasteful and is not: next/script
+  // keys on `src`, so the library is fetched and evaluated once however many
+  // rows the account list renders. `onReady` still fires per instance, which is
+  // all this needs — it only flips a local "the SDK should be there" flag.
+  const script = (
+    <Script
+      // Always PayHere's own current library, for both sandbox and live —
+      // which environment is used is decided by the `sandbox` flag in the
+      // payment object, never by the script URL. Deliberately not
+      // configurable: an older or self-hosted copy of this file posts to
+      // `/pay/checkout` instead of `/pay/checkoutJ`, and only the latter
+      // answers cross-origin, so a stale copy fails as an unexplained CORS
+      // error. (`sandbox.payhere.lk/lib/payhere.js` does not exist — it 404s.)
+      src="https://www.payhere.lk/lib/payhere.js"
+      strategy="afterInteractive"
+      onReady={() => {
+        scriptReady.current = true;
+      }}
+      onError={() =>
+        setError("Could not load PayHere. Check your connection and reload.")
+      }
+    />
+  );
+
+  if (variant === "compact") {
+    return (
+      <>
+        {script}
+
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending}
+          onClick={pay}
+          aria-label={`Pay now — ${amountLabel}`}
+        >
+          {pending ? <LoaderCircle className="animate-spin" /> : <CreditCard />}
+          {pending ? "Opening" : "Pay now"}
+        </Button>
+
+        {error && (
+          <p
+            role="alert"
+            className="basis-full text-right text-xs text-destructive sm:max-w-xs"
+          >
+            {error}
+          </p>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
-      <Script
-        // Always PayHere's own current library, for both sandbox and live —
-        // which environment is used is decided by the `sandbox` flag in the
-        // payment object, never by the script URL. Deliberately not
-        // configurable: an older or self-hosted copy of this file posts to
-        // `/pay/checkout` instead of `/pay/checkoutJ`, and only the latter
-        // answers cross-origin, so a stale copy fails as an unexplained CORS
-        // error. (`sandbox.payhere.lk/lib/payhere.js` does not exist — it 404s.)
-        src="https://www.payhere.lk/lib/payhere.js"
-        strategy="afterInteractive"
-        onReady={() => {
-          scriptReady.current = true;
-        }}
-        onError={() =>
-          setError("Could not load PayHere. Check your connection and reload.")
-        }
-      />
+      {script}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button

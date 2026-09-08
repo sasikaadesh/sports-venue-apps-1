@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/link-button";
 import { LinkPending } from "@/components/link-pending";
+import { PayNowButton } from "@/components/public/pay-now-button";
 import { RemoveAccountBookingButton } from "@/components/remove-account-booking-button";
 import { prisma } from "@/lib/prisma";
 import {
@@ -167,6 +168,19 @@ export async function AccountBookings({
           const holdLive =
             booking.status === "pending" && isFuture(booking.holdExpiresAt);
 
+          // Still `pending` in the row, but the hold ran out — the sweep has
+          // simply not reached it yet (reads never sweep, see
+          // docs/ARCHITECTURE.md → Releasing a booking). Paying would be
+          // refused by `startCheckout` anyway, so say so instead of offering a
+          // button that cannot work.
+          const holdExpired =
+            booking.status === "pending" && !isFuture(booking.holdExpiresAt);
+
+          // Same three conditions the server re-checks in `startCheckout`:
+          // yours (the whole query is scoped to `userId`), still held, and
+          // there is actually something to pay.
+          const canPay = holdLive && booking.totalPrice.greaterThan(0);
+
           const removable = REMOVABLE_STATUSES.includes(booking.status);
 
           return (
@@ -222,6 +236,13 @@ export async function AccountBookings({
                     — pay to confirm it.
                   </p>
                 )}
+
+                {holdExpired && (
+                  <p className="text-xs font-medium text-muted-foreground">
+                    This hold has expired — the hours have gone back on sale.
+                    Book them again to pay.
+                  </p>
+                )}
               </div>
 
               {/* The card is no longer one big link: it now carries a button,
@@ -236,7 +257,18 @@ export async function AccountBookings({
                   {formatPrice(booking.totalPrice.toString())}
                 </span>
 
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                  {/* The same component, and therefore the same checkout, as
+                      the booking page's primary button — a hold started
+                      earlier can be finished from here without opening it. */}
+                  {canPay && (
+                    <PayNowButton
+                      variant="compact"
+                      bookingId={booking.id}
+                      amountLabel={formatPrice(booking.totalPrice.toString())}
+                    />
+                  )}
+
                   <LinkButton
                     href={`/bookings/${booking.id}`}
                     variant="ghost"

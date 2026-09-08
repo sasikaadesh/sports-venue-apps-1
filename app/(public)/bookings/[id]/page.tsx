@@ -96,6 +96,14 @@ export default async function BookingPage({
 
   const canPay = holdLive && isOwner && booking.totalPrice.greaterThan(0);
 
+  // `pending` with a lapsed hold: the expiry sweep has not reached this row yet
+  // (reads never sweep — docs/ARCHITECTURE.md → Releasing a booking), so the
+  // status still says pending while the hours are effectively gone. Show the
+  // reason rather than a Pay button the server would refuse.
+  // `expired` is the same story once the sweep has been through, so both read
+  // as one state to the user.
+  const holdExpired = (isPending && !holdLive) || booking.status === "expired";
+
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-12 sm:px-8">
       <div className="flex flex-col items-start gap-3">
@@ -222,6 +230,26 @@ export default async function BookingPage({
             amountLabel={formatPrice(booking.totalPrice.toString())}
           />
         </div>
+      )}
+
+      {/* The hold ran out before it was paid for. Not an error — it is the
+          designed outcome of an abandoned hold — so it is stated plainly, with
+          the only thing left to do. Suppressed when a payment did succeed:
+          that case has its own, far more serious message below. */}
+      {holdExpired && payment?.status !== "success" && (
+        <p
+          role="status"
+          className="mt-8 flex items-start gap-2.5 rounded-xl border bg-muted px-4 py-3 text-sm"
+        >
+          <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <span>
+            <span className="font-medium text-foreground">
+              This hold has expired
+            </span>{" "}
+            — the hours have gone back on sale and this booking can no longer be
+            paid for. Pick your slot again to rebook.
+          </span>
+        </p>
       )}
 
       {/* Paid, but the booking is not confirmed: the hold lapsed before the
