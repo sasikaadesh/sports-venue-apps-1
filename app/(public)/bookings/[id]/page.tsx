@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
+  AlertCircle,
   CalendarDays,
   CheckCircle2,
   Clock,
@@ -104,6 +105,13 @@ export default async function BookingPage({
   // as one state to the user.
   const holdExpired = (isPending && !holdLive) || booking.status === "expired";
 
+  // A declined or abandoned attempt on a booking that is still held and still
+  // payable. The webhook records the attempt on the `Payment` row and leaves
+  // the booking alone (lib/payment-service.ts → settleUnpaid), so this is a
+  // retry prompt, not a dead end.
+  const failedAttempt =
+    canPay && (payment?.status === "failed" || payment?.status === "cancelled");
+
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-12 sm:px-8">
       <div className="flex flex-col items-start gap-3">
@@ -128,8 +136,10 @@ export default async function BookingPage({
 
       {/* PayHere sends a cancelled checkout back here rather than to the status
           page — nothing was charged and the hold is untouched, so this is a
-          notice, not a failure. */}
-      {paymentFlag === "cancelled" && isPending && (
+          notice, not a failure. Suppressed once the webhook has landed and
+          recorded the attempt — that produces the fuller retry message below,
+          and two notices saying the same thing is one too many. */}
+      {paymentFlag === "cancelled" && isPending && !failedAttempt && (
         <p
           role="status"
           className="mt-8 flex items-start gap-2.5 rounded-xl border bg-muted px-4 py-3 text-sm"
@@ -219,6 +229,28 @@ export default async function BookingPage({
             </span>
             , after which the hours go back on sale. Paying is what makes it
             permanent.
+          </span>
+        </p>
+      )}
+
+      {/* The last attempt was declined or abandoned, and the hold survived it
+          — a payment attempt failing is not the booking failing. Say what
+          happened, then leave the Pay button directly below it so the retry is
+          one click away. */}
+      {failedAttempt && (
+        <p
+          role="status"
+          className="mt-8 flex items-start gap-2.5 rounded-xl border bg-muted px-4 py-3 text-sm"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <span>
+            <span className="font-medium text-foreground">
+              {payment?.status === "cancelled"
+                ? "Payment cancelled — please try again."
+                : "Payment failed — please try again."}
+            </span>{" "}
+            Nothing was charged and your slot is still held. You can pay again
+            below, with the same card or a different one.
           </span>
         </p>
       )}

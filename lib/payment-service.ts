@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import {
   confirmPaidBooking,
   extendHoldForPayment,
-  releaseUnpaidBooking,
   type BookingResult,
 } from "@/lib/booking-service";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking";
@@ -500,7 +499,33 @@ async function settleSuccess(
   return { status: 200, message: "Already confirmed" };
 }
 
-/** status_code -1 / -2 — cancelled or failed at PayHere; give the hours back. */
+/**
+ * status_code -1 / -2 — cancelled or failed at PayHere.
+ *
+ * **This records the attempt and nothing else.** The booking is deliberately
+ * left `pending`, still holding its hours until `holdExpiresAt` passes.
+ *
+ * It used to release the hours here, which was wrong: a declined card is not a
+ * decision to give up the slot. One insufficient-funds attempt cancelled the
+ * booking outright and left the user with no way to retry — they had to find
+ * the slot again and hope nobody had taken it in between. A payment attempt is
+ * a thing that can fail and be repeated; only two things end a hold (see
+ * docs/ARCHITECTURE.md → Releasing a booking):
+ *
+ *  - the user explicitly releases it (`removeOwnBooking` / cancel), or
+ *  - `holdExpiresAt` passes and the sweep takes it (`releaseExpiredHolds`).
+ *
+ * A decline is neither, so the hours stay held for the rest of the hold and
+ * "Pay now" stays on the booking page and the account list for the retry.
+ *
+ * Not touching the booking is also what makes the late-notification case safe
+ * for free. A `-1` for attempt #1 can easily arrive after attempt #2 has
+ * already succeeded and confirmed the booking; because this function writes
+ * only its own `Payment` row — addressed by `paymentId`, not by booking — it
+ * cannot strip the hours off a booking that has since been paid for. The old
+ * code needed a `status: 'pending'` guard to survive that race; this needs no
+ * guard because it never writes a booking at all.
+ */
 async function settleUnpaid(
   paymentId: string,
   bookingId: string,
@@ -512,15 +537,11 @@ async function settleUnpaid(
     data: { status, payhereRef: payhereRef || undefined },
   });
 
-  const released = await releaseUnpaidBooking(bookingId);
+  console.info(
+    `[payhere] payment ${paymentId} ${status} — booking ${bookingId} stays pending and payable until its hold lapses`
+  );
 
-  if (!released.ok) {
-    console.error(
-      `[payhere] could not release booking ${bookingId} after a ${status} payment: ${released.error}`
-    );
-  }
-
-  return { status: 200, message: `Payment ${status}` };
+  return { status: 200, message: `Payment ${status}; booking still held` };
 }
 
 /**

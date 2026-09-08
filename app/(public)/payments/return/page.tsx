@@ -4,10 +4,11 @@ import { AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
 
 import { LinkButton } from "@/components/link-button";
 import { PaymentStatusPoller } from "@/components/public/payment-status-poller";
+import { PayNowButton } from "@/components/public/pay-now-button";
 import { requireUser, roleIsAdmin } from "@/lib/auth";
 import { latestPaymentForBooking } from "@/lib/payment-service";
 import { prisma } from "@/lib/prisma";
-import { formatDate, formatPrice } from "@/lib/time";
+import { formatDate, formatPrice, isFuture } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export default async function PaymentReturnPage({
       bookingDate: true,
       totalPrice: true,
       durationHours: true,
+      holdExpiresAt: true,
       court: { select: { name: true } },
     },
   });
@@ -57,7 +59,19 @@ export default async function PaymentReturnPage({
 
   const payment = await latestPaymentForBooking(booking.id);
 
-  const view = describe(booking.status, payment?.status);
+  const holdLive =
+    booking.status === "pending" && isFuture(booking.holdExpiresAt);
+
+  const view = describe(booking.status, payment?.status, holdLive);
+
+  // A declined card leaves the booking exactly as it was — pending, still
+  // holding its hours — so the retry belongs right here, on the page the user
+  // was just dropped on. Same component and same checkout as everywhere else;
+  // an admin looking at someone else's booking does not get a Pay button.
+  const canRetry =
+    view.retryable &&
+    booking.userId === user.id &&
+    booking.totalPrice.greaterThan(0);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-16 sm:px-8">
@@ -86,6 +100,15 @@ export default async function PaymentReturnPage({
         </div>
       )}
 
+      {canRetry && (
+        <div className="mt-8">
+          <PayNowButton
+            bookingId={booking.id}
+            amountLabel={formatPrice(booking.totalPrice.toString())}
+          />
+        </div>
+      )}
+
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <LinkButton
           href={`/bookings/${booking.id}`}
@@ -109,17 +132,24 @@ type View = {
   iconClass: string;
   tone: "success" | "waiting" | "failed";
   polling: boolean;
+  /** The attempt failed but the hold survived it, so another card can be tried. */
+  retryable: boolean;
 };
 
 /**
- * Booking status and payment status together, because either alone can mislead.
- * The case that matters most is the last one: money taken for hours the
- * booking no longer holds, which must say so plainly rather than read as a
- * plain failure.
+ * Booking status, payment status and whether the hold is still live — all
+ * three, because any one alone misleads. Two cases carry the weight:
+ *
+ *  - money taken for hours the booking no longer holds, which must say so
+ *    plainly rather than read as a plain failure; and
+ *  - a declined card, which is *not* the end of the booking. The hold is
+ *    untouched by a failed attempt, so this reads as "try again", not as
+ *    "those hours are gone".
  */
 function describe(
   bookingStatus: string,
-  paymentStatus: string | undefined
+  paymentStatus: string | undefined,
+  holdLive: boolean
 ): View {
   if (bookingStatus === "confirmed") {
     return {
@@ -129,6 +159,7 @@ function describe(
       iconClass: "bg-primary text-primary-foreground",
       tone: "success",
       polling: false,
+      retryable: false,
     };
   }
 
@@ -140,18 +171,39 @@ function describe(
       iconClass: "bg-destructive/15 text-destructive",
       tone: "failed",
       polling: false,
+      retryable: false,
     };
   }
 
   if (paymentStatus === "cancelled" || paymentStatus === "failed") {
+    const cancelled = paymentStatus === "cancelled";
+
+    // The hold outlived the failed attempt: nothing was charged, nothing was
+    // released, and the only thing that went wrong was the card.
+    if (holdLive) {
+      return {
+        title: cancelled
+          ? "Payment cancelled — please try again"
+          : "Payment failed — please try again",
+        body: cancelled
+          ? "Nothing was charged. Your slot is still held for you — you can pay for it now, or with a different card, until the hold lapses."
+          : "Your card was declined and nothing was charged. Your slot is still held for you — try again below, with the same card or a different one, until the hold lapses.",
+        icon: <AlertCircle className="size-6" />,
+        iconClass: "bg-muted text-foreground",
+        tone: "failed",
+        polling: false,
+        retryable: true,
+      };
+    }
+
     return {
-      title:
-        paymentStatus === "cancelled" ? "Payment cancelled" : "Payment failed",
-      body: "Nothing was charged and the hours have been released. You can book them again if they are still free.",
+      title: cancelled ? "Payment cancelled" : "Payment failed",
+      body: "Nothing was charged, and the hold on these hours has since lapsed. Pick a slot again to rebook.",
       icon: <XCircle className="size-6" />,
       iconClass: "bg-muted text-muted-foreground",
       tone: "failed",
       polling: false,
+      retryable: false,
     };
   }
 
@@ -163,6 +215,7 @@ function describe(
       iconClass: "bg-muted text-muted-foreground",
       tone: "failed",
       polling: false,
+      retryable: false,
     };
   }
 
@@ -174,6 +227,7 @@ function describe(
     iconClass: "bg-muted text-foreground",
     tone: "waiting",
     polling: true,
+    retryable: false,
   };
 }
 
