@@ -8,6 +8,7 @@ import {
   Home,
   Inbox,
   LayoutGrid,
+  MessageSquarePlus,
   Shapes,
   Users,
 } from "lucide-react";
@@ -22,15 +23,30 @@ const LINKS = [
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/messages", label: "Messages", icon: Inbox },
+  {
+    href: "/admin/special-requests",
+    label: "Special requests",
+    icon: MessageSquarePlus,
+  },
 ];
 
 /**
- * `unreadMessages` is passed in from the server layout rather than fetched
- * here — this is a client component (it needs `usePathname`), so it has no
- * database access of its own.
+ * `unreadMessages` and `newRequests` are passed in from the server layout
+ * rather than fetched here — this is a client component (it needs
+ * `usePathname`), so it has no database access of its own.
  */
-export function AdminNav({ unreadMessages = 0 }: { unreadMessages?: number }) {
+export function AdminNav({
+  unreadMessages = 0,
+  newRequests = 0,
+}: {
+  unreadMessages?: number;
+  newRequests?: number;
+}) {
   const pathname = usePathname();
+  const counts: Record<string, number> = {
+    "/admin/messages": unreadMessages,
+    "/admin/special-requests": newRequests,
+  };
 
   return (
     // `overflow-y-hidden` is load-bearing, not decoration. Per CSS overflow,
@@ -60,9 +76,9 @@ export function AdminNav({ unreadMessages = 0 }: { unreadMessages?: number }) {
               >
                 <Icon className="size-4" />
                 {label}
-                {href === "/admin/messages" && unreadMessages > 0 && (
+                {(counts[href] ?? 0) > 0 && (
                   <span className="grid min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground tabular-nums">
-                    {unreadMessages}
+                    {counts[href]}
                   </span>
                 )}
               </Link>

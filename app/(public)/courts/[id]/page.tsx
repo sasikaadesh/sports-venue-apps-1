@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { CourtGallery } from "@/components/public/court-gallery";
 import { CourtBookingPanel } from "@/components/public/court-booking-panel";
 import { AvailabilityDatePicker } from "@/components/public/date-picker";
+import { SpecialRequestDialog } from "@/components/public/special-request-dialog";
+import { getCurrentUser } from "@/lib/auth";
 import { getCourtAvailability } from "@/lib/availability";
 import { getCourtDetail } from "@/lib/catalogue";
 import { MAX_DURATION_HOURS } from "@/lib/slots";
@@ -73,10 +75,10 @@ export default async function CourtDetailsPage({
   const date =
     requested < today ? today : requested > maxDate ? maxDate : requested;
 
-  const availability = await getCourtAvailability(
-    court.id,
-    dateStringToDate(date)
-  );
+  const [availability, user] = await Promise.all([
+    getCourtAvailability(court.id, dateStringToDate(date)),
+    getCurrentUser(),
+  ]);
 
   // A selection carried back from the review page's "Change" link — used to
   // pre-fill the panel so nothing is lost on the round trip. Only clean positive
@@ -185,6 +187,21 @@ export default async function CourtDetailsPage({
             open hours. Click again to start over. Nothing is reserved until you
             confirm.
           </p>
+
+          <div className="flex flex-col items-start gap-2 border-t pt-5">
+            <p className="text-sm text-muted-foreground">
+              Need something the times above don&apos;t cover?
+            </p>
+            <SpecialRequestDialog
+              courtId={court.id}
+              courtName={court.name}
+              playerOptions={court.playerOptions}
+              signedIn={!!user}
+              returnTo={`/courts/${court.id}`}
+              defaultDate={date}
+              minDate={today}
+            />
+          </div>
         </aside>
       </div>
     </div>

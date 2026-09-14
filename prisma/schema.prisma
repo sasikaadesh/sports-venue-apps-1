@@ -46,6 +46,14 @@ enum BookingStatus {
   expired
 }
 
+/// Where an admin has got to with a special request. Handled by hand — a
+/// request never becomes a booking on its own.
+enum SpecialRequestStatus {
+  new
+  contacted
+  resolved
+}
+
 enum PaymentStatus {
   pending
   success
@@ -74,9 +82,10 @@ model User {
 
   affiliation Affiliation?
 
-  role      Role      @default(user)
-  createdAt DateTime  @default(now())
-  bookings  Booking[]
+  role            Role             @default(user)
+  createdAt       DateTime         @default(now())
+  bookings        Booking[]
+  specialRequests SpecialRequest[]
 
   /// Conduct notes written ABOUT this user. Admin-only, in every layer.
   ratings UserRating[] @relation("RatingTarget")
@@ -143,8 +152,44 @@ model Court {
   slots        SlotTemplate[]
   bookings     Booking[]
   bookingSlots BookingSlot[]
+  specialRequests SpecialRequest[]
 
   @@index([courtTypeId])
+}
+
+/// A signed-in user's manual request for a court — a time outside the listed
+/// hours, a large group, an event. It does NOT reserve anything: no Booking or
+/// BookingSlot is written, and an admin follows up by hand.
+///
+/// Name, email, phone and court name are snapshots taken at submission, so the
+/// request still reads correctly if the account or court later changes or goes.
+model SpecialRequest {
+  id        String  @id @default(uuid()) @db.Uuid
+  /// SET NULL: removing an account keeps the request (and its snapshot contact).
+  userId    String? @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// SET NULL: deleting a court must not be blocked by, or erase, requests for it.
+  courtId   String? @db.Uuid
+  court     Court?  @relation(fields: [courtId], references: [id], onDelete: SetNull)
+  courtName String
+
+  name  String?
+  email String
+  phone String?
+
+  preferredDate DateTime @db.Date
+  preferredTime DateTime @db.Time(6) // wall-clock, via lib/time.ts
+  playerCount   Int
+  message       String
+
+  status    SpecialRequestStatus @default(new)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([userId])
+  @@index([courtId])
 }
 
 /// Per-court recurring schedule. A slot is a template, not a per-day row.

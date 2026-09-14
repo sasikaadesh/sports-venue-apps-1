@@ -29,9 +29,10 @@ export default async function AdminLayout({
 
   // Counted here, not in AdminNav — that is a client component and cannot
   // reach the database.
-  const unreadMessages = await prisma.contactMessage.count({
-    where: { readAt: null },
-  });
+  const [unreadMessages, newRequests] = await Promise.all([
+    prisma.contactMessage.count({ where: { readAt: null } }),
+    prisma.specialRequest.count({ where: { status: "new" } }),
+  ]);
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -76,7 +77,7 @@ export default async function AdminLayout({
           </div>
         </div>
 
-        <AdminNav unreadMessages={unreadMessages} />
+        <AdminNav unreadMessages={unreadMessages} newRequests={newRequests} />
       </header>
 
       {/* On paper the page box IS the margin (`@page` in globals.css), so the

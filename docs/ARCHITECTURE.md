@@ -118,6 +118,7 @@ The one table that summarises this doc's access rules. "Owner" means the signed-
 | Booking / BookingSlot                   | —                   | own only                             | all           | all                                 |
 | Payment                                 | —                   | own only                             | all           | all                                 |
 | ContactMessage                          | write (submit)      | —                                    | read + manage | read + manage                       |
+| SpecialRequest                          | —                   | write (submit, own name only)        | read + status | read + status                       |
 | User — name, phone, address             | —                   | own, editable                        | all, read     | all, read                           |
 | **User.affiliation**                    | **never**           | own, editable                        | all, read     | all, read                           |
 | User.role                               | —                   | own, read-only                       | read          | read + assign (`user`/`admin` only) |
@@ -371,6 +372,15 @@ Conversely, `?code=` and `?token_hash=` cannot be handled by the page itself, be
 - Admins read the inbox at `/admin/messages` (mark read/unread, delete), with an unread count on the nav tab. **Admin-level, not super-admin-level** — answering enquiries is ordinary staff work. The panel remains the system of record; email is a notification layer on top of it (below).
 - RLS on `ContactMessage`: insert for `anon` + `authenticated`, select/update/delete admin-only. There is deliberately no public SELECT policy — a sender cannot read the inbox back, not even their own message.
 
+## Special requests (`20260914120000_special_requests`)
+
+- A **"Special request"** control on every court page opens a short form: court (pre-filled, read-only), preferred date, preferred time, players, reason. It is for anything the booking grid cannot do — a time outside the listed hours, a large group, an event.
+- **It is not a booking.** `submitSpecialRequest` (`app/(public)/courts/[id]/actions.ts`) writes one `SpecialRequest` row and nothing else — no `Booking`, no `BookingSlot`, so it cannot hold an hour, and the booking service is not involved.
+- **Signed-in only.** Signed-out visitors see a sign-in link that returns them to the court. The requester's id, name, email and phone are read from their account on the server, never from the payload, and snapshotted onto the row (as is the court name) so a request still reads correctly if the account or court later changes or is removed (both FKs are `SET NULL`).
+- Admins handle requests at `/admin/special-requests` (newest first, with a count of `new` ones on the nav tab) and set the status **New → Contacted → Resolved**. Admin-level, like Messages.
+- RLS: no access for `anon`; `authenticated` may insert only with `userId = auth.uid()` and status `new`; select/update/delete are admin-only.
+- On submit, `sendSpecialRequestAdminEmail` (`lib/email/special-request.ts`) notifies `ADMIN_CONTACT_EMAIL` with `replyTo` set to the member — same never-throws, awaited, best-effort contract as the contact emails below. No confirmation email goes to the member; the dialog confirms on screen.
+
 ### Transactional email (Resend + React Email)
 
 **Provider: [Resend](https://resend.com), templates in [React Email](https://react.email).** Resend is the only mail dependency; React Email supplies the components the templates are written with. Nothing here runs in the browser.
@@ -396,7 +406,7 @@ Flow, on a successful `submitContactMessage`:
 
 Lives under `/app/admin`, gated by `requireAdmin()` in the layout **and** in every page **and** in every server action — an action is its own HTTP endpoint and never runs the layout that guards the pages.
 
-- **Tabs:** Overview, Court types, Courts, Block slots, Bookings, **Users**, **Messages**. The header carries the signed-in email (linked to `/account`) and a **Log out** control on a single row.
+- **Tabs:** Overview, Court types, Courts, Block slots, Bookings, **Users**, **Messages**, **Special requests**. The header carries the signed-in email (linked to `/account`) and a **Log out** control on a single row.
 - **Users** lists every account and is where the role ladder above is applied. What a row draws (`canManage`, `actorIsSuperAdmin`) is presentation only; the same rules are re-derived from the database inside each action. It also carries the one admin-only field — **Conduct** — plus the affiliation; see "Conduct ratings" above for what may leave this page (nothing).
 
 - **Booking writes** — `/lib/booking-service.ts` is the only module that writes `Booking` or `BookingSlot`. Admin actions (block, unblock, cancel) validate and authorize, then delegate. `blockSlot` rejects a slot that belongs to another court or does not recur on the chosen weekday, and translates the unique-constraint violation (Prisma `P2002`) into "already booked or blocked".

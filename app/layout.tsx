@@ -88,8 +88,11 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          // Light by default; there is no "system" option — the OS preference
+          // is deliberately ignored, so a first visit is always the white theme.
+          defaultTheme="light"
+          enableSystem={false}
+          themes={["light", "dark"]}
           disableTransitionOnChange
         >
           {children}
