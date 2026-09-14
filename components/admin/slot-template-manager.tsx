@@ -97,8 +97,9 @@ function EmptyDay({
   name: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [start, setStart] = useState("06:00");
-  const [end, setEnd] = useState("22:00");
+  // The venue's operating window: every court, every day.
+  const [start, setStart] = useState("18:00");
+  const [end, setEnd] = useState("21:00");
   const [rate, setRate] = useState("1000");
   const [pending, startTransition] = useTransition();
 
@@ -153,7 +154,10 @@ function EmptyDay({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor={`close-${day}`} className="text-sm font-medium">
+            <FieldLabel
+              htmlFor={`close-${day}`}
+              className="text-sm font-medium"
+            >
               Closes
             </FieldLabel>
             <Input
@@ -251,7 +255,8 @@ function DaySection({
         dayOfWeek: day,
         isActive: open,
       });
-      if (result.ok) toast.success(open ? `${name} opened.` : `${name} closed.`);
+      if (result.ok)
+        toast.success(open ? `${name} opened.` : `${name} closed.`);
       else toast.error(result.error);
     });
   }

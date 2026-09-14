@@ -1,9 +1,9 @@
 /**
  * ONE-OFF BULK SCHEDULE UPDATE — rebuild every court's weekly slot templates to
- * the venue's new operating hours:
+ * the venue's new operating hours, and rename courts to their canonical names
+ * (see RENAMES, applied in place by id):
  *
- *   Mon–Fri   15:00–21:00   (6 × 1-hour slots)
- *   Sat–Sun   07:00–21:00   (14 × 1-hour slots)
+ *   Every day   18:00–21:00   (3 × 1-hour slots)
  *
  *   npx tsx scripts/reset-slot-schedule.mts          # dry run (default)
  *   npx tsx scripts/reset-slot-schedule.mts --apply  # write changes
@@ -46,10 +46,19 @@ config({ path: ".env.local" });
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes("--apply");
 
-/** The new schedule. Hours are half-open: 15:00–21:00 is 15–16 … 20–21. */
-const WEEKDAY_HOURS = { start: 15, end: 21 }; // Mon–Fri
-const WEEKEND_HOURS = { start: 7, end: 21 }; // Sat, Sun
+/** The new schedule. Hours are half-open: 18:00–21:00 is 18–19 … 20–21. */
+const WEEKDAY_HOURS = { start: 18, end: 21 }; // Mon–Fri
+const WEEKEND_HOURS = { start: 18, end: 21 }; // Sat, Sun
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+/**
+ * Canonical court names. An existing court is renamed in place (same id, so
+ * its bookings and images are untouched) — never duplicated.
+ */
+const RENAMES: Record<string, string> = {
+  "Centre Court": "Tennis",
+  "Badminton Court 1": "Badminton",
+};
 
 /** 0 = Sunday, 6 = Saturday. */
 const rangeFor = (dayOfWeek: number) =>
@@ -109,6 +118,20 @@ const skippedCourts: string[] = [];
 const warnings: string[] = [];
 
 for (const court of courts) {
+  const rename = RENAMES[court.name];
+  if (rename) {
+    const clash = courts.some((c) => c.id !== court.id && c.name === rename);
+    if (clash) {
+      warnings.push(`${court.name}: not renamed — a court named "${rename}" already exists`);
+    } else {
+      console.log(`${court.name}  -> renamed to "${rename}"`);
+      if (APPLY) {
+        await prisma.court.update({ where: { id: court.id }, data: { name: rename } });
+      }
+      court.name = rename;
+    }
+  }
+
   console.log(`${court.name}${court.isActive ? "" : "  (court inactive)"}`);
 
   const courtRate = modePrice(court.slots);

@@ -225,6 +225,87 @@ export function ContactAdminEmail({ name, email, message }: ContactEmailProps) {
   );
 }
 
+export type SpecialRequestEmailProps = {
+  name: string | null;
+  email: string;
+  phone: string | null;
+  courtName: string;
+  /** Already formatted for display, e.g. "Tue, 22 Sep 2026". */
+  date: string;
+  /** Already formatted for display, e.g. "6:30 PM". */
+  time: string;
+  playerCount: number;
+  message: string;
+};
+
+/** Sent to ADMIN_CONTACT_EMAIL. Reply-To is set to the requester on dispatch. */
+export function SpecialRequestAdminEmail({
+  name,
+  email,
+  phone,
+  courtName,
+  date,
+  time,
+  playerCount,
+  message,
+}: SpecialRequestEmailProps) {
+  const who = name ?? email;
+  return (
+    <Html lang="en">
+      <Head />
+      <Preview>{`${who} sent a special request for ${courtName}`}</Preview>
+      <Body style={body}>
+        <Container style={container}>
+          <Masthead />
+          <Heading style={heading}>New special request</Heading>
+
+          <Text style={label}>From</Text>
+          <Text style={value}>{who}</Text>
+
+          <Text style={label}>Email</Text>
+          <Text style={value}>
+            <Link href={`mailto:${email}`} style={link}>
+              {email}
+            </Link>
+          </Text>
+
+          {phone && (
+            <>
+              <Text style={label}>Phone</Text>
+              <Text style={value}>
+                <Link href={`tel:${phone}`} style={link}>
+                  {phone}
+                </Link>
+              </Text>
+            </>
+          )}
+
+          <Text style={label}>Court</Text>
+          <Text style={value}>{courtName}</Text>
+
+          <Text style={label}>Preferred date and time</Text>
+          <Text style={value}>
+            {date} at {time}
+          </Text>
+
+          <Text style={label}>Players</Text>
+          <Text style={value}>{playerCount}</Text>
+
+          <Text style={label}>Reason</Text>
+          <Text style={quotedMessage}>{message}</Text>
+
+          <Hr style={rule} />
+          <Text style={footer}>
+            Nothing has been booked. Reply directly to this email to contact{" "}
+            {who}, and update the request&apos;s status in the admin panel under
+            Special requests.
+          </Text>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
 export type BookingConfirmationEmailProps = {
   name: string;
   courtName: string;

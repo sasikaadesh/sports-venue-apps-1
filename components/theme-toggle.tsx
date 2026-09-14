@@ -2,29 +2,28 @@
 
 import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 /**
- * Light / dark / system switcher for the site and admin headers.
+ * Light / dark switcher for the site, auth and admin headers.
  *
- * A three-way segmented control rather than a cycling icon button: "system" is
- * a real, distinct choice and a single button cannot show which of the three is
- * active. Rendered as a radiogroup, so arrow keys work and screen readers
- * announce the current selection.
+ * A two-way segmented control rather than a cycling icon button, so the active
+ * choice is always visible. Rendered as a radiogroup, so arrow keys work and
+ * screen readers announce the current selection.
  *
- * `theme` (the stored preference) drives which segment is marked active —
- * `resolvedTheme` would light up Light or Dark while the user is actually on
- * System. Until mount, next-themes cannot know the stored value, so we render
- * the same shell with nothing selected: same size, no layout shift, no
- * hydration mismatch.
+ * Light is the default and there is no "system" option. Anything other than an
+ * explicit "dark" — no stored value, or a "system" left in localStorage from
+ * before that option was removed — renders light, so it marks Light active.
+ * Until mount, next-themes cannot know the stored value, so we render the same
+ * shell with nothing selected: same size, no layout shift, no hydration
+ * mismatch.
  */
 
 const OPTIONS = [
   { value: "light", label: "Light", Icon: Sun },
   { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "System", Icon: Monitor },
 ] as const;
 
 /**
@@ -46,6 +45,7 @@ function useHydrated() {
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const mounted = useHydrated();
+  const current = theme === "dark" ? "dark" : "light";
 
   return (
     <div
@@ -58,7 +58,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       )}
     >
       {OPTIONS.map(({ value, label, Icon }) => {
-        const active = mounted && theme === value;
+        const active = mounted && current === value;
         return (
           <button
             key={value}

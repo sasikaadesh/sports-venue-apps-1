@@ -207,6 +207,41 @@ export const contactMessageSchema = z.object({
     .max(2000, "Message must be 2000 characters or fewer."),
 });
 
+/**
+ * A special request from a court page. Signed-in only; contact details come
+ * from the account on the server, never from this payload.
+ */
+export const specialRequestSchema = z.object({
+  courtId: z.uuid("Choose a court."),
+  preferredDate: z.string().regex(DATE_RE, "Pick a preferred date."),
+  preferredTime: z.string().regex(TIME_RE, "Pick a preferred time."),
+  playerCount: z.coerce
+    .number<number>()
+    .int("Use a whole number of players.")
+    .min(1, "At least one player.")
+    .max(100, "For more than 100 players, say so in the message."),
+  message: z
+    .string()
+    .trim()
+    .min(10, "Tell the admin a little more — at least 10 characters.")
+    .max(1000, "Keep it to 1000 characters or fewer."),
+});
+
+export const SPECIAL_REQUEST_STATUSES = [
+  "new",
+  "contacted",
+  "resolved",
+] as const;
+export const specialRequestStatusSchema = z.enum(SPECIAL_REQUEST_STATUSES);
+export const SPECIAL_REQUEST_STATUS_LABELS: Record<
+  (typeof SPECIAL_REQUEST_STATUSES)[number],
+  string
+> = {
+  new: "New",
+  contacted: "Contacted",
+  resolved: "Resolved",
+};
+
 /** Roles an admin UI may assign. `super_admin` is never handed out this way. */
 export const assignableRoleSchema = z.enum(["user", "admin"]);
 
@@ -353,6 +388,10 @@ export type PasswordResetRequestInput = z.infer<
 >;
 export type NewPasswordInput = z.infer<typeof newPasswordSchema>;
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
+export type SpecialRequestInput = z.infer<typeof specialRequestSchema>;
+export type SpecialRequestStatusValue = z.infer<
+  typeof specialRequestStatusSchema
+>;
 export type UserRatingInput = z.infer<typeof userRatingSchema>;
 export type AssignableRole = z.infer<typeof assignableRoleSchema>;
 export type CourtTypeInput = z.infer<typeof courtTypeSchema>;
