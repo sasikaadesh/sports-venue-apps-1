@@ -39,6 +39,7 @@ function courtFieldsFrom(formData: FormData) {
     name: formData.get("name"),
     courtTypeId: formData.get("courtTypeId"),
     description: formData.get("description") ?? "",
+    amenities: formData.get("amenities") ?? "",
     // FormData has no booleans — the client sends the string "true"/"false".
     isActive: formData.get("isActive") === "true",
   };
@@ -77,6 +78,7 @@ export async function createCourt(
       name: parsed.data.name,
       courtTypeId: parsed.data.courtTypeId,
       description: parsed.data.description || null,
+      amenities: parsed.data.amenities || null,
       isActive: parsed.data.isActive,
       images: [],
     },
@@ -136,6 +138,7 @@ export async function updateCourt(
       name: parsed.data.name,
       courtTypeId: parsed.data.courtTypeId,
       description: parsed.data.description || null,
+      amenities: parsed.data.amenities || null,
       isActive: parsed.data.isActive,
       images,
     },

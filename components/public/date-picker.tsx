@@ -55,7 +55,7 @@ export function AvailabilityDatePicker({
         max={maxDate}
         onChange={(e) => go(e.target.value)}
         aria-label="Booking date"
-        className="h-10 w-auto rounded-xl"
+        className="h-10 w-auto"
       />
 
       <Button

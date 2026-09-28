@@ -71,14 +71,6 @@ const masthead = {
   margin: "0 0 10px",
 };
 
-const mottoLine = {
-  color: MUTED,
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: "12px",
-  fontStyle: "italic" as const,
-  margin: "0 0 12px",
-};
-
 /** The gold hairline. The only gold in the message. */
 const goldRule = {
   backgroundColor: GOLD,
@@ -170,15 +162,14 @@ const footer = {
 const link = { color: GREEN, textDecoration: "underline" };
 
 /**
- * Letterhead: school name, motto, gold rule. Opens every message so an email
- * from the booking system is recognisably from the school, the same way the
+ * Letterhead: school name, gold rule. Opens every message so an email from
+ * the booking system is recognisably from the school, the same way the
  * footer signs off the website.
  */
 function Masthead() {
   return (
     <>
       <Text style={masthead}>{BRAND.name}</Text>
-      <Text style={mottoLine}>{BRAND.motto}</Text>
       <Section style={goldRule} />
     </>
   );

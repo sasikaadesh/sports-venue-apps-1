@@ -171,14 +171,6 @@ function DetailsPanel({
             </span>
           </dd>
         </div>
-        <div className="bg-card px-5 py-4 sm:col-span-2">
-          <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            User ID
-          </dt>
-          <dd className="mt-1 font-mono text-xs text-muted-foreground">
-            {user.id}
-          </dd>
-        </div>
       </dl>
 
       <div className="flex flex-col gap-5">

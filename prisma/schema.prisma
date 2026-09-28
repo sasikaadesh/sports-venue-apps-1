@@ -146,6 +146,9 @@ model Court {
   courtTypeId  String         @db.Uuid
   courtType    CourtType      @relation(fields: [courtTypeId], references: [id])
   description  String?
+  /// Free-text list, e.g. "Floodlights, Changing rooms, Water" — shown as-is
+  /// on the public court page. Optional; no separate amenity taxonomy.
+  amenities    String?
   images       String[] // Supabase Storage URLs (Unsplash placeholders for now)
   isActive     Boolean        @default(true)
   createdAt    DateTime       @default(now())

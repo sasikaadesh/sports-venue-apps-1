@@ -81,12 +81,12 @@ export function RemoveAccountBookingButton({
         }
       >
         <Trash2 />
-        Remove
+        Cancel
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Remove this booking?</DialogTitle>
+          <DialogTitle>Cancel this booking?</DialogTitle>
           <DialogDescription>
             {holdsHours
               ? `Your hold on ${courtName} is released straight away and the hours go back on sale. Nothing has been charged, so nothing is lost — you can book again while the time is free.`
@@ -110,7 +110,7 @@ export function RemoveAccountBookingButton({
           </DialogClose>
           <Button variant="destructive" disabled={pending} onClick={remove}>
             {pending ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
-            {pending ? "Removing…" : "Remove booking"}
+            {pending ? "Cancelling…" : "Cancel booking"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -197,7 +197,7 @@ export default async function BookPage({
         ) : (
           <div className="flex flex-col items-start gap-4 rounded-xl border border-dashed px-5 py-6">
             <p className="text-sm text-muted-foreground">
-              Sign in to hold these hours. Your selection is kept — you will
+              Sign in to confirm these hours. Your selection is kept — you will
               come straight back here.
             </p>
             {/* Both routes carry the same return URL, so a visitor without an

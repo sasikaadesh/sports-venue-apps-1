@@ -27,6 +27,7 @@ export default async function EditCourtPage({
         name: true,
         courtTypeId: true,
         description: true,
+        amenities: true,
         isActive: true,
         images: true,
         courtType: { select: { name: true } },
@@ -70,7 +71,7 @@ export default async function EditCourtPage({
       <LinkButton
         href="/admin/courts"
         variant="ghost"
-        className="-ml-2.5 mb-6 h-9"
+        className="mb-6 -ml-2.5 h-9"
       >
         <ArrowLeft />
         All courts
@@ -103,6 +104,7 @@ export default async function EditCourtPage({
                 name: court.name,
                 courtTypeId: court.courtTypeId,
                 description: court.description,
+                amenities: court.amenities,
                 isActive: court.isActive,
                 imageCount: court.images.length,
               }}

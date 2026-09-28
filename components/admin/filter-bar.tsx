@@ -276,7 +276,7 @@ export function FilterSelect({
         name={name}
         defaultValue={defaultValue}
         className={cn(
-          "h-8 w-full min-w-0 appearance-none rounded-lg border border-input bg-transparent py-1 pr-8 pl-2.5 text-sm transition-colors outline-none",
+          "h-8 w-full min-w-0 appearance-none rounded-input border border-input bg-transparent py-1 pr-8 pl-2.5 text-sm transition-colors outline-none",
           "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           // Matches Input's own dark treatment: a transparent field disappears
           // against the dark card, so it gets the faint input fill instead.
@@ -315,7 +315,7 @@ export function FilterInput({
       defaultValue={defaultValue}
       placeholder={placeholder}
       className={cn(
-        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none",
+        "h-8 w-full min-w-0 rounded-input border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none",
         "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
         // See FilterSelect — same reason.
         "dark:bg-input/30"
@@ -401,7 +401,7 @@ export function FilterCombobox({
         placeholder={placeholder}
         autoComplete="off"
         className={cn(
-          "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none",
+          "h-8 w-full min-w-0 rounded-input border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none",
           "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           // See FilterSelect — same reason.
           "dark:bg-input/30"

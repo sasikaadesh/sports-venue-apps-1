@@ -76,7 +76,9 @@ export function HeroBookingBar({
       `/api/availability?courtId=${encodeURIComponent(courtId)}&date=${encodeURIComponent(date)}`,
       { signal: controller.signal }
     )
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
+      .then((res) =>
+        res.ok ? res.json() : Promise.reject(new Error("failed"))
+      )
       .then((data: AvailabilityResponse) => setLoaded({ key, data }))
       .catch(() => {
         // An aborted request is a superseded one, not a failure.
@@ -188,7 +190,7 @@ export function HeroBookingBar({
             min={today}
             max={maxDate}
             onChange={(e) => setDate(e.target.value)}
-            className="h-10 rounded-xl"
+            className="h-10"
           />
         </Field>
 

@@ -118,7 +118,7 @@ export function ProfileForm({
           id="profile-name"
           autoComplete="name"
           placeholder="Nimal Perera"
-          className="h-11 rounded-xl px-3.5"
+          className="h-11 px-3.5"
           {...form.register("name")}
         />
         {form.formState.errors.name && (
@@ -136,7 +136,7 @@ export function ProfileForm({
           inputMode="tel"
           autoComplete="tel"
           placeholder="077 123 4567"
-          className="h-11 rounded-xl px-3.5"
+          className="h-11 px-3.5"
           {...form.register("phone")}
         />
         {form.formState.errors.phone && (
@@ -153,7 +153,7 @@ export function ProfileForm({
           rows={3}
           autoComplete="street-address"
           placeholder="12 Galle Road, Colombo 03"
-          className="rounded-xl px-3.5 py-2.5"
+          className="px-3.5 py-2.5"
           {...form.register("address")}
         />
         {form.formState.errors.address && (
@@ -170,7 +170,7 @@ export function ProfileForm({
         </FieldLabel>
         <NativeSelect
           id="profile-affiliation"
-          className="h-11 rounded-xl px-3.5"
+          className="h-11 px-3.5"
           {...form.register("affiliation")}
         >
           <option value="" disabled>

@@ -27,6 +27,7 @@ type CourtFormProps = {
     name: string;
     courtTypeId: string;
     description: string | null;
+    amenities: string | null;
     isActive: boolean;
     imageCount: number;
   };
@@ -50,6 +51,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
       name: court?.name ?? "",
       courtTypeId: court?.courtTypeId ?? "",
       description: court?.description ?? "",
+      amenities: court?.amenities ?? "",
       isActive: court?.isActive ?? true,
     },
   });
@@ -93,6 +95,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
       formData.set("name", values.name);
       formData.set("courtTypeId", values.courtTypeId);
       formData.set("description", values.description ?? "");
+      formData.set("amenities", values.amenities ?? "");
       formData.set("isActive", String(values.isActive));
       files.forEach((f) => formData.append("images", f));
 
@@ -125,7 +128,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
         <Input
           id="court-name"
           placeholder="Centre Court"
-          className="h-10 rounded-xl"
+          className="h-10"
           {...form.register("name")}
         />
         {form.formState.errors.name && (
@@ -159,11 +162,26 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
           id="court-description"
           rows={4}
           placeholder="Floodlit clay court, changing rooms alongside."
-          className="rounded-xl"
           {...form.register("description")}
         />
         {form.formState.errors.description && (
           <FieldError>{form.formState.errors.description.message}</FieldError>
+        )}
+      </Field>
+
+      <Field>
+        <FieldLabel htmlFor="court-amenities" className="text-sm font-medium">
+          Amenities{" "}
+          <span className="font-normal text-muted-foreground">(optional)</span>
+        </FieldLabel>
+        <Input
+          id="court-amenities"
+          placeholder="Floodlights, Changing rooms, Water"
+          className="h-10"
+          {...form.register("amenities")}
+        />
+        {form.formState.errors.amenities && (
+          <FieldError>{form.formState.errors.amenities.message}</FieldError>
         )}
       </Field>
 

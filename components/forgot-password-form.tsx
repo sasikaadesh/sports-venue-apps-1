@@ -154,7 +154,7 @@ export function ForgotPasswordForm({
           placeholder="you@school.lk"
           required
           autoFocus
-          className="h-11 rounded-xl px-3.5"
+          className="h-11 px-3.5"
         />
       </Field>
 

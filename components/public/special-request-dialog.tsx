@@ -199,7 +199,7 @@ function SignedInDialog({
                   id="sr-court"
                   value={courtName}
                   readOnly
-                  className="h-10 rounded-xl bg-muted/50 px-3.5 text-muted-foreground"
+                  className="h-10 bg-muted/50 px-3.5 text-muted-foreground"
                 />
                 <input type="hidden" {...form.register("courtId")} />
               </Field>
@@ -213,7 +213,7 @@ function SignedInDialog({
                     id="sr-date"
                     type="date"
                     min={minDate}
-                    className="h-10 rounded-xl px-3.5"
+                    className="h-10 px-3.5"
                     {...form.register("preferredDate")}
                   />
                   {errors.preferredDate && (
@@ -229,7 +229,7 @@ function SignedInDialog({
                     id="sr-time"
                     type="time"
                     step={60}
-                    className="h-10 rounded-xl px-3.5"
+                    className="h-10 px-3.5"
                     {...form.register("preferredTime")}
                   />
                   {errors.preferredTime && (
@@ -262,7 +262,7 @@ function SignedInDialog({
                     type="number"
                     min={1}
                     max={100}
-                    className="h-10 rounded-xl px-3.5"
+                    className="h-10 px-3.5"
                     {...form.register("playerCount", { valueAsNumber: true })}
                   />
                 )}
@@ -283,7 +283,7 @@ function SignedInDialog({
                   rows={4}
                   maxLength={1000}
                   placeholder="What do you need, and why? e.g. a school team practice before the weekend match."
-                  className="rounded-xl px-3.5 py-2.5"
+                  className="px-3.5 py-2.5"
                   {...form.register("message")}
                 />
                 {errors.message && (

@@ -122,14 +122,14 @@ export default async function BookingPage({
           {isConfirmed
             ? "Your booking is confirmed"
             : holdLive
-              ? "Your slot is held"
+              ? "Your slot is reserved"
               : "Your booking"}
         </h1>
         <p className="max-w-prose text-muted-foreground">
           {isConfirmed
             ? "Payment received — the court is yours. A confirmation email has been sent."
             : holdLive
-              ? `We are holding ${booking.durationHours === 1 ? "this hour" : "these hours"} for you. Pay below to make the booking permanent.`
+              ? `We have reserved ${booking.durationHours === 1 ? "this hour" : "these hours"} for you. Pay below to make the booking permanent.`
               : "Here is the booking as it stands."}
         </p>
       </div>
@@ -219,16 +219,16 @@ export default async function BookingPage({
         <p className="mt-6 flex items-start gap-2.5 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">
           <CreditCard className="mt-0.5 size-4 shrink-0" />
           <span>
-            This hold lapses at{" "}
+            This booking will be auto cancelled at{" "}
             <span className="font-medium text-foreground">
-              {booking.holdExpiresAt?.toLocaleTimeString("en-GB", {
-                hour: "2-digit",
+              {booking.holdExpiresAt?.toLocaleTimeString("en-US", {
+                hour: "numeric",
                 minute: "2-digit",
+                hour12: true,
                 timeZone: "Asia/Colombo",
               })}
             </span>
-            , after which the hours go back on sale. Paying is what makes it
-            permanent.
+            , if you don&rsquo;t make the payment and reserve it now.
           </span>
         </p>
       )}

@@ -151,6 +151,9 @@ export function AuthForm({
             <Field data-invalid={!!errors.name}>
               <FieldLabel htmlFor="name" className="text-sm font-medium">
                 Full name
+                <span aria-hidden="true" className="text-destructive">
+                  *
+                </span>
               </FieldLabel>
               <Input
                 id="name"
@@ -160,7 +163,7 @@ export function AuthForm({
                 required
                 minLength={2}
                 maxLength={80}
-                className="h-11 rounded-xl px-3.5"
+                className="h-11 px-3.5"
                 {...form.register("name")}
               />
               {errors.name && <FieldError>{errors.name.message}</FieldError>}
@@ -170,6 +173,9 @@ export function AuthForm({
           <Field data-invalid={!!errors.email}>
             <FieldLabel htmlFor="email" className="text-sm font-medium">
               Email
+              <span aria-hidden="true" className="text-destructive">
+                *
+              </span>
             </FieldLabel>
             <Input
               id="email"
@@ -177,7 +183,7 @@ export function AuthForm({
               autoComplete="email"
               placeholder="you@school.lk"
               required
-              className="h-11 rounded-xl px-3.5"
+              className="h-11 px-3.5"
               {...form.register("email")}
             />
             {errors.email && <FieldError>{errors.email.message}</FieldError>}
@@ -188,6 +194,9 @@ export function AuthForm({
               <Field data-invalid={!!errors.phone}>
                 <FieldLabel htmlFor="phone" className="text-sm font-medium">
                   Phone
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
                 </FieldLabel>
                 <Input
                   id="phone"
@@ -197,7 +206,7 @@ export function AuthForm({
                   placeholder="077 123 4567"
                   required
                   maxLength={30}
-                  className="h-11 rounded-xl px-3.5"
+                  className="h-11 px-3.5"
                   {...form.register("phone")}
                 />
                 {errors.phone && (
@@ -208,6 +217,9 @@ export function AuthForm({
               <Field data-invalid={!!errors.address}>
                 <FieldLabel htmlFor="address" className="text-sm font-medium">
                   Address
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
                 </FieldLabel>
                 <Textarea
                   id="address"
@@ -217,7 +229,7 @@ export function AuthForm({
                   required
                   minLength={5}
                   maxLength={300}
-                  className="rounded-xl px-3.5 py-2.5"
+                  className="px-3.5 py-2.5"
                   {...form.register("address")}
                 />
                 {errors.address && (
@@ -231,6 +243,9 @@ export function AuthForm({
                   className="text-sm font-medium"
                 >
                   Affiliation
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
                 </FieldLabel>
                 {/* No pre-selected option — `required` on a select only bites
                     when the chosen option has an empty value, so the
@@ -239,7 +254,7 @@ export function AuthForm({
                   id="affiliation"
                   required
                   defaultValue=""
-                  className="h-11 rounded-xl px-3.5"
+                  className="h-11 px-3.5"
                   {...form.register("affiliation")}
                 >
                   <option value="" disabled>
@@ -264,6 +279,9 @@ export function AuthForm({
             <div className="flex items-baseline justify-between gap-3">
               <FieldLabel htmlFor="password" className="text-sm font-medium">
                 Password
+                <span aria-hidden="true" className="text-destructive">
+                  *
+                </span>
               </FieldLabel>
               {!isSignup && (
                 <Link
@@ -281,7 +299,7 @@ export function AuthForm({
               placeholder={isSignup ? "At least 8 characters" : "••••••••"}
               minLength={isSignup ? 8 : undefined}
               required
-              className="h-11 rounded-xl px-3.5"
+              className="h-11 px-3.5"
               {...form.register("password")}
             />
             {errors.password && (
