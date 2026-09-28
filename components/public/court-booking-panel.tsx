@@ -11,7 +11,7 @@ import { NativeSelect } from "@/components/admin/native-select";
 import { RemoveSelectionDialog } from "@/components/public/remove-selection-dialog";
 import type { SlotAvailability } from "@/lib/availability";
 import { MAX_DURATION_HOURS } from "@/lib/slots";
-import { formatPrice } from "@/lib/time";
+import { dateStringToDate, formatDate, formatPrice } from "@/lib/time";
 
 /**
  * Interactive availability + booking selector for the court detail page.
@@ -74,7 +74,7 @@ export function CourtBookingPanel({
 
     for (let i = lo; i <= hi; i++) {
       if (!slots[i].available) {
-        return `${slots[i].startTime} isn't available, so it can't be part of a booking. Pick hours that are open end to end.`;
+        return `${slots[i].startTime} isn't available, so it can't be part of a booking. Pick hours that are available end to end.`;
       }
     }
 
@@ -108,9 +108,10 @@ export function CourtBookingPanel({
 
   // Re-validate every render: the slots prop is fresh from the server on each
   // date change, and a selection that no longer works is no selection.
-  const range = selection && !rangeProblem(selection.start, selection.end)
-    ? selection
-    : null;
+  const range =
+    selection && !rangeProblem(selection.start, selection.end)
+      ? selection
+      : null;
 
   const players =
     wantedPlayers !== null && playerOptions.includes(wantedPlayers)
@@ -204,7 +205,7 @@ export function CourtBookingPanel({
                   </span>
                   <Badge variant="secondary">
                     {slot.reason === "past"
-                      ? "Passed"
+                      ? "Unavailable"
                       : slot.reason === "blocked"
                         ? "Unavailable"
                         : "Booked"}
@@ -250,9 +251,7 @@ export function CourtBookingPanel({
                 type="button"
                 onClick={() => pick(index)}
                 onMouseEnter={() => setHovered(index)}
-                onMouseLeave={() =>
-                  setHovered((h) => (h === index ? null : h))
-                }
+                onMouseLeave={() => setHovered((h) => (h === index ? null : h))}
                 onFocus={() => setHovered(index)}
                 onBlur={() => setHovered((h) => (h === index ? null : h))}
                 aria-pressed={inRange}
@@ -284,7 +283,7 @@ export function CourtBookingPanel({
                   ) : inRange ? (
                     <Badge variant="secondary">Included</Badge>
                   ) : (
-                    <Badge variant="outline">Open</Badge>
+                    <Badge variant="outline">Available</Badge>
                   )}
                 </span>
               </button>
@@ -316,7 +315,10 @@ export function CourtBookingPanel({
         <div className="flex flex-col gap-4 rounded-xl border bg-card p-4">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <Field className="w-40">
-              <FieldLabel htmlFor="panel-players" className="text-sm font-medium">
+              <FieldLabel
+                htmlFor="panel-players"
+                className="text-sm font-medium"
+              >
                 Players
               </FieldLabel>
               <NativeSelect
@@ -339,14 +341,18 @@ export function CourtBookingPanel({
 
             {!range.complete && (
               <p className="text-xs text-muted-foreground">
-                Click another open hour to extend the block, or review it as one
-                hour.
+                Click another available hour to extend the block, or review it
+                as one hour.
               </p>
             )}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-4">
             <p className="text-sm text-muted-foreground" aria-live="polite">
+              <span className="text-foreground">
+                {formatDate(dateStringToDate(date))}
+              </span>
+              {" · "}
               <span className="font-mono text-foreground">
                 {chain[0].startTime} – {chain[chain.length - 1].endTime}
               </span>
@@ -366,7 +372,11 @@ export function CourtBookingPanel({
                 onConfirm={clearSelection}
                 triggerClassName="h-10"
               />
-              <Button onClick={review} disabled={!canBook} className="h-10 px-5">
+              <Button
+                onClick={review}
+                disabled={!canBook}
+                className="h-10 px-5"
+              >
                 Review booking
                 <ArrowRight />
               </Button>

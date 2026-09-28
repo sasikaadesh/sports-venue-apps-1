@@ -5,8 +5,7 @@ institution — a Catholic boys' national school founded in **1854** — not a
 startup. Refined and understated, never bright or playful. Where the choice is
 between "energetic" and "elegant", choose elegant.
 
-School colours are **green and gold**. Motto: _Exspecta Dominum Viriliter Age_
-("Expect the Lord and act manfully").
+School colours are **green and gold**.
 
 ## What this document is
 
@@ -21,11 +20,11 @@ If the two ever disagree, the skill wins and this file is stale.
 
 Three things, and nothing else, make this app belong to a different school:
 
-| File                              | Holds                                            |
-| --------------------------------- | ------------------------------------------------ |
-| `app/globals.css` → palette block | every colour in the app                          |
-| `public/logo.png`                 | the crest (header, footer, favicon, Apple icon)  |
-| `lib/brand.ts`                    | name, motto, established year, page-title suffix |
+| File                              | Holds                                           |
+| --------------------------------- | ----------------------------------------------- |
+| `app/globals.css` → palette block | every colour in the app                         |
+| `public/logo.png`                 | the crest (header, footer, favicon, Apple icon) |
+| `lib/brand.ts`                    | name, established year, page-title suffix       |
 
 No component contains a colour, a school name or a logo path. That is a hard
 rule, not an aspiration — see "Auditing it" at the end.
@@ -71,9 +70,9 @@ skill's table, both forced:
 
 **Usage discipline.** Green is the identity. Gold is a _rare_ accent — a
 `variant="gold"` button for the single most important action on a page, and the
-gold segment of the footer's top rule (plus the footer's own labels and motto,
-which are the block's signature). If two golds are visible at once on a page
-body, one is wrong. Deep
+gold segment of the footer's top rule (plus the footer's own labels, which are
+the block's signature). If two golds are visible at once on a page body, one
+is wrong. Deep
 green is for grounding bands. Mint backgrounds create the calm, spacious feel;
 alternate white and mint sections for gentle rhythm.
 
@@ -202,10 +201,10 @@ Four components carry the brand. Reuse them rather than re-inventing the look.
    (`--footer`, one step deeper than the band), and across the top the **school
    rule**: a single hairline split into three filled segments of **equal
    width** — medium green, white, gold, each an even third (`flex-1`). Below it the crest and school name, `Moratuwa · Est. 1854`, the
-   tagline, the motto in gold serif italic, a gold primary and a white-outlined
-   secondary button; link columns to the right under gold uppercase labels; a
-   divider and a pale-green copyright row. Gold appears exactly three times
-   (labels, motto, primary button) plus the rule's third segment.
+   tagline, a gold primary and a white-outlined secondary button; link columns
+   to the right under gold uppercase labels; a divider and a pale-green
+   copyright row. Gold appears exactly twice (labels, primary button) plus the
+   rule's third segment.
 5. **Testimonials band** — `components/brand/testimonials-band.tsx`. A compact
    `--band` strip (py-12/14, well under the CTA band) closing the home page: a
    gold eyebrow, one serif line, and two or three quotes in a row, each under a

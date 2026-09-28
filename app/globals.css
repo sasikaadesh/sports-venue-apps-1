@@ -83,6 +83,11 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Single tokens for button and input corner radius (`rounded-button`,
+     `rounded-input`) — set once here so every button/input picks it up. */
+  --radius-button: 0.5rem; /* 8px */
+  --radius-input: 0.5rem; /* 8px */
 }
 
 /* ==========================================================================
@@ -309,6 +314,28 @@
   --sidebar-accent-foreground: var(--p-night-fg);
   --sidebar-border: color-mix(in oklab, var(--p-night-fg) 14%, transparent);
   --sidebar-ring: var(--p-green-lift);
+}
+
+/* ==========================================================================
+   Native <select> popups.
+   ==========================================================================
+   Every dropdown in the app is a plain <select> (see `NativeSelect` and
+   `FilterSelect`) so it keeps native keyboard, mobile and form-submit
+   behaviour for free. Its open list is drawn by the OS, not by this
+   stylesheet — `color-scheme` above (on `:root` and `.dark`) is what stops it
+   defaulting to a light popup in dark mode. Chromium and Firefox additionally
+   let `<option>` itself be styled, so this rule pulls the popup onto the
+   app's own tokens rather than leaving it to a generic OS dark grey; on a
+   browser that ignores it, `color-scheme` is still the fallback that keeps it
+   readable. */
+select {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+select option {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
 }
 
 /* ==========================================================================

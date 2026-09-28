@@ -88,7 +88,7 @@ function PlayerOptionsField({
             }}
             inputMode="numeric"
             placeholder="Add"
-            className="h-8 w-20 rounded-lg"
+            className="h-8 w-20"
             aria-label="Player count to add"
           />
           <Button
@@ -154,7 +154,7 @@ function CourtTypeForm({
         <Input
           id="ct-name"
           placeholder="Tennis"
-          className="h-10 rounded-xl"
+          className="h-10"
           {...form.register("name")}
         />
         {form.formState.errors.name && (

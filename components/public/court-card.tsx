@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ImageOff } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/time";
 
 export type PublicCourt = {
@@ -45,14 +44,9 @@ export function CourtCard({
       </div>
 
       <div className="flex flex-1 flex-col gap-2 px-5 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-heading text-lg leading-tight font-bold tracking-tight">
-            {court.name}
-          </h3>
-          <Badge variant="secondary" className="mt-0.5 shrink-0">
-            {court.typeName}
-          </Badge>
-        </div>
+        <h3 className="font-heading text-lg leading-tight font-bold tracking-tight">
+          {court.name}
+        </h3>
 
         <span className="text-sm text-muted-foreground">
           {court.fromPrice

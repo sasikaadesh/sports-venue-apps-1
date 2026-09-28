@@ -78,12 +78,6 @@ export function SiteFooter() {
 
             <p className="text-sm leading-relaxed">{BRAND.tagline}.</p>
 
-            {/* The motto — the one line on the page that is allowed to be
-                decorative. Serif, italic, gold. */}
-            <p className="font-heading text-base text-gold italic">
-              {BRAND.motto}
-            </p>
-
             <div className="flex flex-wrap items-center gap-3">
               <LinkButton
                 href="/courts"

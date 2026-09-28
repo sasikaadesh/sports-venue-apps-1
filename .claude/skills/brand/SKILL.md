@@ -16,7 +16,7 @@ description: The project's brand and visual identity — colours, typography, sp
 
 ## Who this is for
 
-St. Sebastian's College, Moratuwa — a premier Catholic boys' national school, **established 1854**. Motto: _Exspecta Dominum Viriliter Age_ ("Expect the Lord and act manfully"). School colours are **green and gold**.
+St. Sebastian's College, Moratuwa — a premier Catholic boys' national school, **established 1854**. School colours are **green and gold**.
 
 The feeling to aim for: **dignified, traditional, trustworthy, calm** — an established institution, not a startup. Refined and understated, not bright or playful. When a choice is between "energetic" and "elegant", choose elegant.
 
@@ -76,20 +76,20 @@ The school's signature block. Ground it in `--green-deepest` — a deep, slightl
 
 - **Top rule.** One thin horizontal hairline (~4px) split into **three equal thirds: medium green, white, then `--gold`, each exactly one third of the full width.** This is the school rule and it is the footer's signature — it is _not_ a solid gold bar, and the thirds are even, not a wide green run closed by a short gold tail. Fill the segments (`flex`, each `flex-1`) rather than drawing three borders, so the thirds stay equal at every width.
 - **Identity, top-left.** Crest + school name in the serif, with `<Location> · Est. <Year>` beneath it as a small letter-spaced uppercase line in the muted pale-green.
-- **Then, in order:** a one-line tagline in off-white, the motto in **gold serif italic** (_Exspecta Dominum Viriliter Age_), and a pair of actions — a solid `--gold` primary button and a **white-outlined** secondary. This is the only place two buttons sit on a coloured band outside the CTA band itself.
+- **Then, in order:** a one-line tagline in off-white, and a pair of actions — a solid `--gold` primary button and a **white-outlined** secondary. This is the only place two buttons sit on a coloured band outside the CTA band itself.
 - **Link columns to the right.** Section labels (EXPLORE / ACCOUNT / CONNECT — or whatever the site's real sections are) in small letter-spaced uppercase **`--gold`**; the links themselves off-white.
 - **Bottom.** A thin divider, then a copyright row in the muted pale-green, with the location pushed to the right on wide screens.
 
-**Colour roles in the footer:** off-white for the school name, links, tagline and body; `--gold` for the section labels and the motto only; a muted pale-**green** (not grey) for the copyright row. Gold appears exactly three times — labels, motto, primary button. Any more and the block tips from institutional into gaudy.
+**Colour roles in the footer:** off-white for the school name, links, tagline and body; `--gold` for the section labels only; a muted pale-**green** (not grey) for the copyright row. Gold appears exactly twice — labels and primary button. Any more and the block tips from institutional into gaudy.
 
 **5. Testimonials band** _(the compact deep-green quotes strip)._
 A short sibling of the CTA band on the same `--green-deep` ground, and deliberately **compact — a closing note, not another full section**: a `--gold` uppercase eyebrow, one white serif line, then two or three quotes in a row. Each quote carries a hairline rule above it in the band's border colour rather than sitting in a card — a bordered box on a coloured band reads as a second surface. Beneath each quote, the attribution: the name in `--gold`, the role ("Parent", "Old Boy", "Coach") as a small letter-spaced uppercase line in the muted band colour. Optionally the crest, bled off one corner at ~7% opacity, as a watermark. Gold appears exactly twice — the eyebrow and the names. Like the CTA band it is the last block on its page and sits flush against the footer.
 
 ## Buttons
 
-**Every button in the app has square corners — no border radius at all, at any size or variant.** The sharp corner is a deliberate brand signal: it reads traditional and institutional, where a pill or a soft rounded button reads consumer-app. This is set once on the button component's base styles (and its size variants carry no radius of their own), so it holds app-wide without call sites opting in. Hand-rolled button-like controls — segmented toggles, tab pills, pagination controls, small icon buttons — follow the same rule.
+**Every button in the app uses an 8px corner radius (`rounded-button`, token `--radius-button`) — never a pill, never square.** This is set once on the button component's base styles (and its size variants carry no radius of their own), so it holds app-wide without call sites opting in. Hand-rolled button-like controls — segmented toggles, tab pills, pagination controls, small icon buttons — follow the same rule.
 
-Cards, inputs, images and other surfaces keep their (modest) radius; only buttons are square.
+Cards, images and other surfaces keep their (modest) radius. Inputs — text fields, textareas, native selects — use the same 8px radius as buttons, via the `rounded-input` token (`--radius-input`), so it never needs to be repeated as a per-field override.
 
 - **Primary:** solid `--green`, white text, square. ("Start Admissions" style.)
 - **Secondary/accent:** solid `--gold`, dark text — used sparingly for the single most important action. ("Apply Now" style.)
@@ -102,6 +102,8 @@ Use the school **crest** (green & gold shield). Place the high-resolution PNG/SV
 ## Dark mode
 
 Keep the identity in dark mode: deep green (`--green-deepest`) backgrounds, light text, `--green` and `--gold` accents kept readable with good contrast. Test every screen in both themes.
+
+**Dropdowns are native `<select>` elements** (see `NativeSelect`/`FilterSelect`), so their open list is drawn by the OS, not by the app's own CSS. Two things make it follow the theme instead of defaulting to a light popup: `color-scheme` set to `light`/`dark` on `:root`/`.dark` in `app/globals.css`, and a global `select`/`select option` rule pointing at `--background`/`--foreground`/`--popover`/`--popover-foreground`. Both must stay in place — either one alone is not enough on every browser.
 
 ## Anti-generic rules (do not do these)
 

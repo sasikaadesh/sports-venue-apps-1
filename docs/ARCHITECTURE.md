@@ -368,9 +368,18 @@ Conversely, `?code=` and `?token_hash=` cannot be handled by the page itself, be
 ## Contact Us
 
 - Public page at `/contact`: a form (name, email, message) beside static venue details from `lib/contact-details.ts` (one module, so the page and footer cannot disagree — and swapping them for the next club is a one-file change). **The shipped details are placeholders.**
-- `submitContactMessage` is the app's one **unauthenticated write** — the person most likely to be asking a question is exactly the one without an account. It is kept narrow accordingly: only the three validated fields are written, `readAt` is not settable from it, there is no id so it can only ever insert, lengths are bounded by Zod, and a hidden honeypot field silently drops naive bots (answering `ok`, so they get no signal to retry).
+- `submitContactMessage` is the app's one **unauthenticated write** — the person most likely to be asking a question is exactly the one without an account. It is kept narrow accordingly: only the three validated fields are written, `readAt` is not settable from it, there is no id so it can only ever insert, and lengths are bounded by Zod.
 - Admins read the inbox at `/admin/messages` (mark read/unread, delete), with an unread count on the nav tab. **Admin-level, not super-admin-level** — answering enquiries is ordinary staff work. The panel remains the system of record; email is a notification layer on top of it (below).
 - RLS on `ContactMessage`: insert for `anon` + `authenticated`, select/update/delete admin-only. There is deliberately no public SELECT policy — a sender cannot read the inbox back, not even their own message.
+
+### Contact form spam protection
+
+Two layers, both free and both in `app/(public)/contact/actions.ts`, no third-party service:
+
+- **Honeypot.** `<ContactForm>` renders a `website` field that is hidden from sighted users (`className="hidden"`) and from screen readers (`aria-hidden`, `tabIndex={-1}`) — a naive bot that fills every field in the DOM fills this one too. A non-empty `website` on submit answers `{ ok: true }` and writes nothing, so the bot gets the success signal it expects and no reason to adapt.
+- **Per-IP rate limit.** `lib/rate-limit.ts` is a small in-memory fixed-window counter (5 submissions / 10 minutes / IP by default, read from `x-forwarded-for`). It catches a script that skips the honeypot but still submits faster than a person typing. **In-memory means per-instance** — a burst spread across several serverless instances, or a redeploy, resets the count. That is accepted for what this is: a cheap brake behind the honeypot, not the real defence.
+
+**Upgrade path.** If real spam gets past both — a bot that fills nothing extra and paces itself under the rate limit — the next step is **Cloudflare Turnstile** (a free, privacy-preserving CAPTCHA replacement): a widget on the form, and a server-side token verification call in `submitContactMessage` before the honeypot/rate-limit checks. Nothing else here needs to change to add it.
 
 ## Special requests (`20260914120000_special_requests`)
 

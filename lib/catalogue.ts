@@ -122,6 +122,8 @@ export type CatalogueCourtDetail = {
   id: string;
   name: string;
   description: string | null;
+  /** Free-text list, e.g. "Floodlights, Changing rooms, Water". */
+  amenities: string | null;
   images: string[];
   typeName: string;
   playerOptions: number[];
@@ -149,6 +151,7 @@ export const getCourtDetail = unstable_cache(
         id: true,
         name: true,
         description: true,
+        amenities: true,
         images: true,
         courtType: { select: { name: true, playerOptions: true } },
         slots: {
@@ -165,6 +168,7 @@ export const getCourtDetail = unstable_cache(
       id: court.id,
       name: court.name,
       description: court.description,
+      amenities: court.amenities,
       images: court.images,
       typeName: court.courtType.name,
       playerOptions: court.courtType.playerOptions,

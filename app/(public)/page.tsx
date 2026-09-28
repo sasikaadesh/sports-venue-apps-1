@@ -166,7 +166,7 @@ export default async function HomePage() {
               },
               {
                 title: "Pick your slot",
-                body: "Choose a date and see exactly which hours are still open.",
+                body: "Choose a date and see exactly which hours are still available.",
               },
               {
                 title: "Pay and play",

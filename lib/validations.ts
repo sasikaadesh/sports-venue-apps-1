@@ -63,7 +63,7 @@ const addressField = z
 
 /** The four options, and the only four. Mirrors the `Affiliation` enum. */
 export const AFFILIATIONS = [
-  { value: "old_boy", label: "Old Boy" },
+  { value: "old_boy", label: "Alumni / Old Boy" },
   { value: "parent", label: "Parent" },
   { value: "staff", label: "Staff" },
   { value: "outsider", label: "Outsider" },
@@ -272,6 +272,12 @@ export const courtSchema = z.object({
     .string()
     .trim()
     .max(1000, "Description must be 1000 characters or fewer.")
+    .optional()
+    .or(z.literal("")),
+  amenities: z
+    .string()
+    .trim()
+    .max(300, "Amenities must be 300 characters or fewer.")
     .optional()
     .or(z.literal("")),
   isActive: z.boolean(),

@@ -56,7 +56,7 @@ export function BlockPicker({
           type="date"
           value={date}
           onChange={(e) => update("date", e.target.value)}
-          className="h-10 rounded-xl"
+          className="h-10"
         />
       </Field>
     </div>

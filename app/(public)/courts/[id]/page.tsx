@@ -110,7 +110,12 @@ export default async function CourtDetailsPage({
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-4xl leading-none">{court.name}</h1>
-              <Badge variant="secondary">{court.typeName}</Badge>
+              {/* Only shown when it adds information — a court named after its
+                  own type (e.g. a "Badminton" court of type "Badminton") would
+                  otherwise repeat the title right next to it. */}
+              {court.typeName.toLowerCase() !== court.name.toLowerCase() && (
+                <Badge variant="secondary">{court.typeName}</Badge>
+              )}
             </div>
 
             {court.playerOptions.length > 0 && (
@@ -129,6 +134,23 @@ export default async function CourtDetailsPage({
               <p className="max-w-prose leading-relaxed whitespace-pre-line text-muted-foreground">
                 {court.description}
               </p>
+            </div>
+          )}
+
+          {court.amenities && (
+            <div className="flex flex-col gap-2">
+              <h2 className="text-lg">Amenities</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {court.amenities
+                  .split(",")
+                  .map((a) => a.trim())
+                  .filter(Boolean)
+                  .map((amenity) => (
+                    <Badge key={amenity} variant="outline">
+                      {amenity}
+                    </Badge>
+                  ))}
+              </div>
             </div>
           )}
 
@@ -153,9 +175,16 @@ export default async function CourtDetailsPage({
             <p className="text-sm text-muted-foreground">
               {formatDate(dateStringToDate(date))}
               {availability.slots.length > 0 &&
-                ` · ${availability.openCount} of ${availability.slots.length} open`}
+                ` · ${availability.openCount} of ${availability.slots.length} Available`}
             </p>
           </div>
+
+          <p className="rounded-xl bg-muted px-4 py-3 text-xs text-muted-foreground">
+            Click an hour to book it. Click a second hour to stretch the
+            selection into one block — up to {MAX_DURATION_HOURS} consecutive
+            available hours. Click again to start over. Nothing is reserved
+            until you confirm.
+          </p>
 
           <AvailabilityDatePicker date={date} today={today} maxDate={maxDate} />
 
@@ -180,13 +209,6 @@ export default async function CourtDetailsPage({
               initial={initialSelection}
             />
           )}
-
-          <p className="rounded-xl bg-muted px-4 py-3 text-xs text-muted-foreground">
-            Click an hour to book it. Click a second hour to stretch the
-            selection into one block — up to {MAX_DURATION_HOURS} consecutive
-            open hours. Click again to start over. Nothing is reserved until you
-            confirm.
-          </p>
 
           <div className="flex flex-col items-start gap-2 border-t pt-5">
             <p className="text-sm text-muted-foreground">

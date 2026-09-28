@@ -150,7 +150,7 @@ function EmptyDay({
               step={3600}
               value={start}
               onChange={(e) => setStart(e.target.value)}
-              className="h-10 rounded-xl"
+              className="h-10"
             />
           </Field>
           <Field>
@@ -166,7 +166,7 @@ function EmptyDay({
               step={3600}
               value={end}
               onChange={(e) => setEnd(e.target.value)}
-              className="h-10 rounded-xl"
+              className="h-10"
             />
           </Field>
           <Field>
@@ -180,7 +180,7 @@ function EmptyDay({
               step="0.01"
               value={rate}
               onChange={(e) => setRate(e.target.value)}
-              className="h-10 rounded-xl"
+              className="h-10"
             />
           </Field>
           <div className="flex items-center gap-2">
@@ -345,7 +345,7 @@ function DaySection({
             disabled={pending}
             placeholder={uniform ? undefined : "mixed"}
             onChange={(e) => setRate(e.target.value)}
-            className="h-10 rounded-xl"
+            className="h-10"
           />
         </Field>
 

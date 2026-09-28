@@ -78,7 +78,7 @@ export function ResetPasswordForm() {
             minLength={8}
             required
             autoFocus
-            className="h-11 rounded-xl px-3.5"
+            className="h-11 px-3.5"
           />
         </Field>
 
@@ -94,7 +94,7 @@ export function ResetPasswordForm() {
             placeholder="••••••••"
             minLength={8}
             required
-            className="h-11 rounded-xl px-3.5"
+            className="h-11 px-3.5"
           />
         </Field>
       </FieldGroup>

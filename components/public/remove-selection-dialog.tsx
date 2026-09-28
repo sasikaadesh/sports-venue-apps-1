@@ -16,17 +16,17 @@ import {
 } from "@/components/ui/dialog";
 
 /**
- * "Remove" (clear selection) control with a confirmation step.
+ * "Cancel" (clear selection) control with a confirmation step.
  *
- * The trigger opens a dialog; only the dialog's Remove button runs `onConfirm`.
+ * The trigger opens a dialog; only the dialog's Cancel button runs `onConfirm`.
  * A selection here is unconfirmed and unpaid — nothing is reserved yet, so
  * clearing it discards local UI state only. (Once payments exist, releasing a
  * held/paid booking will be a separate, server-side path.)
  */
 export function RemoveSelectionDialog({
   onConfirm,
-  triggerLabel = "Remove",
-  title = "Remove this selection?",
+  triggerLabel = "Cancel",
+  title = "Cancel this selection?",
   description = "This clears the hours you picked. Nothing has been reserved or paid, so nothing is lost — you can choose again anytime.",
   triggerVariant = "ghost",
   triggerSize = "default",
@@ -74,7 +74,7 @@ export function RemoveSelectionDialog({
             }}
           >
             <Trash2 />
-            Remove
+            Cancel selection
           </Button>
         </DialogFooter>
       </DialogContent>

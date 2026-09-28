@@ -230,7 +230,7 @@ export function UserConductDialog({
                 onChange={(e) => setComment(e.target.value)}
                 maxLength={1000}
                 placeholder="What happened? Whoever reads this in six months will only have these words."
-                className="rounded-lg px-3 py-2 text-sm"
+                className="px-3 py-2 text-sm"
               />
 
               {formError && (

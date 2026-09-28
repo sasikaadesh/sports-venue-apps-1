@@ -122,12 +122,15 @@ export function ContactForm({
         <Field data-invalid={!!form.formState.errors.name}>
           <FieldLabel htmlFor="contact-name" className="text-sm font-medium">
             Your name
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
           </FieldLabel>
           <Input
             id="contact-name"
             autoComplete="name"
             placeholder="Nimal Perera"
-            className="h-11 rounded-xl px-3.5"
+            className="h-11 px-3.5"
             {...form.register("name")}
           />
           {form.formState.errors.name && (
@@ -138,13 +141,16 @@ export function ContactForm({
         <Field data-invalid={!!form.formState.errors.email}>
           <FieldLabel htmlFor="contact-email" className="text-sm font-medium">
             Email
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
           </FieldLabel>
           <Input
             id="contact-email"
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
-            className="h-11 rounded-xl px-3.5"
+            className="h-11 px-3.5"
             {...form.register("email")}
           />
           {form.formState.errors.email && (
@@ -156,12 +162,15 @@ export function ContactForm({
       <Field data-invalid={!!form.formState.errors.message}>
         <FieldLabel htmlFor="contact-message" className="text-sm font-medium">
           Message
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
         </FieldLabel>
         <Textarea
           id="contact-message"
           rows={6}
           placeholder="Which court are you asking about, and what do you need?"
-          className="rounded-xl px-3.5 py-2.5"
+          className="px-3.5 py-2.5"
           {...form.register("message")}
         />
         {form.formState.errors.message && (

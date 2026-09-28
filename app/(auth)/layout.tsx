@@ -61,9 +61,6 @@ export default function AuthLayout({
             Check live availability across every {BRAND.name} court, reserve
             your slot, and pay in seconds.
           </p>
-          <p className="mt-8 font-heading text-sm text-photo-gold italic">
-            {BRAND.motto}
-          </p>
         </div>
       </div>
     </div>
