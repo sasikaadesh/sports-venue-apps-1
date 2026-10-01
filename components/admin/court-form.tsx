@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { NativeSelect } from "@/components/admin/native-select";
+import { STANDARD_COURT_RULES } from "@/lib/court-rules";
 import { courtSchema, type CourtInput } from "@/lib/validations";
 import { MAX_IMAGES_PER_COURT } from "@/lib/storage-constants";
 import { createCourt, updateCourt } from "@/app/admin/courts/actions";
@@ -28,6 +29,9 @@ type CourtFormProps = {
     courtTypeId: string;
     description: string | null;
     amenities: string | null;
+    rules: string | null;
+    bookingMode: "exclusive" | "shared";
+    capacity: number | null;
     isActive: boolean;
     imageCount: number;
   };
@@ -52,9 +56,14 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
       courtTypeId: court?.courtTypeId ?? "",
       description: court?.description ?? "",
       amenities: court?.amenities ?? "",
+      rules: court?.rules ?? "",
+      bookingMode: court?.bookingMode ?? "exclusive",
+      capacity: court?.capacity != null ? String(court.capacity) : "",
       isActive: court?.isActive ?? true,
     },
   });
+
+  const bookingMode = useWatch({ control: form.control, name: "bookingMode" });
 
   // useWatch rather than form.watch(), which would defeat React Compiler
   // memoization for this component.
@@ -96,6 +105,9 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
       formData.set("courtTypeId", values.courtTypeId);
       formData.set("description", values.description ?? "");
       formData.set("amenities", values.amenities ?? "");
+      formData.set("rules", values.rules ?? "");
+      formData.set("bookingMode", values.bookingMode);
+      formData.set("capacity", values.capacity ?? "");
       formData.set("isActive", String(values.isActive));
       files.forEach((f) => formData.append("images", f));
 
@@ -184,6 +196,71 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
           <FieldError>{form.formState.errors.amenities.message}</FieldError>
         )}
       </Field>
+
+      <Field data-invalid={!!form.formState.errors.rules}>
+        <FieldLabel htmlFor="court-rules" className="text-sm font-medium">
+          Court rules{" "}
+          <span className="font-normal text-muted-foreground">(optional)</span>
+        </FieldLabel>
+        <Textarea
+          id="court-rules"
+          rows={6}
+          placeholder={STANDARD_COURT_RULES.join("\n")}
+          {...form.register("rules")}
+        />
+        {/* The placeholder IS the fallback: what is greyed out here is exactly
+            what the court page shows while this is left blank. */}
+        <span className="text-xs text-muted-foreground">
+          One rule per line, shown on the court&apos;s page. Leave blank to use
+          the standard rules shown greyed out above. Parking, medical and
+          weather rules are on the venue-wide Rules page — no need to repeat
+          them here.
+        </span>
+        {form.formState.errors.rules && (
+          <FieldError>{form.formState.errors.rules.message}</FieldError>
+        )}
+      </Field>
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="court-mode" className="text-sm font-medium">
+            Booking mode
+          </FieldLabel>
+          <NativeSelect id="court-mode" {...form.register("bookingMode")}>
+            <option value="exclusive">Exclusive — one booking per hour</option>
+            <option value="shared">Shared — many bookings per hour</option>
+          </NativeSelect>
+          <span className="text-xs text-muted-foreground">
+            Courts are exclusive. Use shared for a gym or pool, where members
+            book a place in the session. Cannot change while there are upcoming
+            bookings.
+          </span>
+        </Field>
+
+        {bookingMode === "shared" && (
+          <Field data-invalid={!!form.formState.errors.capacity}>
+            <FieldLabel
+              htmlFor="court-capacity"
+              className="text-sm font-medium"
+            >
+              Capacity per hour{" "}
+              <span className="font-normal text-muted-foreground">
+                (blank = unlimited)
+              </span>
+            </FieldLabel>
+            <Input
+              id="court-capacity"
+              inputMode="numeric"
+              placeholder="20"
+              className="h-10"
+              {...form.register("capacity")}
+            />
+            {form.formState.errors.capacity && (
+              <FieldError>{form.formState.errors.capacity.message}</FieldError>
+            )}
+          </Field>
+        )}
+      </div>
 
       <Field
         orientation="horizontal"

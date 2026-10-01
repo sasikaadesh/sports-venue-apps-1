@@ -24,8 +24,14 @@ import {
   slotPriceSchema,
   slotTemplateSchema,
   type ActionResult,
+  type CourtInput,
 } from "@/lib/validations";
-import { DAY_NAMES, timeStringToDate } from "@/lib/time";
+import {
+  DAY_NAMES,
+  dateStringToDate,
+  timeStringToDate,
+  todayString,
+} from "@/lib/time";
 
 /**
  * Court and slot-template actions. Every one re-checks admin.
@@ -40,9 +46,19 @@ function courtFieldsFrom(formData: FormData) {
     courtTypeId: formData.get("courtTypeId"),
     description: formData.get("description") ?? "",
     amenities: formData.get("amenities") ?? "",
+    rules: formData.get("rules") ?? "",
+    bookingMode: formData.get("bookingMode") ?? "exclusive",
+    capacity: formData.get("capacity") ?? "",
     // FormData has no booleans — the client sends the string "true"/"false".
     isActive: formData.get("isActive") === "true",
   };
+}
+
+/** Capacity only means something for a shared facility; blank = unlimited. */
+function capacityFrom(data: CourtInput): number | null {
+  return data.bookingMode === "shared" && data.capacity
+    ? Number(data.capacity)
+    : null;
 }
 
 function imageFilesFrom(formData: FormData): File[] {
@@ -72,13 +88,21 @@ export async function createCourt(
   });
   if (!type) return actionError("That court type no longer exists.");
 
+  // A new court joins the end of every court list (COURT_DISPLAY_ORDER) rather
+  // than jumping to the top on the column default of 0.
+  const last = await prisma.court.aggregate({ _max: { displayOrder: true } });
+
   // Create first so images can be filed under the court's id, then attach.
   const court = await prisma.court.create({
     data: {
+      displayOrder: (last._max.displayOrder ?? 0) + 10,
       name: parsed.data.name,
       courtTypeId: parsed.data.courtTypeId,
       description: parsed.data.description || null,
       amenities: parsed.data.amenities || null,
+      rules: parsed.data.rules || null,
+      bookingMode: parsed.data.bookingMode,
+      capacity: capacityFrom(parsed.data),
       isActive: parsed.data.isActive,
       images: [],
     },
@@ -114,9 +138,23 @@ export async function updateCourt(
 
   const existing = await prisma.court.findUnique({
     where: { id },
-    select: { images: true },
+    select: { images: true, bookingMode: true },
   });
   if (!existing) return actionError("That court no longer exists.");
+
+  // Each held hour carries a flag derived from the mode (see the
+  // shared_facilities migration), so the mode cannot flip under today's or
+  // future bookings. The DB trigger refuses it regardless; this says so kindly.
+  if (parsed.data.bookingMode !== existing.bookingMode) {
+    const upcoming = await prisma.bookingSlot.count({
+      where: { courtId: id, bookingDate: { gte: dateStringToDate(todayString()) } },
+    });
+    if (upcoming > 0) {
+      return actionError(
+        "This court has upcoming bookings or blocks, so its booking mode can't change. Cancel or wait them out first."
+      );
+    }
+  }
 
   const files = imageFilesFrom(formData);
   if (existing.images.length + files.length > MAX_IMAGES_PER_COURT) {
@@ -139,6 +177,9 @@ export async function updateCourt(
       courtTypeId: parsed.data.courtTypeId,
       description: parsed.data.description || null,
       amenities: parsed.data.amenities || null,
+      rules: parsed.data.rules || null,
+      bookingMode: parsed.data.bookingMode,
+      capacity: capacityFrom(parsed.data),
       isActive: parsed.data.isActive,
       images,
     },

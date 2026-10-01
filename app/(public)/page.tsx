@@ -1,5 +1,3 @@
-import { ArrowRight } from "lucide-react";
-
 import { CtaBand } from "@/components/brand/cta-band";
 import { Eyebrow } from "@/components/brand/eyebrow";
 import { FeatureCard } from "@/components/brand/feature-card";
@@ -8,13 +6,12 @@ import {
   TestimonialsBand,
   type Testimonial,
 } from "@/components/brand/testimonials-band";
-import { LinkButton } from "@/components/link-button";
 import { CourtCard } from "@/components/public/court-card";
 import { HeroBookingBar } from "@/components/public/hero-booking-bar";
 import { HeroCarousel } from "@/components/public/hero-carousel";
 import { BRAND } from "@/lib/brand";
 import { BOOKING_WINDOW_DAYS } from "@/lib/booking-service";
-import { getActiveCourtsNewestFirst } from "@/lib/catalogue";
+import { getActiveCourts } from "@/lib/catalogue";
 import { addDays, todayString } from "@/lib/time";
 
 // Rendered per request: the header reads the session, and the booking bar's
@@ -50,9 +47,10 @@ const TESTIMONIALS: Testimonial[] = [
 ];
 
 export default async function HomePage() {
-  const courts = await getActiveCourtsNewestFirst();
+  // One array, in Court.displayOrder, feeds both the booking bar's selector and
+  // the grid below — so the two always list courts in the same order.
+  const courts = await getActiveCourts();
 
-  const featured = courts.slice(0, 6);
   const today = todayString();
   const maxDate = addDays(today, BOOKING_WINDOW_DAYS);
 
@@ -106,23 +104,14 @@ export default async function HomePage() {
 
       {/* Court grid */}
       <section className="mx-auto w-full max-w-6xl px-6 py-16 sm:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-4 pb-8">
-          <div className="flex flex-col gap-3">
-            <Eyebrow tone="green">Facilities</Eyebrow>
-            <h2 className="text-3xl">
-              {courts.length > 0 ? "Our courts" : "Courts"}
-            </h2>
-            <p className="max-w-prose text-muted-foreground">
-              Pick a court to see its photos, prices and open times.
-            </p>
-          </div>
-
-          {courts.length > featured.length && (
-            <LinkButton href="/courts" variant="outline" className="h-10">
-              All {courts.length} courts
-              <ArrowRight />
-            </LinkButton>
-          )}
+        <div className="flex flex-col gap-3 pb-8">
+          <Eyebrow tone="green">Facilities</Eyebrow>
+          <h2 className="text-3xl">
+            {courts.length > 0 ? "Our courts" : "Courts"}
+          </h2>
+          <p className="max-w-prose text-muted-foreground">
+            Pick a court to see its photos, prices and open times.
+          </p>
         </div>
 
         {courts.length === 0 ? (
@@ -130,8 +119,9 @@ export default async function HomePage() {
             Nothing to show yet.
           </p>
         ) : (
+          // Every active court: 1 per row on phones, 2 from tablet, 3 on desktop.
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featured.map((court, i) => (
+            {courts.map((court, i) => (
               <li key={court.id}>
                 <CourtCard
                   priority={i < 3}

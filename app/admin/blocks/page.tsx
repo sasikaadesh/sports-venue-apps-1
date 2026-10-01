@@ -9,8 +9,9 @@ import {
 } from "@/components/admin/slot-block-list";
 import { PaginationBar } from "@/components/admin/table-tools";
 import { requireAdmin } from "@/lib/auth";
+import { COURT_DISPLAY_ORDER } from "@/lib/catalogue";
 import { prisma } from "@/lib/prisma";
-import { getOccupyingSlots } from "@/lib/booking-service";
+import { getOccupyingSlots, sharedHourLoad } from "@/lib/booking-service";
 import { buildAdminHref, pageCountFor, parsePage } from "@/lib/admin-filters";
 import {
   DAY_NAMES,
@@ -44,8 +45,8 @@ export default async function BlocksPage({
   const params = await searchParams;
 
   const courts = await prisma.court.findMany({
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    orderBy: COURT_DISPLAY_ORDER,
+    select: { id: true, name: true, bookingMode: true },
   });
 
   if (courts.length === 0) {
@@ -74,8 +75,9 @@ export default async function BlocksPage({
   }
 
   // Fall back to the first court and today when the URL says nothing valid.
-  const courtId =
-    courts.find((c) => c.id === params.courtId)?.id ?? courts[0].id;
+  const court = courts.find((c) => c.id === params.courtId) ?? courts[0];
+  const courtId = court.id;
+  const shared = court.bookingMode === "shared";
   const date =
     params.date && DATE_RE.test(params.date) ? params.date : todayString();
 
@@ -98,11 +100,20 @@ export default async function BlocksPage({
   ]);
 
   // One entry per occupied hour. A multi-hour booking contributes several,
-  // each pointing back at the same parent booking.
-  const occupiedBySlot = new Map(occupying.map((o) => [o.slotId, o]));
+  // each pointing back at the same parent booking. On a SHARED facility an hour
+  // can hold many bookings, so only a block counts as "the" occupant there, and
+  // the bookings are shown as a head count instead.
+  const occupiedBySlot = new Map(
+    occupying
+      .filter((o) => !shared || o.status === "blocked")
+      .map((o) => [o.slotId, o])
+  );
 
   const rows: BlockableSlot[] = slots.map((slot) => {
     const occupied = occupiedBySlot.get(slot.id);
+    const sharedPeople = shared
+      ? sharedHourLoad(occupying.filter((o) => o.slotId === slot.id)).people
+      : undefined;
 
     return {
       slotId: slot.id,
@@ -117,6 +128,7 @@ export default async function BlocksPage({
             who: occupied.status === "blocked" ? null : occupied.userEmail,
           }
         : undefined,
+      sharedPeople,
     };
   });
 

@@ -46,7 +46,8 @@ export default async function CompleteProfilePage({
         <h1 className="text-4xl leading-none">Almost there</h1>
         <p className="text-muted-foreground">
           Signed in as {user.email}. We just need a few details so we can reach
-          you about a booking and know how you are connected to the school.
+          you about a booking, contact someone if you need help during a
+          session, and know how you are connected to the school.
         </p>
       </div>
 
@@ -55,6 +56,8 @@ export default async function CompleteProfilePage({
           name: user.name ?? "",
           phone: user.phone ?? "",
           address: user.address ?? "",
+          nic: user.nic ?? "",
+          emergencyContact: user.emergencyContact ?? "",
           affiliation: user.affiliation ?? undefined,
         }}
         submitLabel="Save and continue"

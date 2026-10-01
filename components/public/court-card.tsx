@@ -25,8 +25,9 @@ export function CourtCard({
       href={`/courts/${court.id}`}
       className="group flex h-full flex-col overflow-hidden rounded-lg border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
-      {/* Consistent 4:3 across the grid, per DESIGN.md. */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+      {/* One ratio across the grid, per DESIGN.md — 3:2, a little shorter than
+          4:3 so a full grid stays compact. object-cover crops, never stretches. */}
+      <div className="relative aspect-[3/2] overflow-hidden bg-muted">
         {court.image ? (
           <Image
             src={court.image}
@@ -43,7 +44,7 @@ export function CourtCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 px-5 py-4">
+      <div className="flex flex-1 flex-col gap-1.5 px-5 py-3.5">
         <h3 className="font-heading text-lg leading-tight font-bold tracking-tight">
           {court.name}
         </h3>

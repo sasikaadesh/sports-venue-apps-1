@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { BookingStatus } from "@/lib/generated/prisma/enums";
+import { COURT_DISPLAY_ORDER } from "@/lib/catalogue";
 import { prisma } from "@/lib/prisma";
 import {
   ADMIN_PAGE_SIZE,
@@ -590,7 +591,7 @@ export type BookingFilterOptions = Awaited<
 export async function getBookingFilterOptions() {
   const [courts, users] = await Promise.all([
     prisma.court.findMany({
-      orderBy: { name: "asc" },
+      orderBy: COURT_DISPLAY_ORDER,
       select: { id: true, name: true, isActive: true },
     }),
     prisma.user.findMany({

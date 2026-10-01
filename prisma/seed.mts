@@ -19,6 +19,8 @@
  *
  * Hours are fixed 1-hour blocks: every court's operating range is 18:00–21:00,
  * every day, which expands to three individual templates at the given rate.
+ * The two shared facilities run the same window and are created with
+ * `bookingMode: shared` and a capacity.
  *
  * Times are written through `timeStringToDate` (lib/time.ts) so they land in the
  * TIME column as UTC wall-clock values — the same path the admin panel uses.
@@ -44,7 +46,55 @@ type CourtSeed = {
   description: string;
   images: string[];
   /** Operating range, whole hours, expanded into 1-hour templates. */
-  schedule: { days: number[]; startTime: string; endTime: string; price: number };
+  schedule: {
+    days: number[];
+    startTime: string;
+    endTime: string;
+    price: number;
+  };
+  /**
+   * Shared facilities only (gym, pool): many members book the same hour, up to
+   * `capacity` people (null = unlimited). Omitted = an exclusive court.
+   */
+  shared?: { capacity: number | null };
+};
+
+/**
+ * Court-specific rules (Court.rules) for the courts the standard set
+ * (STANDARD_COURT_RULES in lib/court-rules.ts) would get wrong — the same text
+ * migrations 20261001141000 / 20261001142000 wrote to the live database.
+ * Written only when the seed creates a court; every other court is left blank
+ * and shows the standard set.
+ */
+const CRICKET_NET_RULES = [
+  "Bring your own bats, balls, pads and protective gear.",
+  "Wear a helmet when batting against a hard ball.",
+  "No metal spikes on the astro or matting surface — rubber soles only.",
+  "One bowler runs in at a time; wait until the batter is ready.",
+  "Stay out of a net while someone is bowling in it.",
+  "Do not damage the nets, netting poles or surface. Damage is charged to the booking holder.",
+].join("\n");
+
+const COURT_RULES: Record<string, string> = {
+  "Cricket Net - Astro": CRICKET_NET_RULES,
+  "Cricket Net - Concrete": CRICKET_NET_RULES,
+  "Cricket Nets - Double": CRICKET_NET_RULES,
+  "Swimming Pool": [
+    "Shower before entering the pool.",
+    "Swimwear only — no outdoor clothing in the water.",
+    "No running, diving or rough play on the pool deck.",
+    "Follow the lifeguard's instructions at all times.",
+    "Children under 12 must be accompanied by an adult in the water.",
+    "No food, glass or chewing gum on the pool deck.",
+  ].join("\n"),
+  "Fitness Center": [
+    "Clean training shoes only — no outdoor footwear on the gym floor.",
+    "Bring a towel and wipe down equipment after use.",
+    "Return weights and equipment to their racks.",
+    "Use a spotter for heavy free-weight lifts.",
+    "No dropping weights except on the lifting platform.",
+    "Ask staff if you are unsure how to use a machine.",
+  ].join("\n"),
 };
 
 /**
@@ -53,16 +103,41 @@ type CourtSeed = {
  * court photography — uploaded to Supabase Storage — before going live.
  */
 const COURTS: CourtSeed[] = [
+  // Three separate nets. They replaced a single "Cricket Nets" court, which
+  // migration 20261001120000_cricket_nets_and_rate_rise deactivated (not
+  // deleted — its bookings still point at it). The seed never creates it.
   {
-    name: "Cricket Nets",
+    name: "Cricket Net - Astro",
     type: { name: "Cricket", playerOptions: [2, 4, 6] },
     description:
-      "Three turf practice nets with a bowling machine and floodlights. Book a lane for batting or bowling practice.",
+      "Synthetic astro-turf practice net with a true, consistent bounce close to a grass pitch. Floodlit for evening sessions — book the lane for batting or bowling practice.",
     images: [
+      "https://images.unsplash.com/photo-1624526267942-ab0ff8a3e972?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1600&q=80",
     ],
-    schedule: { ...EVENING, price: 1500 },
+    schedule: { ...EVENING, price: 1700 },
+  },
+  {
+    name: "Cricket Net - Concrete",
+    type: { name: "Cricket", playerOptions: [2, 4, 6] },
+    description:
+      "Concrete practice strip laid with matting, giving pace and an even, predictable bounce. Well suited to quick bowling and back-foot work. Floodlit for evening sessions.",
+    images: [
+      "https://images.unsplash.com/photo-1593341646782-e0b495cff86d?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1589801258579-18e091f4ca26?auto=format&fit=crop&w=1600&q=80",
+    ],
+    schedule: { ...EVENING, price: 1400 },
+  },
+  {
+    name: "Cricket Nets - Double",
+    type: { name: "Cricket", playerOptions: [2, 4, 6] },
+    description:
+      "Two adjoining practice nets booked together — room for a full squad session, with batters and bowlers rotating across both lanes. Floodlit for evening sessions.",
+    images: [
+      "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1607734834519-d8576ae60ea6?auto=format&fit=crop&w=1600&q=80",
+    ],
+    schedule: { ...EVENING, price: 2800 },
   },
   {
     name: "Basketball",
@@ -73,7 +148,7 @@ const COURTS: CourtSeed[] = [
       "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1519766304817-4f37bda74a26?auto=format&fit=crop&w=1600&q=80",
     ],
-    schedule: { ...EVENING, price: 2000 },
+    schedule: { ...EVENING, price: 2200 },
   },
   {
     name: "Table Tennis",
@@ -84,7 +159,7 @@ const COURTS: CourtSeed[] = [
       "https://images.unsplash.com/photo-1609710228159-0fa9bd7c0827?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1534158914592-062992fbe900?auto=format&fit=crop&w=1600&q=80",
     ],
-    schedule: { ...EVENING, price: 800 },
+    schedule: { ...EVENING, price: 1000 },
   },
   {
     name: "Badminton",
@@ -96,7 +171,7 @@ const COURTS: CourtSeed[] = [
       "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1600&q=80",
       "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?auto=format&fit=crop&w=1600&q=80",
     ],
-    schedule: { ...EVENING, price: 1200 },
+    schedule: { ...EVENING, price: 1400 },
   },
   {
     name: "Tennis",
@@ -107,9 +182,60 @@ const COURTS: CourtSeed[] = [
     images: [
       "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=1600&q=80",
     ],
-    schedule: { ...EVENING, price: 1000 },
+    schedule: { ...EVENING, price: 1200 },
+  },
+
+  // --- Shared facilities ----------------------------------------------------
+  // One person per booking, so the hourly rate is per person and capacity
+  // counts heads. Booking a place never closes the hour to other members.
+  {
+    name: "Fitness Center",
+    type: { name: "Fitness", playerOptions: [1] },
+    description:
+      "Air-conditioned gym with free weights, racks, benches, treadmills and spin bikes. Book your place in a one-hour session — other members train alongside you.",
+    images: [
+      "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&w=1600&q=80",
+    ],
+    schedule: { ...EVENING, price: 700 },
+    shared: { capacity: 20 },
+  },
+  {
+    name: "Swimming Pool",
+    type: { name: "Swimming", playerOptions: [1] },
+    description:
+      "25-metre, eight-lane pool with a lifeguard on duty every session. Book your place for lane swimming — the pool is shared with other members during the hour.",
+    images: [
+      "https://images.unsplash.com/photo-1560090995-01632a28895b?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&w=1600&q=80",
+    ],
+    schedule: { ...EVENING, price: 1200 },
+    shared: { capacity: 30 },
   },
 ];
+
+/**
+ * Display order (Court.displayOrder, every court list on the site), in tens —
+ * the same values migration 20261001130000_court_display_order wrote. Written
+ * only when the seed creates a court, never over an existing court's order.
+ */
+const DISPLAY_ORDER = [
+  "Badminton",
+  "Basketball",
+  "Tennis",
+  "Cricket Nets - Double",
+  "Table Tennis",
+  "Swimming Pool",
+  "Fitness Center",
+  "Cricket Net - Astro",
+  "Cricket Net - Concrete",
+];
+
+function displayOrderFor(name: string): number {
+  const i = DISPLAY_ORDER.indexOf(name);
+  return i === -1 ? 1000 : (i + 1) * 10;
+}
 
 /** "06:00"–"21:00" -> the individual 1-hour rows for one weekday. */
 function hoursFor(
@@ -159,6 +285,12 @@ for (const seed of COURTS) {
         })
       : null);
 
+  // Mode is written only for the shared facilities: re-seeding never touches
+  // an existing court's mode (the DB refuses a switch under live bookings).
+  const mode = seed.shared
+    ? { bookingMode: "shared" as const, capacity: seed.shared.capacity }
+    : {};
+
   const court = existing
     ? await prisma.court.update({
         where: { id: existing.id },
@@ -168,20 +300,27 @@ for (const seed of COURTS) {
           description: seed.description,
           images: seed.images,
           isActive: true,
+          ...mode,
         },
       })
     : await prisma.court.create({
         data: {
           name: seed.name,
+          displayOrder: displayOrderFor(seed.name),
+          rules: COURT_RULES[seed.name] ?? null,
           courtTypeId: courtType.id,
           description: seed.description,
           images: seed.images,
           isActive: true,
+          ...mode,
         },
       });
 
   console.log(
-    `${existing ? "updated" : "created"} ${court.name} (${seed.type.name}, players ${seed.type.playerOptions.join("/")})`
+    `${existing ? "updated" : "created"} ${court.name} (${seed.type.name}, players ${seed.type.playerOptions.join("/")}` +
+      (seed.shared
+        ? `, SHARED, capacity ${seed.shared.capacity ?? "unlimited"}/hour)`
+        : ")")
   );
 
   const { days, startTime, endTime, price } = seed.schedule;

@@ -21,6 +21,11 @@ export type BlockableSlot = {
     status: "pending" | "confirmed" | "blocked";
     who: string | null;
   };
+  /**
+   * Shared facilities only: people booked into this hour (bookings there are
+   * a head count, not an occupant). Undefined on an exclusive court.
+   */
+  sharedPeople?: number;
 };
 
 export function SlotBlockList({
@@ -60,6 +65,7 @@ export function SlotBlockList({
         const blocked = slot.occupied?.status === "blocked";
         const booked =
           slot.occupied && slot.occupied.status !== "blocked" ? slot.occupied : null;
+        const sharedBooked = !blocked && (slot.sharedPeople ?? 0) > 0;
 
         return (
           <li
@@ -90,7 +96,13 @@ export function SlotBlockList({
                 </Badge>
               )}
 
-              {!slot.occupied && (
+              {sharedBooked && (
+                <Badge variant="secondary">
+                  {slot.sharedPeople} booked
+                </Badge>
+              )}
+
+              {!slot.occupied && !sharedBooked && (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <CircleCheck className="size-3.5 text-primary" />
                   Open
@@ -113,6 +125,11 @@ export function SlotBlockList({
               // the Bookings page first, which is an explicit, logged action.
               <span className="text-xs text-muted-foreground">
                 Cancel the booking to free this slot
+              </span>
+            ) : sharedBooked ? (
+              // Same rule for a shared session (enforced in blockSlot too).
+              <span className="text-xs text-muted-foreground">
+                Cancel its bookings to block this session
               </span>
             ) : (
               <Button

@@ -28,6 +28,9 @@ export default async function EditCourtPage({
         courtTypeId: true,
         description: true,
         amenities: true,
+        rules: true,
+        bookingMode: true,
+        capacity: true,
         isActive: true,
         images: true,
         courtType: { select: { name: true } },
@@ -80,6 +83,12 @@ export default async function EditCourtPage({
       <div className="flex flex-wrap items-center gap-3 pb-8">
         <h1 className="text-3xl leading-none">{court.name}</h1>
         <Badge variant="secondary">{court.courtType.name}</Badge>
+        {court.bookingMode === "shared" && (
+          <Badge variant="outline">
+            Shared
+            {court.capacity !== null ? ` · ${court.capacity} per hour` : ""}
+          </Badge>
+        )}
         {!court.isActive && <Badge variant="outline">Inactive</Badge>}
       </div>
 
@@ -105,6 +114,9 @@ export default async function EditCourtPage({
                 courtTypeId: court.courtTypeId,
                 description: court.description,
                 amenities: court.amenities,
+                rules: court.rules,
+                bookingMode: court.bookingMode,
+                capacity: court.capacity,
                 isActive: court.isActive,
                 imageCount: court.images.length,
               }}

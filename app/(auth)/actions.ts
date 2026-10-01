@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, profileIsComplete } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { isOAuthOnlyAccount } from "@/lib/auth-identities";
 import {
   authRedirectOrigin,
@@ -27,10 +28,11 @@ export type AuthFormState = {
 /**
  * Where to send someone once they are authenticated.
  *
- * A profile that is missing a phone or address is sent through
+ * An incomplete profile (see `profileIsComplete`) is sent through
  * /complete-profile first, carrying the original destination. This catches
- * both Google sign-ins (Google supplies neither) and accounts created before
- * those fields existed.
+ * both Google sign-ins (Google supplies none of the profile fields) and
+ * accounts created before a field existed — e.g. every account that predates
+ * the NIC and emergency contact.
  */
 async function destinationAfterAuth(next: string): Promise<string> {
   const user = await getCurrentUser();
@@ -50,6 +52,8 @@ export async function signUp(
     name: formData.get("name"),
     phone: formData.get("phone"),
     address: formData.get("address"),
+    nic: formData.get("nic"),
+    emergencyContact: formData.get("emergencyContact"),
     affiliation: formData.get("affiliation"),
   });
 
@@ -57,7 +61,31 @@ export async function signUp(
     return { error: firstIssue(parsed.error) };
   }
 
-  const { email, password, name, phone, address, affiliation } = parsed.data;
+  const {
+    email,
+    password,
+    name,
+    phone,
+    address,
+    nic,
+    emergencyContact,
+    affiliation,
+  } = parsed.data;
+
+  // One NIC, one account (UNIQUE in the database). Checked here so the person
+  // gets a clear answer now. Without it the signup trigger would still create
+  // the account — it falls back to no NIC on a duplicate rather than failing —
+  // but they would only find out at /complete-profile.
+  const nicTaken = await prisma.user.findUnique({
+    where: { nic },
+    select: { id: true },
+  });
+  if (nicTaken) {
+    return {
+      error:
+        "That NIC number is already registered to another account. If it is yours, log in instead, or contact the venue.",
+    };
+  }
 
   const supabase = await createClient();
   const origin = await authRedirectOrigin();
@@ -76,7 +104,7 @@ export async function signUp(
       // Handed to the on_auth_user_created trigger, which copies these into
       // public."User". The app still never INSERTs the profile row itself, so
       // profile creation cannot be skipped — see the migration for the trigger.
-      data: { name, phone, address, affiliation },
+      data: { name, phone, address, nic, emergencyContact, affiliation },
     },
   });
 
