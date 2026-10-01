@@ -54,7 +54,11 @@ const SECTIONS: LegalSection[] = [
   {
     heading: "Using the courts",
     points: [
-      "Follow the school's rules and the instructions of the sports office and ground staff.",
+      <>
+        Follow the school&apos;s{" "}
+        <Link href="/rules">rules &amp; regulations</Link> and the instructions
+        of the sports office and ground staff.
+      </>,
       "Arrive and finish on time — another group may be waiting.",
       "Use the right footwear for the surface and leave the court as you found it.",
       "No alcohol, smoking, illegal substances or abusive behaviour on the grounds.",

@@ -233,7 +233,9 @@ export async function getAdminDashboard() {
         WHERE c."isActive"
            OR COALESCE(live.bookings, 0) > 0
            OR COALESCE(hours.booked, 0) > 0
-        ORDER BY bookings DESC, c.name ASC
+        -- A ranking, so busiest first; ties fall back to the site's own court
+        -- order (COURT_DISPLAY_ORDER in lib/catalogue.ts).
+        ORDER BY bookings DESC, c."displayOrder" ASC, c.name ASC
       `,
 
       // The whole weekly schedule, counted per court and weekday — a handful of

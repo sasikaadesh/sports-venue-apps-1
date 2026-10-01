@@ -50,6 +50,9 @@ Court
   courtTypeId   -> CourtType
   description
   images        string[]  (Supabase Storage URLs; Unsplash placeholders for now)
+  bookingMode   enum('exclusive','shared') default 'exclusive'   # see "Exclusive vs shared facilities"
+  capacity      int?      # shared only: max people per hour; null = unlimited; CHECK >= 1
+  displayOrder  int default 0   # position in EVERY court list, lowest first, name breaks ties (COURT_DISPLAY_ORDER, lib/catalogue.ts); spaced in tens; createCourt appends
   isActive      boolean default true
   createdAt
 
@@ -81,7 +84,8 @@ BookingSlot               # one row per reserved HOUR — this is the protected 
   courtId       -> Court   # denormalised from the parent Booking
   bookingDate   date       # denormalised from the parent Booking
   price         decimal    # that hour's price, frozen at booking time
-  UNIQUE (courtId, bookingDate, slotId)   # <-- anti double-booking, per hour
+  exclusive     boolean?   # DERIVED by a DB trigger from Court.bookingMode: TRUE / NULL (shared)
+  UNIQUE (courtId, bookingDate, slotId, exclusive)   # <-- anti double-booking, per hour (exclusive courts)
 
 Payment
   id
@@ -108,6 +112,31 @@ Shipped in migration `20260722120000_multi_hour_bookings`, which moved `slotId` 
 
 `affiliation` and `UserRating` shipped in `20260803120000_nic_affiliation_and_user_ratings` — see "Profile fields", "Affiliation" and "Conduct ratings" below. That migration also added a `nic` column; `20260905120000_remove_nic` dropped it again (see "The NIC, and its removal").
 
+### Exclusive vs shared facilities (`20260930120000_shared_facilities`)
+
+Every `Court` has a `bookingMode`:
+
+|                             | **exclusive** (default — every court)                   | **shared** (Fitness Center, Swimming Pool)                                 |
+| --------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Bookings per hour           | one                                                     | many, up to `Court.capacity` people (null = unlimited)                     |
+| What guarantees it          | the unique key on `BookingSlot` (DB)                    | a locked re-count in the booking service (`createSharedBooking`)          |
+| A booked hour on the site   | taken — "Booked"                                        | still open — "N places left"; "Full" only at capacity                      |
+| Admin block                 | refused over a booking (unique key)                     | refused over any live booking (checked under the same lock)                |
+| Hold, payment, confirmation | `pending` → PayHere webhook → `confirmed`, expiry sweep | **identical** — same `Booking` row, same code                              |
+
+**One table, one key, scoped by a derived flag.** Shared bookings still write one `BookingSlot` per hour — so payment, confirmation, the expiry sweep, every release path, emails, reports and all the booking displays work without knowing the difference. What changes is the unique key: `UNIQUE (courtId, bookingDate, slotId, exclusive)`.
+
+- A trigger (`booking_slot_set_exclusive`) sets `exclusive` on every insert and update, from the court: `TRUE` for an exclusive court, `NULL` for a shared one. **The application never sets it** — whatever it sends is overwritten, so no code path can accidentally switch a court's protection off. If the court cannot be read the trigger writes `TRUE`: fail closed.
+- For exclusive courts every row is `TRUE`, so the key is _exactly_ the old `(courtId, bookingDate, slotId)` guarantee, still enforced by Postgres and still surfacing as `P2002` → "just taken". None of the exclusive booking code changed.
+- For shared rows the flag is `NULL`, and Postgres treats NULLs as distinct in a unique index, so any number of bookings may hold the same hour.
+- **Why not a partial unique index (`WHERE bookingMode = 'exclusive'`)?** Prisma 6 cannot express one. It would exist only in SQL, and the next `prisma migrate` would see it as drift and generate a `DROP INDEX` — silently removing the double-booking guarantee. The four-column key is fully described in `schema.prisma` (verified with `prisma migrate diff`).
+
+**Capacity is enforced under a lock, not by a constraint.** "Count the people, then insert" races on its own — two requests can both see one place left. `createSharedBooking` runs in one interactive transaction: take a `pg_advisory_xact_lock` per (hour, date) — in sorted order, so two multi-hour requests cannot deadlock — then re-count the people holding those hours (`sharedHourLoad`: confirmed, blocked, unexpired pending; blocks close the hour, bookings sum `playerCount`), and insert only if there is room. The locks release on commit or rollback, so nothing can leak. `quoteBooking`'s capacity check is advisory, exactly like its exclusive "taken" check. Admin blocks on a shared facility take the same lock. A pending hold counts toward capacity while it is live, so the place is kept through payment just as an exclusive hold keeps its hour.
+
+**A court's mode cannot change under live bookings.** `exclusive` is denormalised onto each hour-row, so flipping the mode while the court holds today's or future hours would leave rows with the wrong flag. `updateCourt` refuses with a readable message, and a trigger (`court_guard_booking_mode`) refuses it regardless. Past rows keep the flag they were written with, as history — no past date can be booked again.
+
+**Admin.** The court form has a **Booking mode** select and, for shared, a **Capacity per hour** (blank = unlimited). The Block-slots page shows a shared hour's head count ("3 booked") rather than a single occupant.
+
 ### Who can see what
 
 The one table that summarises this doc's access rules. "Owner" means the signed-in user the row is about.
@@ -128,7 +157,9 @@ The one table that summarises this doc's access rules. "Owner" means the signed-
 
 ## Demo data (`prisma/seed.mts`)
 
-`npm run db:seed` (or `npx prisma db seed`) populates court types, courts and their hourly schedules — Cricket Nets, Basketball, Table Tennis and Badminton Court 1, with Unsplash placeholder images.
+`npm run db:seed` (or `npx prisma db seed`) populates court types, courts and their hourly schedules — Cricket Net - Astro, Cricket Net - Concrete, Cricket Nets - Double, Basketball, Table Tennis, Badminton and Tennis (exclusive), plus two **shared** facilities: **Fitness Center** (LKR 700/hour, capacity 20) and **Swimming Pool** (LKR 1,200/hour, capacity 30) — every one 18:00–21:00 daily, all with Unsplash placeholder images. The shared facilities' types offer one person per booking, so their rate is per person and capacity counts heads.
+
+On a database that predates them, the shared facilities are added by `npm run db:add-shared-facilities` (`prisma/add-shared-facilities.mts`), which touches nothing else — the seed would also rewrite every existing court's name, description and images. The three cricket nets and a Rs.200 rise on every rate arrived as a data migration, `20261001120000_cricket_nets_and_rate_rise`, so the rise can only ever apply once; it **deactivated** the old single "Cricket Nets" court rather than renaming or deleting it, so its bookings, payments and special requests still read "Cricket Nets". Rate changes never touch existing bookings: a booking's price is frozen on `BookingSlot.price` / `Booking.totalPrice`, and `Booking.totalPrice` is what PayHere is charged.
 
 It is idempotent, so it can be re-run against a populated database: court types upsert on their unique `name`; courts are matched by name (`Court.name` is not unique, so this is find-then-create/update) and keep their id, so anything already booked stays valid; slot templates are generated for a weekday **only when that weekday has no templates**, exactly as `generateDaySchedule` does — a day is always either empty or a clean hourly grid, and a rate an admin has since adjusted is never overwritten.
 
@@ -138,7 +169,7 @@ Slots are defined as templates, not stored per-day. To get availability for a co
 
 1. Take the `SlotTemplate`s for that court matching the date's `dayOfWeek` (and `isActive`), ordered by `startTime`.
 2. Load the `BookingSlot`s for that court + date whose parent `Booking` has status `confirmed`, `pending` (unexpired hold), or `blocked`.
-3. A single hour is **free** if no such `BookingSlot` occupies it.
+3. A single hour is **free** if no such `BookingSlot` occupies it. On a **shared** facility it is free unless it is blocked or its capacity is used up (see "Exclusive vs shared facilities"); each hour also reports `spotsLeft`.
 
 **Availability for a chosen duration N:** a start slot is bookable at duration N only if _every_ hour in the range is free. Concretely, walking forward from the start slot, all N slots must:
 
@@ -157,6 +188,7 @@ Routes live in the `(public)` route group: `/` (landing), `/courts`, `/courts/[i
 - **`lib/availability.ts`** computes per-slot availability, reusing `getOccupyingSlots` from the booking service so the public site and admin panel can never disagree about what is taken.
 - **Only active rows are public.** Inactive courts 404; inactive slot templates are not listed.
 - **Past slots are excluded**, judged against the venue's wall clock (`VENUE_TIME_ZONE`, `nowAtVenue()` in `lib/time.ts`) — not UTC and not the visitor's zone, or a 09:00 slot would keep looking bookable into the afternoon.
+- **Same-day cutoff.** Bookings for _today_ close at a venue wall-clock time — 14:00 by default, `SAME_DAY_BOOKING_CUTOFF` (`HH:MM`) to change it; `24:00` disables it. The rule lives once in `lib/same-day-cutoff.ts`, judged on `nowAtVenue()` like past slots. `quoteBooking` refuses a same-day request at or after the cutoff — and `createBooking` re-runs that quote immediately before writing the pending hold, so this is enforced server-side, not just drawn. `getCourtAvailability` marks today's remaining hours `reason: "closed"` and returns a `closedMessage` that the court page and hero bar show. Future dates are never affected. A hold created before the cutoff may still be paid after it — payment confirms an existing hold, it does not create one.
 - **Date lives in the URL** (`?date=`), clamped server-side to `[today, today + 60 days]`, so pages stay server-rendered and a date is shareable.
 - Pages are `force-dynamic`: availability changes as people book, so nothing here may be cached.
 - `next.config.ts` whitelists `images.unsplash.com` and the Supabase Storage host (derived from `NEXT_PUBLIC_SUPABASE_URL`) for `next/image`.
@@ -288,7 +320,7 @@ Supabase Auth owns credentials; the app owns the role.
 `name`, `phone`, `address` and `affiliation` are all nullable on `User`, which is a consequence of where the row comes from rather than a preference: the row is created by a database trigger the instant Supabase Auth creates the user, and **Google supplies none of them**.
 
 - **Email/password signup collects all of them up front.** They are passed as Supabase Auth user metadata and `handle_new_user()` copies them into `public."User"` — so the app still never INSERTs the profile row itself, and profile creation stays unskippable.
-- **`profileIsComplete()` means "has a phone, an address and an affiliation"**. `NULLIF(TRIM(...), '')` in the trigger keeps an empty metadata string from counting as filled in, or blanks would walk straight through the gate.
+- **`profileIsComplete()` means "has a phone, an address, a NIC, an emergency contact and an affiliation"**. `NULLIF(TRIM(...), '')` in the trigger keeps an empty metadata string from counting as filled in, or blanks would walk straight through the gate.
 - **Anything incomplete is routed to `/complete-profile`**, carrying its original destination in `?next=`. Both the OAuth callback and the two password actions check this, so it also catches accounts created before these columns existed. That page guards with `requireUser`, _not_ `requireCompleteProfile` — the latter redirects to it, and would loop.
 - **Users edit their own profile through a server action** (`app/account/actions.ts`), which takes the id from `requireUser()` and never from the form, and whose schema has no `role` field. Users still have **no write policy on `User`**, so the invariant "nobody can promote themselves through the anon key" holds literally: there is no self-UPDATE path to abuse.
 
@@ -308,6 +340,22 @@ One field collected from every member: an **affiliation** to the school.
 What went with it: `nicField` in `lib/validations.ts`, the field on the signup form, the profile form and `/complete-profile`, the NIC column on the admin Users table, `profileIsComplete`'s third condition, the signup pre-check and the `P2002` translation in `updateProfileAction` (nothing a user may write is unique any more), the `unique_violation` retry inside `handle_new_user()`, and the `nic` key in `auth.users.raw_user_meta_data`, which the migration strips so a copy does not survive in the auth schema.
 
 **Affiliation was kept.** Only the NIC is gone.
+
+### The NIC returns, with an emergency contact (`20261001140000`)
+
+The venue asked for the NIC back, alongside an **emergency contact number**. The original design was restored rather than reinvented — nothing was recovered from before, so every account starts without one:
+
+- **`nic`** — `UNIQUE` (`User_nic_key`), format `CHECK` (`User_nic_format`: 9 digits + `V`/`X`, or 12 digits), stored with spaces stripped and upper-cased. `nicField` in `lib/validations.ts` also rejects an impossible day-of-year (must be 1–366, or 501–866 for women).
+- **`emergencyContact`** — a phone number, same rules as `phone`, not unique (families share one), and refused if it is the member's own number (`emergencyIsSomeoneElse`, applied to `profileSchema` and `signUpSchema` separately because Zod will not `.extend` a refined object).
+- **Uniqueness, three layers:** the signup action pre-checks and answers "already registered"; `updateProfileAction` translates the `P2002` from the unique index (the real guarantee — a pre-check can race); and `handle_new_user()` regains its `unique_violation` retry, creating the account *without* the NIC on a duplicate rather than failing account creation inside the auth trigger.
+- **`getCurrentUser`'s fallback upsert never sets `nic`** from metadata: a taken value would make that upsert throw on every request. It stays NULL and `/complete-profile` asks for it.
+- **Both are part of `profileIsComplete()`.** Every existing account (all predate them) is routed once through `/complete-profile` after signing in — logins are unaffected, exactly as with affiliation.
+- Collected on the signup form, the account Details tab and `/complete-profile` (one `ProfileForm`). Listed in the privacy policy's "What we collect". **Not yet shown anywhere in the admin panel** — there is no admin view of a member's contact details to extend.
+
+### Rules (`/rules` and `Court.rules`, `20261001141000`, `20261001142000`)
+
+- **`/rules`** — venue-wide rules: six highlighted points (parking at own risk, no waiting in the car park, no medical facilities, weather stoppages, own risk, child supervision), then grouped one-line bullets. Static copy in the page; linked from the footer's Explore column and from `/terms`.
+- **`Court.rules`** — per-court rules, one per line, edited in the admin court form. Blank means the standard set, `STANDARD_COURT_RULES` in `lib/court-rules.ts`, which the form shows as its placeholder so an admin can see what blank means. The pool, gym and three cricket nets were given their own (the standard set talks about non-marking shoes and rackets). Shown in a "Court rules" card on each court page, linking to `/rules`.
 
 ### Conduct ratings (admin-only, private)
 

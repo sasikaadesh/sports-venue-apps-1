@@ -244,7 +244,13 @@ admin forms. Cards, inputs and images keep their radius; only buttons are sharp.
   gallery all sit at `rounded-lg`, a step tighter than the old `rounded-xl`, so
   the grid reads refined rather than bubbly.
 - **Left-align most content.** Avoid centering everything.
-- Court thumbnails in a tidy grid, consistent aspect ratio.
+- Court thumbnails in a tidy grid, consistent aspect ratio — **3:2** on the
+  public cards (and their `/courts` loading skeleton), cropped with
+  `object-cover`, never stretched. Every active court is shown: 1 per row on
+  phones, 2 from `sm`, 3 from `lg`, `gap-6` throughout.
+- Courts are listed in `Court.displayOrder` everywhere (home grid, booking-bar
+  selector, `/courts`, admin lists) via `COURT_DISPLAY_ORDER` in
+  `lib/catalogue.ts` — never re-sort a court list by name or date in a page.
 
 ## Logo
 

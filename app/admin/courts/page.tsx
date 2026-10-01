@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/link-button";
 import { EmptyState, PageHeader } from "@/components/admin/page-header";
 import { requireAdmin } from "@/lib/auth";
+import { COURT_DISPLAY_ORDER } from "@/lib/catalogue";
 import { prisma } from "@/lib/prisma";
 
 export const metadata = { title: "Courts — Admin" };
@@ -15,7 +16,8 @@ export default async function CourtsPage() {
 
   const [courts, courtTypeCount] = await Promise.all([
     prisma.court.findMany({
-      orderBy: [{ isActive: "desc" }, { name: "asc" }],
+      // Active first, then the public site's own order.
+      orderBy: [{ isActive: "desc" }, ...COURT_DISPLAY_ORDER],
       select: {
         id: true,
         name: true,

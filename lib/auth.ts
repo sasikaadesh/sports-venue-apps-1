@@ -23,6 +23,8 @@ export type CurrentUser = {
   name: string | null;
   phone: string | null;
   address: string | null;
+  nic: string | null;
+  emergencyContact: string | null;
   affiliation: Affiliation | null;
   role: Role;
 };
@@ -34,6 +36,8 @@ const PROFILE_SELECT = {
   name: true,
   phone: true,
   address: true,
+  nic: true,
+  emergencyContact: true,
   affiliation: true,
   role: true,
 } as const;
@@ -113,6 +117,11 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       name: fromMetadata("name") ?? fromMetadata("full_name") ?? null,
       phone: fromMetadata("phone") ?? null,
       address: fromMetadata("address") ?? null,
+      emergencyContact: fromMetadata("emergencyContact") ?? null,
+      // NIC deliberately NOT taken from metadata here. It is UNIQUE, so a
+      // value someone else already holds would make this upsert throw on
+      // every request this user makes. Left NULL, the profile is incomplete
+      // and /complete-profile asks for it with a readable error instead.
       affiliation: isAffiliation(affiliation) ? affiliation : null,
     },
     update: {},
@@ -133,10 +142,10 @@ export async function isSuperAdmin(): Promise<boolean> {
 }
 
 /**
- * A profile is complete once we have a phone number, an address and an
- * affiliation.
+ * A profile is complete once we have a phone number, an address, a NIC, an
+ * emergency contact number and an affiliation.
  *
- * Email/password signup collects all three up front. Google supplies none of
+ * Email/password signup collects all of them up front. Google supplies none of
  * them, so an OAuth user arrives incomplete and is routed to
  * /complete-profile.
  *
@@ -148,9 +157,18 @@ export async function isSuperAdmin(): Promise<boolean> {
  * Nothing about the old accounts is invalid; it is just not filled in.
  */
 export function profileIsComplete(
-  user: Pick<CurrentUser, "phone" | "address" | "affiliation">
+  user: Pick<
+    CurrentUser,
+    "phone" | "address" | "nic" | "emergencyContact" | "affiliation"
+  >
 ): boolean {
-  return !!user.phone?.trim() && !!user.address?.trim() && !!user.affiliation;
+  return (
+    !!user.phone?.trim() &&
+    !!user.address?.trim() &&
+    !!user.nic?.trim() &&
+    !!user.emergencyContact?.trim() &&
+    !!user.affiliation
+  );
 }
 
 /**

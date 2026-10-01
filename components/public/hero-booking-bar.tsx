@@ -38,6 +38,8 @@ type AvailabilityResponse = {
   date: string;
   playerOptions: number[];
   slots: SlotAvailability[];
+  /** Set when the date is today and the same-day cutoff has passed. */
+  closedMessage: string | null;
 };
 
 /** A fetch result tagged with the selection it belongs to. */
@@ -251,7 +253,7 @@ export function HeroBookingBar({
               // Driven by the court's type, so it changes with the court.
               playerOptions.map((count) => (
                 <option key={count} value={count}>
-                  {count} players
+                  {count} {count === 1 ? "person" : "players"}
                 </option>
               ))
             )}
@@ -270,6 +272,8 @@ export function HeroBookingBar({
             "Could not load availability. Try again."
           ) : slots.length === 0 ? (
             "This court has no slots on that day."
+          ) : !selected && data?.closedMessage ? (
+            data.closedMessage
           ) : !selected ? (
             "Fully booked that day — try another date."
           ) : (

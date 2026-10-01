@@ -2,7 +2,19 @@ import "server-only";
 
 import { revalidateTag, unstable_cache } from "next/cache";
 
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+
+/**
+ * The one order every court list uses — the home page grid, the booking bar's
+ * court selector, /courts and the admin lists: `Court.displayOrder`, lowest
+ * first, then name as a tiebreak. Data-driven, so reordering is a data change,
+ * not a code change. Use this rather than writing an `orderBy` by hand.
+ */
+export const COURT_DISPLAY_ORDER = [
+  { displayOrder: "asc" },
+  { name: "asc" },
+] satisfies Prisma.CourtOrderByWithRelationInput[];
 
 /**
  * Cached reads of the court **catalogue** — the slow-moving half of the site.
@@ -67,28 +79,22 @@ export type CatalogueCourt = {
   images: string[];
   /** Cheapest active slot price across the week, or null when none exist. */
   fromPrice: string | null;
-  /** ISO timestamp — the home page orders by it. Never rendered. */
-  createdAt: string;
 };
 
 /**
  * Every active court with its cheapest price — what the home page grid, the
- * home page's booking bar and /courts all render.
- *
- * Ordered by type then name (what /courts wants). The home page wants
- * newest-first, so it re-sorts this array in memory: a handful of rows, already
- * loaded, rather than a second query and a second cache entry.
+ * home page's booking bar and /courts all render, in COURT_DISPLAY_ORDER. The
+ * grid and the selector share this one array, so they cannot disagree.
  */
 export const getActiveCourts = unstable_cache(
   async (): Promise<CatalogueCourt[]> => {
     const courts = await prisma.court.findMany({
       where: { isActive: true },
-      orderBy: [{ courtType: { name: "asc" } }, { name: "asc" }],
+      orderBy: COURT_DISPLAY_ORDER,
       select: {
         id: true,
         name: true,
         images: true,
-        createdAt: true,
         courtType: { select: { name: true } },
         slots: {
           where: { isActive: true },
@@ -105,18 +111,13 @@ export const getActiveCourts = unstable_cache(
       images: court.images,
       typeName: court.courtType.name,
       fromPrice: court.slots[0]?.price.toString() ?? null,
-      createdAt: court.createdAt.toISOString(),
     }));
   },
-  ["active-courts"],
+  // Key bumped from "active-courts": the cached shape and order changed, so an
+  // entry written by the old code must not be served to the new.
+  ["active-courts-v2"],
   { tags: [COURTS_TAG], revalidate: CATALOGUE_TTL }
 );
-
-/** The same courts, newest first — the order the home page grid uses. */
-export async function getActiveCourtsNewestFirst(): Promise<CatalogueCourt[]> {
-  const courts = await getActiveCourts();
-  return [...courts].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
 
 export type CatalogueCourtDetail = {
   id: string;
@@ -124,6 +125,8 @@ export type CatalogueCourtDetail = {
   description: string | null;
   /** Free-text list, e.g. "Floodlights, Changing rooms, Water". */
   amenities: string | null;
+  /** Court rules, one per line; null = the standard set (lib/court-rules.ts). */
+  rules: string | null;
   images: string[];
   typeName: string;
   playerOptions: number[];
@@ -152,6 +155,7 @@ export const getCourtDetail = unstable_cache(
         name: true,
         description: true,
         amenities: true,
+        rules: true,
         images: true,
         courtType: { select: { name: true, playerOptions: true } },
         slots: {
@@ -169,13 +173,16 @@ export const getCourtDetail = unstable_cache(
       name: court.name,
       description: court.description,
       amenities: court.amenities,
+      rules: court.rules,
       images: court.images,
       typeName: court.courtType.name,
       playerOptions: court.courtType.playerOptions,
       activeDays: [...new Set(court.slots.map((s) => s.dayOfWeek))],
     };
   },
-  ["court-detail"],
+  // Bumped from "court-detail" when `rules` joined the shape: an entry cached
+  // by the old code would otherwise be served without it.
+  ["court-detail-v2"],
   { tags: [COURTS_TAG], revalidate: CATALOGUE_TTL }
 );
 

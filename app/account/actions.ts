@@ -13,8 +13,8 @@ import {
 } from "@/lib/validations";
 
 /**
- * Save the signed-in user's own profile — name, phone, address and
- * affiliation.
+ * Save the signed-in user's own profile — name, phone, address, NIC,
+ * emergency contact and affiliation.
  *
  * Used by both the account page and the "Complete your profile" step after a
  * Google sign-in — they collect the same fields, so they share one writer.
@@ -34,15 +34,29 @@ export async function updateProfileAction(
   const parsed = profileSchema.safeParse(input);
   if (!parsed.success) return actionError(firstIssue(parsed.error));
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      name: parsed.data.name,
-      phone: parsed.data.phone,
-      address: parsed.data.address,
-      affiliation: parsed.data.affiliation,
-    },
-  });
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        name: parsed.data.name,
+        phone: parsed.data.phone,
+        address: parsed.data.address,
+        nic: parsed.data.nic,
+        emergencyContact: parsed.data.emergencyContact,
+        affiliation: parsed.data.affiliation,
+      },
+    });
+  } catch (e) {
+    // `nic` is the only unique column a user may write. Its unique index is the
+    // real guarantee — a pre-check could race — so the violation itself is
+    // translated rather than prevented.
+    if ((e as { code?: unknown }).code === "P2002") {
+      return actionError(
+        "That NIC number is already registered to another account. If you think this is a mistake, contact the venue."
+      );
+    }
+    throw e;
+  }
 
   revalidatePath("/account");
   revalidatePath("/complete-profile");

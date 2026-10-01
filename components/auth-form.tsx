@@ -237,6 +237,57 @@ export function AuthForm({
                 )}
               </Field>
 
+              <Field data-invalid={!!errors.nic}>
+                <FieldLabel htmlFor="nic" className="text-sm font-medium">
+                  NIC number
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
+                </FieldLabel>
+                {/* No `pattern` attribute: the server strips spaces and
+                    upper-cases first, so a native pattern would reject input
+                    the real check accepts. Zod gives the message on blur. */}
+                <Input
+                  id="nic"
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  placeholder="853202937V or 198532002937"
+                  required
+                  maxLength={16}
+                  className="h-11 px-3.5"
+                  {...form.register("nic")}
+                />
+                {errors.nic && <FieldError>{errors.nic.message}</FieldError>}
+              </Field>
+
+              <Field data-invalid={!!errors.emergencyContact}>
+                <FieldLabel
+                  htmlFor="emergencyContact"
+                  className="text-sm font-medium"
+                >
+                  Emergency contact number
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
+                </FieldLabel>
+                <Input
+                  id="emergencyContact"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  placeholder="Someone we can call — 071 234 5678"
+                  required
+                  maxLength={30}
+                  className="h-11 px-3.5"
+                  {...form.register("emergencyContact")}
+                />
+                {errors.emergencyContact && (
+                  <FieldError>{errors.emergencyContact.message}</FieldError>
+                )}
+              </Field>
+
               <Field data-invalid={!!errors.affiliation}>
                 <FieldLabel
                   htmlFor="affiliation"

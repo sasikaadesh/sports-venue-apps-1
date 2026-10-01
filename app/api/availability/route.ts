@@ -67,6 +67,7 @@ export async function GET(request: Request) {
       playerOptions: court.playerOptions,
       slots: availability.slots,
       openCount: availability.openCount,
+      closedMessage: availability.closedMessage ?? null,
     },
     // Availability changes as people book; a cached answer would offer hours
     // that are already gone.

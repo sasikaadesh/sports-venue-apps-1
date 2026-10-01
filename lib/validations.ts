@@ -61,6 +61,48 @@ const addressField = z
   .min(5, "Enter your address.")
   .max(300, "Address must be 300 characters or fewer.");
 
+/**
+ * Sri Lankan NIC. Two formats are in circulation:
+ *  - old: 9 digits + V or X  — YY DDD SSS C + letter, e.g. 853202937V
+ *  - new: 12 digits          — YYYY DDD SSSS C,       e.g. 198532002937
+ * DDD is the day of the year of birth, plus 500 for women, so it must fall in
+ * 1–366 or 501–866; anything else is a mistyped number, caught here rather
+ * than stored. Spaces are stripped and the letter upper-cased, so the stored
+ * value has one spelling — the database CHECK (`User_nic_format`) and UNIQUE
+ * index both rely on that.
+ */
+const nicField = z
+  .string()
+  .transform((v) => v.replace(/\s+/g, "").toUpperCase())
+  .pipe(
+    z
+      .string()
+      .min(1, "Enter your NIC number.")
+      .regex(
+        /^(\d{9}[VX]|\d{12})$/,
+        "Use 9 digits followed by V or X, or 12 digits."
+      )
+      .refine(
+        (v) => {
+          const day = Number(v.length === 10 ? v.slice(2, 5) : v.slice(4, 7));
+          return (day >= 1 && day <= 366) || (day >= 501 && day <= 866);
+        },
+        { message: "That NIC number does not look right — check the digits." }
+      )
+  );
+
+/** A number to ring in an emergency. Same rules as the member's own phone. */
+const emergencyContactField = z
+  .string()
+  .trim()
+  .min(1, "Enter an emergency contact number.")
+  .pipe(phoneField);
+
+/** Digits only, so "077 123 4567" and "0771234567" compare equal. */
+function digitsOf(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
 /** The four options, and the only four. Mirrors the `Affiliation` enum. */
 export const AFFILIATIONS = [
   { value: "old_boy", label: "Alumni / Old Boy" },
@@ -101,12 +143,38 @@ const passwordField = z
  * things. `role` is deliberately absent — the profile writer must not be able
  * to express a role change however the request is crafted.
  */
-export const profileSchema = z.object({
+const profileFields = z.object({
   name: nameField,
   phone: phoneField,
   address: addressField,
+  nic: nicField,
+  emergencyContact: emergencyContactField,
   affiliation: affiliationField,
 });
+
+/**
+ * An emergency contact that rings the member's own phone reaches nobody useful
+ * in an emergency. Applied to each schema separately: Zod refuses to `.extend`
+ * an object that already carries a refinement.
+ */
+function emergencyIsSomeoneElse(
+  v: { phone: string; emergencyContact: string },
+  ctx: z.RefinementCtx
+) {
+  if (
+    v.phone &&
+    v.emergencyContact &&
+    digitsOf(v.phone) === digitsOf(v.emergencyContact)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Use someone else's number — not your own.",
+      path: ["emergencyContact"],
+    });
+  }
+}
+
+export const profileSchema = profileFields.superRefine(emergencyIsSomeoneElse);
 
 export const signInSchema = z.object({
   email: emailField,
@@ -114,10 +182,12 @@ export const signInSchema = z.object({
 });
 
 /** Email/password signup collects the full profile up front. */
-export const signUpSchema = profileSchema.extend({
-  email: emailField,
-  password: passwordField,
-});
+export const signUpSchema = profileFields
+  .extend({
+    email: emailField,
+    password: passwordField,
+  })
+  .superRefine(emergencyIsSomeoneElse);
 
 /** "Email me a reset link" — the address is all we ask for. */
 export const passwordResetRequestSchema = z.object({ email: emailField });
@@ -139,7 +209,7 @@ export const newPasswordSchema = z
 
 /**
  * The Google path collects everything Google cannot give us — which is now
- * phone, address and affiliation. `name` is included because the OIDC
+ * phone, address, NIC, emergency contact and affiliation. `name` is included because the OIDC
  * claim can be absent or unhelpful, and the user should be able to correct it.
  * The same schema also catches accounts created before a field existed: they
  * are simply incomplete profiles and are asked for the missing values here.
@@ -280,6 +350,27 @@ export const courtSchema = z.object({
     .max(300, "Amenities must be 300 characters or fewer.")
     .optional()
     .or(z.literal("")),
+  /** One rule per line. Blank = the standard set (lib/court-rules.ts). */
+  rules: z
+    .string()
+    .trim()
+    .max(2000, "Rules must be 2000 characters or fewer.")
+    .optional()
+    .or(z.literal("")),
+  /** Exclusive = one booking per hour (courts); shared = many (gym, pool). */
+  bookingMode: z.enum(["exclusive", "shared"]),
+  /**
+   * Shared facilities: max people per hour. Blank = unlimited. Kept as a
+   * string because it comes from a text input; the action converts it.
+   */
+  capacity: z
+    .string()
+    .trim()
+    .regex(
+      /^(|[1-9]\d{0,3})$/,
+      "Capacity must be a whole number from 1 to 9999, or blank for unlimited."
+    )
+    .optional(),
   isActive: z.boolean(),
 });
 

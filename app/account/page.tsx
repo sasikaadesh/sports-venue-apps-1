@@ -87,7 +87,8 @@ export default async function AccountPage({
           <UserIcon className="mt-0.5 size-4 shrink-0 text-primary" />
           <span>
             Complete your details under <strong>Details</strong> — we need a
-            phone number, address and affiliation before you can book.
+            phone number, address, NIC, emergency contact and affiliation before
+            you can book.
           </span>
         </p>
       )}
@@ -177,8 +178,9 @@ function DetailsPanel({
         <div className="flex flex-col gap-1.5">
           <h2 className="text-2xl leading-none">Your details</h2>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Used to contact you about a booking. Your email address is your
-            sign-in and cannot be changed here.
+            Used to contact you about a booking, and to call your emergency
+            contact if you need help during a session. Your email address is
+            your sign-in and cannot be changed here.
           </p>
         </div>
 
@@ -187,6 +189,8 @@ function DetailsPanel({
             name: user.name ?? "",
             phone: user.phone ?? "",
             address: user.address ?? "",
+            nic: user.nic ?? "",
+            emergencyContact: user.emergencyContact ?? "",
             affiliation: user.affiliation ?? undefined,
           }}
         />

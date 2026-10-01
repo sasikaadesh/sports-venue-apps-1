@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { chainFrom, MAX_DURATION_HOURS } from "@/lib/slots";
+import { isSameDayClosed, sameDayClosedMessage } from "@/lib/same-day-cutoff";
 import {
   addDays,
   dateToDateString,
@@ -11,7 +12,7 @@ import {
   nowAtVenue,
   timeToMinutes,
 } from "@/lib/time";
-import type { BookingStatus } from "@/lib/generated/prisma/enums";
+import type { BookingMode, BookingStatus } from "@/lib/generated/prisma/enums";
 
 /**
  * The booking service — the ONLY place in the app that writes `Booking` or
@@ -29,6 +30,15 @@ import type { BookingStatus } from "@/lib/generated/prisma/enums";
  * A booking spans N consecutive hours and owns one `BookingSlot` per hour, so
  * a multi-hour reservation is N protected rows written in ONE transaction:
  * all N, or none.
+ *
+ * Two kinds of court (docs/ARCHITECTURE.md → "Exclusive vs shared"):
+ *  - EXCLUSIVE (every court): one booking per hour, guaranteed by the unique
+ *    key above. This path is unchanged by shared facilities.
+ *  - SHARED (gym, pool): many bookings per hour. The DB trigger writes their
+ *    hour-rows with `exclusive = NULL`, which the unique key ignores; capacity
+ *    and blocks are enforced here, under a per-hour advisory lock.
+ * Everything else — pending holds, expiry, payment, confirmation, release — is
+ * the same code for both.
  */
 
 /** Statuses that hold their hours, so nothing else may take them. */
@@ -186,13 +196,34 @@ export type OccupyingSlot = {
   /** The booking holding it. */
   bookingId: string;
   status: BookingStatus;
+  /** People on that booking — what a shared facility's capacity counts. */
+  playerCount: number;
   userId: string | null;
   userEmail: string | null;
 };
 
 /**
+ * A booking that is holding its hours right now: confirmed, blocked, or a
+ * `pending` hold that has not lapsed. The one definition every occupancy read
+ * uses, so the view and the shared-capacity check cannot disagree.
+ */
+function holdingBooking(now: Date): Prisma.BookingWhereInput {
+  return {
+    OR: [
+      { status: { in: ["confirmed", "blocked"] } },
+      { status: "pending", holdExpiresAt: { gt: now } },
+    ],
+  };
+}
+
+/**
  * The hours currently taken on a court for a given date — one entry per
  * occupied hour, whatever booking it belongs to.
+ *
+ * On an exclusive court that is at most one entry per hour (the unique key
+ * guarantees it). On a SHARED facility an hour can carry many entries — one per
+ * booking in it — and callers count them against capacity rather than treating
+ * any entry as "taken".
  *
  * A `pending` hold only counts while it is unexpired: an abandoned hold must
  * not keep an hour locked. This is a read, so it filters expired holds out
@@ -202,25 +233,15 @@ export async function getOccupyingSlots(
   courtId: string,
   bookingDate: Date
 ): Promise<OccupyingSlot[]> {
-  const now = new Date();
-
   const rows = await prisma.bookingSlot.findMany({
-    where: {
-      courtId,
-      bookingDate,
-      booking: {
-        OR: [
-          { status: { in: ["confirmed", "blocked"] } },
-          { status: "pending", holdExpiresAt: { gt: now } },
-        ],
-      },
-    },
+    where: { courtId, bookingDate, booking: holdingBooking(new Date()) },
     select: {
       slotId: true,
       booking: {
         select: {
           id: true,
           status: true,
+          playerCount: true,
           userId: true,
           user: { select: { email: true } },
         },
@@ -232,8 +253,111 @@ export async function getOccupyingSlots(
     slotId: row.slotId,
     bookingId: row.booking.id,
     status: row.booking.status,
+    playerCount: row.booking.playerCount,
     userId: row.booking.userId,
     userEmail: row.booking.user?.email ?? null,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Shared facilities
+// ---------------------------------------------------------------------------
+
+/**
+ * How full one hour of a shared facility is, from its occupying rows.
+ * Exported so the availability view counts exactly the way the writer does.
+ */
+export function sharedHourLoad(
+  rows: { status: BookingStatus; playerCount: number }[]
+): { blocked: boolean; people: number } {
+  return {
+    blocked: rows.some((r) => r.status === "blocked"),
+    people: rows
+      .filter((r) => r.status !== "blocked")
+      .reduce((sum, r) => sum + r.playerCount, 0),
+  };
+}
+
+/**
+ * Why `playerCount` more people cannot join these hours of a shared facility,
+ * or null when they can. A blocked hour is closed to everyone; otherwise the
+ * only limit is `capacity` (null = unlimited).
+ */
+function sharedHoursProblem(
+  hours: { slotId: string; startTime: string }[],
+  occupying: { slotId: string; status: BookingStatus; playerCount: number }[],
+  capacity: number | null,
+  playerCount: number
+): string | null {
+  for (const hour of hours) {
+    const load = sharedHourLoad(
+      occupying.filter((o) => o.slotId === hour.slotId)
+    );
+
+    if (load.blocked) {
+      return `The ${hour.startTime} session has been closed by the venue. Pick another time.`;
+    }
+
+    if (capacity !== null && load.people + playerCount > capacity) {
+      const left = Math.max(capacity - load.people, 0);
+      return left === 0
+        ? `The ${hour.startTime} session is full. Pick another time.`
+        : `Only ${left} ${left === 1 ? "place is" : "places are"} left in the ${hour.startTime} session.`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Serialise every writer touching these hours of a shared facility on this
+ * date, until the surrounding transaction ends.
+ *
+ * Shared hours have no unique key to lean on (that is the point of them), so
+ * "count the people, then insert" would race: two requests could both see one
+ * place left and both take it. A transaction-scoped advisory lock per
+ * (hour, date) makes the count and the insert one step. Locks are taken in a
+ * fixed order so two multi-hour requests cannot deadlock each other, and they
+ * are released automatically on commit or rollback — nothing can leak. The key
+ * is a hash, so an unrelated collision only costs a moment's extra waiting.
+ *
+ * Exclusive courts never come through here: their guarantee is the unique key.
+ */
+async function lockSharedHours(
+  tx: Prisma.TransactionClient,
+  dateString: string,
+  slotIds: string[]
+): Promise<void> {
+  for (const slotId of [...slotIds].sort()) {
+    const key = `shared-hour:${slotId}:${dateString}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+  }
+}
+
+/** The live rows on these hours, read inside a transaction that holds their locks. */
+async function sharedOccupancyInTx(
+  tx: Prisma.TransactionClient,
+  courtId: string,
+  bookingDate: Date,
+  slotIds: string[]
+) {
+  const rows = await tx.bookingSlot.findMany({
+    where: {
+      courtId,
+      bookingDate,
+      slotId: { in: slotIds },
+      booking: holdingBooking(new Date()),
+    },
+    select: {
+      slotId: true,
+      booking: { select: { status: true, playerCount: true } },
+    },
+  });
+
+  return rows.map((r) => ({
+    slotId: r.slotId,
+    status: r.booking.status,
+    playerCount: r.booking.playerCount,
   }));
 }
 
@@ -263,6 +387,10 @@ export type BookingQuote = {
   }[];
   /** Sum of `hours[].price`, computed here — never accepted from a client. */
   totalPrice: string;
+  /** Exclusive court or shared facility — decides how the hold is written. */
+  bookingMode: BookingMode;
+  /** Shared facilities: max people per hour, null = unlimited. */
+  capacity: number | null;
 };
 
 /**
@@ -301,6 +429,8 @@ export async function quoteBooking(
     select: {
       id: true,
       name: true,
+      bookingMode: true,
+      capacity: true,
       courtType: { select: { playerOptions: true } },
     },
   });
@@ -337,6 +467,14 @@ export async function quoteBooking(
       error: `Bookings open ${BOOKING_WINDOW_DAYS} days ahead.`,
       reason: "invalid",
     };
+  }
+
+  // Same-day bookings close at the venue's cutoff (default 14:00). Checked
+  // here, not only in the UI: `createBooking` re-runs this quote immediately
+  // before writing the pending hold, so a stale page or a crafted request
+  // after the cutoff reserves nothing. Future dates are never affected.
+  if (isSameDayClosed(dateString, now)) {
+    return { ok: false, error: sameDayClosedMessage(), reason: "invalid" };
   }
 
   // --- Resolve the chain of hours ------------------------------------------
@@ -385,13 +523,32 @@ export async function quoteBooking(
     };
   }
 
+  const occupying = await getOccupyingSlots(courtId, bookingDate);
+
+  // --- Shared facility: is there room in every hour? -----------------------
+  // Advisory, like the exclusive check below. The guarantee for shared hours
+  // is the locked re-count inside `createSharedBooking`.
+  if (court.bookingMode === "shared") {
+    const problem = sharedHoursProblem(
+      chain.map((slot) => ({
+        slotId: slot.id,
+        startTime: dateToTimeString(slot.startTime),
+      })),
+      occupying,
+      court.capacity,
+      playerCount
+    );
+    if (problem) return { ok: false, error: problem, reason: "taken" };
+  }
+
   // --- Is every hour in the range still free? ------------------------------
   // Advisory only. Between here and the INSERT another request can take one of
   // these hours; the unique constraint is what stops that becoming a double
   // booking. This check exists so the common case gets a clear message instead
   // of a constraint error.
+  // Exclusive courts only — a shared hour being occupied is normal.
   const taken = new Set(
-    (await getOccupyingSlots(courtId, bookingDate)).map((o) => o.slotId)
+    court.bookingMode === "exclusive" ? occupying.map((o) => o.slotId) : []
   );
 
   if (chain.some((slot) => taken.has(slot.id))) {
@@ -432,6 +589,8 @@ export async function quoteBooking(
         price: slot.price.toFixed(2),
       })),
       totalPrice: totalPrice.toFixed(2),
+      bookingMode: court.bookingMode,
+      capacity: court.capacity,
     },
   };
 }
@@ -469,6 +628,20 @@ export async function createBooking(
   const { hours, durationHours, totalPrice, playerCount } = quote.data;
   const holdExpiresAt = new Date(Date.now() + HOLD_MINUTES * 60_000);
 
+  // Shared facilities (gym, pool) take many bookings per hour, so they are
+  // written under a capacity lock instead of relying on the unique key. The
+  // Booking row, the pending hold, payment and confirmation are all the same.
+  if (quote.data.bookingMode === "shared") {
+    return createSharedBooking({
+      courtId,
+      bookingDate,
+      userId,
+      quote: quote.data,
+      holdExpiresAt,
+    });
+  }
+
+  // --- Exclusive court: unchanged — the unique key is the guarantee. --------
   try {
     // ONE nested write => ONE transaction: the parent and all N hour-rows are
     // inserted together. If any single hour collides with the unique index,
@@ -522,6 +695,84 @@ export async function createBooking(
     }
     throw e;
   }
+}
+
+/**
+ * The shared-facility half of `createBooking`: same Booking row, same pending
+ * hold, same one-BookingSlot-per-hour shape — so payment, confirmation, expiry
+ * and every display work unchanged. What differs is the guarantee.
+ *
+ * The rows are written with `exclusive = NULL` (set by the DB trigger from the
+ * court's mode), so the unique key lets many bookings share an hour. Capacity
+ * is enforced here instead: lock the hours, re-count the people holding them,
+ * insert only if there is room — all in one transaction, so two requests for
+ * the last place cannot both get it.
+ */
+async function createSharedBooking(params: {
+  courtId: string;
+  bookingDate: Date;
+  userId: string;
+  quote: BookingQuote;
+  holdExpiresAt: Date;
+}): Promise<
+  BookingResult<{
+    id: string;
+    totalPrice: string;
+    durationHours: number;
+    holdExpiresAt: Date;
+  }>
+> {
+  const { courtId, bookingDate, userId, quote, holdExpiresAt } = params;
+  const { hours, durationHours, totalPrice, playerCount, capacity } = quote;
+  const slotIds = hours.map((h) => h.slotId);
+
+  const outcome = await prisma.$transaction(async (tx) => {
+    await lockSharedHours(tx, quote.dateString, slotIds);
+
+    // Only a finite capacity or a block can refuse — read what holds the
+    // hours now, after the lock, so nothing can slip in between.
+    const occupying = await sharedOccupancyInTx(
+      tx,
+      courtId,
+      bookingDate,
+      slotIds
+    );
+    const problem = sharedHoursProblem(hours, occupying, capacity, playerCount);
+    if (problem) return { ok: false as const, error: problem };
+
+    const booking = await tx.booking.create({
+      data: {
+        courtId,
+        bookingDate,
+        userId,
+        playerCount,
+        durationHours,
+        totalPrice,
+        status: "pending",
+        holdExpiresAt,
+        slots: {
+          create: hours.map((hour) => ({
+            slotId: hour.slotId,
+            courtId,
+            bookingDate,
+            price: new Prisma.Decimal(hour.price),
+          })),
+        },
+      },
+      select: { id: true },
+    });
+
+    return { ok: true as const, id: booking.id };
+  });
+
+  if (!outcome.ok) {
+    return { ok: false, error: outcome.error, reason: "taken" };
+  }
+
+  return {
+    ok: true,
+    data: { id: outcome.id, totalPrice, durationHours, holdExpiresAt },
+  };
 }
 
 /**
@@ -785,7 +1036,13 @@ export async function blockSlot(input: {
   // query could ever match, i.e. an invisible ghost row.
   const slot = await prisma.slotTemplate.findUnique({
     where: { id: slotId },
-    select: { id: true, courtId: true, dayOfWeek: true, price: true },
+    select: {
+      id: true,
+      courtId: true,
+      dayOfWeek: true,
+      price: true,
+      court: { select: { bookingMode: true } },
+    },
   });
 
   if (!slot || slot.courtId !== courtId) {
@@ -805,6 +1062,45 @@ export async function blockSlot(input: {
   }
 
   await releaseExpiredHolds({ courtId, bookingDate });
+
+  // A shared hour has no unique key to refuse a second block or a block over
+  // live bookings, so the same rule is applied under the capacity lock: block
+  // only an hour nobody holds — as on an exclusive court, a real booking is
+  // never silently overridden; cancel it first.
+  if (slot.court.bookingMode === "shared") {
+    return prisma.$transaction(async (tx) => {
+      await lockSharedHours(tx, dateToDateString(bookingDate), [slotId]);
+
+      const occupying = await sharedOccupancyInTx(tx, courtId, bookingDate, [
+        slotId,
+      ]);
+      if (occupying.length > 0) {
+        return {
+          ok: false as const,
+          error: sharedHourLoad(occupying).blocked
+            ? "That slot is already blocked for this date."
+            : "That session already has bookings. Cancel them before blocking it.",
+          reason: "taken" as const,
+        };
+      }
+
+      const booking = await tx.booking.create({
+        data: {
+          courtId,
+          bookingDate,
+          userId: adminId,
+          playerCount: 0,
+          durationHours: 1,
+          totalPrice: 0,
+          status: "blocked",
+          slots: { create: [{ slotId, courtId, bookingDate, price: 0 }] },
+        },
+        select: { id: true },
+      });
+
+      return { ok: true as const, data: booking };
+    });
+  }
 
   try {
     const booking = await prisma.booking.create({

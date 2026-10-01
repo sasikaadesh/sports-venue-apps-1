@@ -204,9 +204,11 @@ export function CourtBookingPanel({
                     {formatPrice(slot.price)}
                   </span>
                   <Badge variant="secondary">
-                    {slot.reason === "past"
-                      ? "Unavailable"
-                      : slot.reason === "blocked"
+                    {slot.reason === "closed"
+                      ? "Closed"
+                      : slot.reason === "full"
+                        ? "Full"
+                        : slot.reason === "past" || slot.reason === "blocked"
                         ? "Unavailable"
                         : "Booked"}
                   </Badge>
@@ -283,7 +285,13 @@ export function CourtBookingPanel({
                   ) : inRange ? (
                     <Badge variant="secondary">Included</Badge>
                   ) : (
-                    <Badge variant="outline">Available</Badge>
+                    <Badge variant="outline">
+                      {/* Shared facility with a capacity: other people can
+                          book this hour too, so say how much room is left. */}
+                      {typeof slot.spotsLeft === "number"
+                        ? `${slot.spotsLeft} ${slot.spotsLeft === 1 ? "place" : "places"} left`
+                        : "Available"}
+                    </Badge>
                   )}
                 </span>
               </button>
@@ -332,7 +340,7 @@ export function CourtBookingPanel({
                 ) : (
                   playerOptions.map((count) => (
                     <option key={count} value={count}>
-                      {count} players
+                      {count} {count === 1 ? "person" : "players"}
                     </option>
                   ))
                 )}

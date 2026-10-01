@@ -19,7 +19,7 @@ import {
 } from "@/lib/validations";
 
 /**
- * Edit your own name, phone, address and affiliation.
+ * Edit your own name, phone, address, NIC, emergency contact and affiliation.
  *
  * Shared by the account page and the "Complete your profile" step so the two
  * cannot drift — same fields, same schema, same server action. Feedback is
@@ -53,6 +53,8 @@ export function ProfileForm({
       name: defaultValues.name ?? "",
       phone: defaultValues.phone ?? "",
       address: defaultValues.address ?? "",
+      nic: defaultValues.nic ?? "",
+      emergencyContact: defaultValues.emergencyContact ?? "",
       // No default option: an unset affiliation must read as "not answered
       // yet", not as a silent "Old Boy" for every legacy account.
       affiliation:
@@ -158,6 +160,46 @@ export function ProfileForm({
         />
         {form.formState.errors.address && (
           <FieldError>{form.formState.errors.address.message}</FieldError>
+        )}
+      </Field>
+
+      <Field data-invalid={!!form.formState.errors.nic}>
+        <FieldLabel htmlFor="profile-nic" className="text-sm font-medium">
+          NIC number
+        </FieldLabel>
+        <Input
+          id="profile-nic"
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          placeholder="853202937V or 198532002937"
+          maxLength={16}
+          className="h-11 px-3.5"
+          {...form.register("nic")}
+        />
+        {form.formState.errors.nic && (
+          <FieldError>{form.formState.errors.nic.message}</FieldError>
+        )}
+      </Field>
+
+      <Field data-invalid={!!form.formState.errors.emergencyContact}>
+        <FieldLabel htmlFor="profile-emergency" className="text-sm font-medium">
+          Emergency contact number
+        </FieldLabel>
+        <Input
+          id="profile-emergency"
+          type="tel"
+          inputMode="tel"
+          autoComplete="off"
+          placeholder="Someone we can call — 071 234 5678"
+          maxLength={30}
+          className="h-11 px-3.5"
+          {...form.register("emergencyContact")}
+        />
+        {form.formState.errors.emergencyContact && (
+          <FieldError>
+            {form.formState.errors.emergencyContact.message}
+          </FieldError>
         )}
       </Field>
 

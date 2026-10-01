@@ -13,7 +13,7 @@
 import { CONTACT_DETAILS, CONTACT_PHONE_HREF } from "@/lib/contact-details";
 
 /** ISO date the policies were last revised. Bump on every substantive edit. */
-export const LEGAL_LAST_UPDATED = "2026-09-05";
+export const LEGAL_LAST_UPDATED = "2026-10-01";
 
 /** "5 September 2026" — fixed locale, so server and client render alike. */
 export const LEGAL_LAST_UPDATED_LABEL = new Intl.DateTimeFormat("en-GB", {

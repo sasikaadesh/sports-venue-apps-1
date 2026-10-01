@@ -15,6 +15,8 @@ const SECTIONS: LegalSection[] = [
     points: [
       "Your name, email address and phone number.",
       "Your postal address.",
+      "Your National Identity Card (NIC) number — one account per person.",
+      "An emergency contact number, to call if you need help during a session.",
       "Your affiliation: old boy, parent, staff or member of the public.",
       "Your bookings: the court, the date and the hours.",
       "Payment details: the amount and the reference PayHere gives us — never your card number.",
@@ -27,6 +29,7 @@ const SECTIONS: LegalSection[] = [
       "To process your payment.",
       "To email you booking confirmations and account emails such as password resets.",
       "So the sports office can contact you about a booking.",
+      "Your NIC confirms who you are; your emergency contact is called only if something happens to you at the venue.",
       "We do not send you marketing you did not ask for.",
     ],
   },
@@ -68,7 +71,7 @@ const SECTIONS: LegalSection[] = [
   {
     heading: "Your rights",
     points: [
-      "Update your name, phone, address and affiliation any time from your account.",
+      "Update your name, phone, address, NIC, emergency contact and affiliation any time from your account.",
       "Ask us to correct or delete your details — we may check who you are first.",
       "Paid bookings stay on file as financial records.",
     ],

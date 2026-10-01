@@ -46,6 +46,16 @@ enum BookingStatus {
   expired
 }
 
+/// How a court's hours are sold (docs/ARCHITECTURE.md → "Exclusive vs shared").
+///  - `exclusive`: one booking per hour — courts. Enforced by the unique key on
+///    BookingSlot.
+///  - `shared`: many bookings per hour — a gym, a pool — optionally capped by
+///    `Court.capacity`.
+enum BookingMode {
+  exclusive
+  shared
+}
+
 /// Where an admin has got to with a special request. Handled by hand — a
 /// request never becomes a booking on its own.
 enum SpecialRequestStatus {
@@ -70,15 +80,21 @@ enum PaymentStatus {
 /// Every profile field is nullable because a profile row is created by a
 /// database trigger the moment Supabase Auth makes the user, and an OAuth
 /// (Google) sign-in supplies none of them. The app treats a row missing any of
-/// phone / address / affiliation as an *incomplete* profile and routes the
-/// user through /complete-profile — see `profileIsComplete` in lib/auth.ts.
-/// Accounts that predate a field simply arrive incomplete and are asked for it.
+/// phone / address / NIC / emergency contact / affiliation as an *incomplete*
+/// profile and routes the user through /complete-profile — see
+/// `profileIsComplete` in lib/auth.ts. Accounts that predate a field simply
+/// arrive incomplete and are asked for it.
 model User {
   id      String  @id @db.Uuid
   email   String  @unique
   name    String?
   phone   String?
   address String?
+  /// Sri Lankan NIC, upper-cased. One per account. Format CHECK in the database
+  /// (`User_nic_format`): 9 digits + V/X, or 12 digits.
+  nic     String? @unique
+  /// A phone number to ring in an emergency during a session. Not unique.
+  emergencyContact String?
 
   affiliation Affiliation?
 
@@ -149,7 +165,19 @@ model Court {
   /// Free-text list, e.g. "Floodlights, Changing rooms, Water" — shown as-is
   /// on the public court page. Optional; no separate amenity taxonomy.
   amenities    String?
+  /// Court-specific rules for the public court page, one per line. Null/blank
+  /// = the standard set (STANDARD_COURT_RULES in lib/court-rules.ts).
+  rules        String?
   images       String[] // Supabase Storage URLs (Unsplash placeholders for now)
+  /// Cannot change while the court holds today's or future hours (DB trigger
+  /// `court_guard_booking_mode`), because BookingSlot.exclusive is derived from it.
+  bookingMode  BookingMode    @default(exclusive)
+  /// Shared facilities only: max people per hour (sum of playerCount). Null =
+  /// unlimited. CHECK >= 1 in the database.
+  capacity     Int?
+  /// Position in every court list, lowest first (name breaks ties). Spaced in
+  /// tens; createCourt appends after the current last. See COURT_DISPLAY_ORDER.
+  displayOrder Int            @default(0)
   isActive     Boolean        @default(true)
   createdAt    DateTime       @default(now())
   slots        SlotTemplate[]
@@ -158,6 +186,7 @@ model Court {
   specialRequests SpecialRequest[]
 
   @@index([courtTypeId])
+  @@index([displayOrder])
 }
 
 /// A signed-in user's manual request for a court — a time outside the listed
@@ -265,9 +294,17 @@ model BookingSlot {
   court       Court        @relation(fields: [courtId], references: [id])
   bookingDate DateTime     @db.Date
   price       Decimal      @db.Decimal(10, 2) // that hour's price, frozen at booking time
+  /// DERIVED BY A DB TRIGGER from the court's bookingMode — never set it from
+  /// the app (the trigger overwrites whatever is sent). TRUE for an exclusive
+  /// court, NULL for a shared one.
+  exclusive   Boolean?     @default(true)
 
-  // Anti double-booking guarantee: one reservation per court + date + hour.
-  @@unique([courtId, bookingDate, slotId])
+  // Anti double-booking guarantee: one reservation per court + date + hour —
+  // for EXCLUSIVE courts. Every exclusive row has exclusive = TRUE, so this is
+  // exactly UNIQUE (courtId, bookingDate, slotId) for them. Shared rows carry
+  // NULL, and NULLs never collide in a Postgres unique index, so a shared hour
+  // takes many bookings (capacity is enforced in the booking service instead).
+  @@unique([courtId, bookingDate, slotId, exclusive])
   @@index([bookingId])
   @@index([courtId, bookingDate])
 }

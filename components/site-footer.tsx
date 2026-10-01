@@ -11,6 +11,7 @@ const LINK_COLUMNS = [
     links: [
       { href: "/courts", label: "Browse courts" },
       { href: "/book", label: "Check availability" },
+      { href: "/rules", label: "Rules & regulations" },
       { href: "/contact", label: "Contact us" },
     ],
   },
