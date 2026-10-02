@@ -77,8 +77,9 @@ const FACILITIES: FacilitySeed[] = [
     description:
       "25-metre, eight-lane pool with a lifeguard on duty every session. Book your place for lane swimming — the pool is shared with other members during the hour.",
     images: [
-      "https://images.unsplash.com/photo-1560090995-01632a28895b?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/Pool_01.jpeg",
+      "/images/courts/Pool_02.jpeg",
+      "/images/courts/Pool_03.jpeg",
     ],
     price: 1200, // Rs.1,000 + the Rs.200 rise (migration 20261001120000)
     displayOrder: 60,

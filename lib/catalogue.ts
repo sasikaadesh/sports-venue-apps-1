@@ -114,8 +114,11 @@ export const getActiveCourts = unstable_cache(
     }));
   },
   // Key bumped from "active-courts": the cached shape and order changed, so an
-  // entry written by the old code must not be served to the new.
-  ["active-courts-v2"],
+  // entry written by the old code must not be served to the new. v3: court
+  // images were rewritten by prisma/update-court-images.mts, a script that
+  // cannot revalidate COURTS_TAG — bumped together with "court-detail" so the
+  // grid and the detail pages drop their old entries at the same moment.
+  ["active-courts-v3"],
   { tags: [COURTS_TAG], revalidate: CATALOGUE_TTL }
 );
 
@@ -181,8 +184,9 @@ export const getCourtDetail = unstable_cache(
     };
   },
   // Bumped from "court-detail" when `rules` joined the shape: an entry cached
-  // by the old code would otherwise be served without it.
-  ["court-detail-v2"],
+  // by the old code would otherwise be served without it. v3: see
+  // "active-courts-v3" above — always bump these two together.
+  ["court-detail-v3"],
   { tags: [COURTS_TAG], revalidate: CATALOGUE_TTL }
 );
 

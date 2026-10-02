@@ -16,7 +16,7 @@ export const CONTACT_DETAILS = {
     "Moratuwa 10400",
     "Sri Lanka",
   ],
-  phone: "+94 11 264 5411",
+  phone: "076 567 4350, 077 786 7766",
   /**
    * The address shown to visitors. Purely display — where contact-form
    * notifications are actually delivered is `ADMIN_CONTACT_EMAIL`, so the
