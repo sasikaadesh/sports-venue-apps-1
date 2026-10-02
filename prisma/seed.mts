@@ -112,8 +112,7 @@ const COURTS: CourtSeed[] = [
     description:
       "Synthetic astro-turf practice net with a true, consistent bounce close to a grass pitch. Floodlit for evening sessions — book the lane for batting or bowling practice.",
     images: [
-      "https://images.unsplash.com/photo-1624526267942-ab0ff8a3e972?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/cricket_nets_3.jpg",
     ],
     schedule: { ...EVENING, price: 1700 },
   },
@@ -123,8 +122,7 @@ const COURTS: CourtSeed[] = [
     description:
       "Concrete practice strip laid with matting, giving pace and an even, predictable bounce. Well suited to quick bowling and back-foot work. Floodlit for evening sessions.",
     images: [
-      "https://images.unsplash.com/photo-1593341646782-e0b495cff86d?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1589801258579-18e091f4ca26?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/cricket_nets_1.jpg",
     ],
     schedule: { ...EVENING, price: 1400 },
   },
@@ -134,8 +132,7 @@ const COURTS: CourtSeed[] = [
     description:
       "Two adjoining practice nets booked together — room for a full squad session, with batters and bowlers rotating across both lanes. Floodlit for evening sessions.",
     images: [
-      "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1607734834519-d8576ae60ea6?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/cricket_nets_2.jpg",
     ],
     schedule: { ...EVENING, price: 2800 },
   },
@@ -145,8 +142,9 @@ const COURTS: CourtSeed[] = [
     description:
       "Full-size indoor court with sprung flooring, adjustable hoops and match-grade lighting. Suits half-court practice or a full five-a-side.",
     images: [
-      "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1519766304817-4f37bda74a26?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/basketball_1.jpg",
+      "/images/courts/basketball_2.jpg",
+      "/images/courts/basketball_3.jpg",
     ],
     schedule: { ...EVENING, price: 2200 },
   },
@@ -168,8 +166,8 @@ const COURTS: CourtSeed[] = [
     description:
       "Indoor wooden court with tournament netting and shuttle-friendly lighting, screened from any draught.",
     images: [
-      "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/badminton_1.jpg",
+      "/images/courts/badminton_2.jpg",
     ],
     schedule: { ...EVENING, price: 1400 },
   },
@@ -180,7 +178,8 @@ const COURTS: CourtSeed[] = [
     description:
       "Floodlit hard court for singles or doubles, with a full-height net and courtside seating.",
     images: [
-      "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/tennis_1.png",
+      "/images/courts/tennis_2.jpg",
     ],
     schedule: { ...EVENING, price: 1200 },
   },
@@ -207,8 +206,9 @@ const COURTS: CourtSeed[] = [
     description:
       "25-metre, eight-lane pool with a lifeguard on duty every session. Book your place for lane swimming — the pool is shared with other members during the hour.",
     images: [
-      "https://images.unsplash.com/photo-1560090995-01632a28895b?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/Pool_01.jpeg",
+      "/images/courts/Pool_02.jpeg",
+      "/images/courts/Pool_03.jpeg",
     ],
     schedule: { ...EVENING, price: 1200 },
     shared: { capacity: 30 },
