@@ -48,7 +48,12 @@ const KEY_POINTS: { icon: LucideIcon; title: string; body: React.ReactNode }[] =
           <a href="tel:1990" className={linkClass}>
             1990
           </a>{" "}
-          (Suwa Seriya ambulance), then tell a member of staff.
+          (Suwa Seriya ambulance), then call or message the sports
+          administration on{" "}
+          <a href="tel:+94765674350" className={linkClass}>
+            076 567 4350
+          </a>
+          .
         </>
       ),
     },

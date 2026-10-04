@@ -166,7 +166,7 @@ model Court {
   /// on the public court page. Optional; no separate amenity taxonomy.
   amenities    String?
   /// Court-specific rules for the public court page, one per line. Null/blank
-  /// = the standard set (STANDARD_COURT_RULES in lib/court-rules.ts).
+  /// = the court type's standard set (standardRulesForType in lib/court-rules.ts).
   rules        String?
   images       String[] // Supabase Storage URLs (Unsplash placeholders for now)
   /// Cannot change while the court holds today's or future hours (DB trigger

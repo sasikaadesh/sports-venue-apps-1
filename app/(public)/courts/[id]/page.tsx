@@ -102,7 +102,7 @@ export default async function CourtDetailsPage({
   // Which weekdays this court runs at all — useful when the chosen day is bare.
   const activeDays = court.activeDays;
 
-  const { rules: courtRules } = courtRulesFor(court.rules);
+  const { rules: courtRules } = courtRulesFor(court.rules, court.typeName);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8">
