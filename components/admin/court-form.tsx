@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { NativeSelect } from "@/components/admin/native-select";
-import { STANDARD_COURT_RULES } from "@/lib/court-rules";
+import { standardRulesForType } from "@/lib/court-rules";
 import { courtSchema, type CourtInput } from "@/lib/validations";
 import { MAX_IMAGES_PER_COURT } from "@/lib/storage-constants";
 import { createCourt, updateCourt } from "@/app/admin/courts/actions";
@@ -68,6 +68,13 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
   // useWatch rather than form.watch(), which would defeat React Compiler
   // memoization for this component.
   const isActive = useWatch({ control: form.control, name: "isActive" });
+
+  // The blank-rules fallback depends on the court type, so the placeholder
+  // follows the type picked above.
+  const courtTypeId = useWatch({ control: form.control, name: "courtTypeId" });
+  const standardRules = standardRulesForType(
+    courtTypes.find((t) => t.id === courtTypeId)?.name
+  );
 
   // Previews are derived from the file list, not stored — setting state in an
   // effect would cause a cascading second render on every pick.
@@ -205,16 +212,16 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
         <Textarea
           id="court-rules"
           rows={6}
-          placeholder={STANDARD_COURT_RULES.join("\n")}
+          placeholder={standardRules.join("\n")}
           {...form.register("rules")}
         />
         {/* The placeholder IS the fallback: what is greyed out here is exactly
             what the court page shows while this is left blank. */}
         <span className="text-xs text-muted-foreground">
           One rule per line, shown on the court&apos;s page. Leave blank to use
-          the standard rules shown greyed out above. Parking, medical and
-          weather rules are on the venue-wide Rules page — no need to repeat
-          them here.
+          the standard rules for this court type, shown greyed out above.
+          Parking, medical and weather rules are on the venue-wide Rules page —
+          no need to repeat them here.
         </span>
         {form.formState.errors.rules && (
           <FieldError>{form.formState.errors.rules.message}</FieldError>

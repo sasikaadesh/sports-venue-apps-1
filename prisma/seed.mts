@@ -60,44 +60,6 @@ type CourtSeed = {
 };
 
 /**
- * Court-specific rules (Court.rules) for the courts the standard set
- * (STANDARD_COURT_RULES in lib/court-rules.ts) would get wrong — the same text
- * migrations 20261001141000 / 20261001142000 wrote to the live database.
- * Written only when the seed creates a court; every other court is left blank
- * and shows the standard set.
- */
-const CRICKET_NET_RULES = [
-  "Bring your own bats, balls, pads and protective gear.",
-  "Wear a helmet when batting against a hard ball.",
-  "No metal spikes on the astro or matting surface — rubber soles only.",
-  "One bowler runs in at a time; wait until the batter is ready.",
-  "Stay out of a net while someone is bowling in it.",
-  "Do not damage the nets, netting poles or surface. Damage is charged to the booking holder.",
-].join("\n");
-
-const COURT_RULES: Record<string, string> = {
-  "Cricket Net - Astro": CRICKET_NET_RULES,
-  "Cricket Net - Concrete": CRICKET_NET_RULES,
-  "Cricket Nets - Double": CRICKET_NET_RULES,
-  "Swimming Pool": [
-    "Shower before entering the pool.",
-    "Swimwear only — no outdoor clothing in the water.",
-    "No running, diving or rough play on the pool deck.",
-    "Follow the lifeguard's instructions at all times.",
-    "Children under 12 must be accompanied by an adult in the water.",
-    "No food, glass or chewing gum on the pool deck.",
-  ].join("\n"),
-  "Fitness Center": [
-    "Clean training shoes only — no outdoor footwear on the gym floor.",
-    "Bring a towel and wipe down equipment after use.",
-    "Return weights and equipment to their racks.",
-    "Use a spotter for heavy free-weight lifts.",
-    "No dropping weights except on the lifting platform.",
-    "Ask staff if you are unsure how to use a machine.",
-  ].join("\n"),
-};
-
-/**
  * Unsplash placeholders (docs/DESIGN.md); the host is whitelisted in
  * next.config.ts and everything renders through next/image. Swap these for real
  * court photography — uploaded to Supabase Storage — before going live.
@@ -307,7 +269,6 @@ for (const seed of COURTS) {
         data: {
           name: seed.name,
           displayOrder: displayOrderFor(seed.name),
-          rules: COURT_RULES[seed.name] ?? null,
           courtTypeId: courtType.id,
           description: seed.description,
           images: seed.images,

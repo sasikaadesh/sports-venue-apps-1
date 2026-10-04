@@ -355,7 +355,7 @@ The venue asked for the NIC back, alongside an **emergency contact number**. The
 ### Rules (`/rules` and `Court.rules`, `20261001141000`, `20261001142000`)
 
 - **`/rules`** — venue-wide rules: six highlighted points (parking at own risk, no waiting in the car park, no medical facilities, weather stoppages, own risk, child supervision), then grouped one-line bullets. Static copy in the page; linked from the footer's Explore column and from `/terms`.
-- **`Court.rules`** — per-court rules, one per line, edited in the admin court form. Blank means the standard set, `STANDARD_COURT_RULES` in `lib/court-rules.ts`, which the form shows as its placeholder so an admin can see what blank means. The pool, gym and three cricket nets were given their own (the standard set talks about non-marking shoes and rackets). Shown in a "Court rules" card on each court page, linking to `/rules`.
+- **`Court.rules`** — per-court rules, one per line, edited in the admin court form. Blank means the standard set for the court's type (`standardRulesForType` in `lib/court-rules.ts` — each sport names its own equipment; a type with no set gets the generic `STANDARD_COURT_RULES`), which the form shows as its placeholder, following the chosen type, so an admin can see what blank means. Shown in a "Court rules" card on each court page, linking to `/rules`.
 
 ### Conduct ratings (admin-only, private)
 
