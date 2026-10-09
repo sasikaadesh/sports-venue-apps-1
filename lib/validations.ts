@@ -372,6 +372,16 @@ export const courtSchema = z.object({
     )
     .optional(),
   isActive: z.boolean(),
+  /**
+   * This court's colour for the /bookings grid and the admin Bookings table —
+   * any `#rrggbb` hex, usually one of `COURT_COLOR_PALETTE`
+   * (lib/court-colors.ts), but not restricted to it: a venue may eventually
+   * want a shade the 9-swatch set doesn't have.
+   */
+  color: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour."),
 });
 
 export const slotTemplateSchema = z
@@ -449,6 +459,45 @@ export const slotPriceSchema = z.object({
   price: priceField,
 });
 
+// ---------------------------------------------------------------------------
+// Security staff — username + PIN, not an email/password account
+// ---------------------------------------------------------------------------
+
+/** Short, memorable, not an email — lower-cased before every lookup/write. */
+export const securityUsernameField = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "Username must be at least 3 characters.")
+  .max(24, "Username must be 24 characters or fewer.")
+  .regex(/^[a-z0-9_.-]+$/, "Use lowercase letters, numbers, and . _ - only.");
+
+/** A 4–6 digit PIN. Digits only — this is typed on a gate, not a keyboard. */
+export const securityPinField = z
+  .string()
+  .regex(/^\d{4,6}$/, "PIN must be 4 to 6 digits.");
+
+export const securityLoginSchema = z.object({
+  username: securityUsernameField,
+  pin: securityPinField,
+});
+
+export const createSecurityStaffSchema = z.object({
+  username: securityUsernameField,
+  pin: securityPinField,
+  label: z
+    .string()
+    .trim()
+    .max(60, "Label must be 60 characters or fewer.")
+    .optional()
+    .or(z.literal("")),
+});
+
+export const resetSecurityStaffPinSchema = z.object({
+  id: z.uuid(),
+  pin: securityPinField,
+});
+
 export const blockSlotSchema = z.object({
   courtId: z.uuid(),
   slotId: z.uuid(),
@@ -502,6 +551,13 @@ export type DayActiveInput = z.infer<typeof dayActiveSchema>;
 export type CopyScheduleInput = z.infer<typeof copyScheduleSchema>;
 export type SlotPriceInput = z.infer<typeof slotPriceSchema>;
 export type BlockSlotInput = z.infer<typeof blockSlotSchema>;
+export type SecurityLoginInput = z.infer<typeof securityLoginSchema>;
+export type CreateSecurityStaffInput = z.infer<
+  typeof createSecurityStaffSchema
+>;
+export type ResetSecurityStaffPinInput = z.infer<
+  typeof resetSecurityStaffPinSchema
+>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 
 /** Uniform shape every admin server action returns. */

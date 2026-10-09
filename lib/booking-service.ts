@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { nextBookingReference } from "@/lib/booking-reference";
 import { chainFrom, MAX_DURATION_HOURS } from "@/lib/slots";
 import { isSameDayClosed, sameDayClosedMessage } from "@/lib/same-day-cutoff";
 import {
@@ -643,31 +644,44 @@ export async function createBooking(
 
   // --- Exclusive court: unchanged — the unique key is the guarantee. --------
   try {
-    // ONE nested write => ONE transaction: the parent and all N hour-rows are
-    // inserted together. If any single hour collides with the unique index,
-    // the whole statement rolls back — no partial reservation, no orphan rows.
-    const booking = await prisma.booking.create({
-      data: {
+    // An interactive transaction rather than a single nested write: the
+    // booking reference's sequence number (lib/booking-reference.ts) has to
+    // be taken in the same transaction as the insert, so a reference is
+    // never assigned to a booking that then fails to write. If any one hour
+    // collides with the unique index, the whole thing rolls back — no
+    // partial reservation, no orphan rows, and no sequence number burned on
+    // a booking that never existed.
+    const booking = await prisma.$transaction(async (tx) => {
+      const bookingReference = await nextBookingReference(
+        tx,
         courtId,
-        bookingDate,
-        userId,
-        playerCount,
-        durationHours,
-        totalPrice,
-        status: "pending",
-        holdExpiresAt,
-        slots: {
-          create: hours.map((hour) => ({
-            slotId: hour.slotId,
-            // Denormalised from the parent so the unique constraint can be
-            // evaluated within one row — written in the same transaction.
-            courtId,
-            bookingDate,
-            price: new Prisma.Decimal(hour.price),
-          })),
+        bookingDate
+      );
+
+      return tx.booking.create({
+        data: {
+          courtId,
+          bookingDate,
+          userId,
+          playerCount,
+          durationHours,
+          totalPrice,
+          bookingReference,
+          status: "pending",
+          holdExpiresAt,
+          slots: {
+            create: hours.map((hour) => ({
+              slotId: hour.slotId,
+              // Denormalised from the parent so the unique constraint can be
+              // evaluated within one row — written in the same transaction.
+              courtId,
+              bookingDate,
+              price: new Prisma.Decimal(hour.price),
+            })),
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
     });
 
     return {
@@ -740,6 +754,12 @@ async function createSharedBooking(params: {
     const problem = sharedHoursProblem(hours, occupying, capacity, playerCount);
     if (problem) return { ok: false as const, error: problem };
 
+    const bookingReference = await nextBookingReference(
+      tx,
+      courtId,
+      bookingDate
+    );
+
     const booking = await tx.booking.create({
       data: {
         courtId,
@@ -748,6 +768,7 @@ async function createSharedBooking(params: {
         playerCount,
         durationHours,
         totalPrice,
+        bookingReference,
         status: "pending",
         holdExpiresAt,
         slots: {
@@ -1084,6 +1105,12 @@ export async function blockSlot(input: {
         };
       }
 
+      const bookingReference = await nextBookingReference(
+        tx,
+        courtId,
+        bookingDate
+      );
+
       const booking = await tx.booking.create({
         data: {
           courtId,
@@ -1092,6 +1119,7 @@ export async function blockSlot(input: {
           playerCount: 0,
           durationHours: 1,
           totalPrice: 0,
+          bookingReference,
           status: "blocked",
           slots: { create: [{ slotId, courtId, bookingDate, price: 0 }] },
         },
@@ -1103,20 +1131,29 @@ export async function blockSlot(input: {
   }
 
   try {
-    const booking = await prisma.booking.create({
-      data: {
+    const booking = await prisma.$transaction(async (tx) => {
+      const bookingReference = await nextBookingReference(
+        tx,
         courtId,
-        bookingDate,
-        userId: adminId,
-        playerCount: 0, // a block has no players
-        durationHours: 1,
-        totalPrice: 0, // nor a price
-        status: "blocked",
-        slots: {
-          create: [{ slotId, courtId, bookingDate, price: 0 }],
+        bookingDate
+      );
+
+      return tx.booking.create({
+        data: {
+          courtId,
+          bookingDate,
+          userId: adminId,
+          playerCount: 0, // a block has no players
+          durationHours: 1,
+          totalPrice: 0, // nor a price
+          bookingReference,
+          status: "blocked",
+          slots: {
+            create: [{ slotId, courtId, bookingDate, price: 0 }],
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
     });
 
     return { ok: true, data: booking };

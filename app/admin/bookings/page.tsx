@@ -13,6 +13,7 @@ import { EmptyState, PageHeader } from "@/components/admin/page-header";
 import { BookingFilterBar } from "@/components/admin/booking-filter-bar";
 import { BookingRowActions } from "@/components/admin/booking-row-actions";
 import { PaginationBar, SortableHeader } from "@/components/admin/table-tools";
+import { CourtColorDot } from "@/components/court-color-dot";
 import { LinkButton } from "@/components/link-button";
 import { requireAdmin } from "@/lib/auth";
 import {
@@ -198,6 +199,7 @@ export default async function BookingsPage({
                       href={sortHref("court")}
                       direction={sort === "court" ? direction : null}
                     />
+                    <TableHead>Reference</TableHead>
                     <TableHead>Time</TableHead>
                     <SortableHeader
                       label="Who"
@@ -235,7 +237,17 @@ export default async function BookingsPage({
                         <TableCell className="pl-5 font-medium">
                           {formatDate(b.bookingDate)}
                         </TableCell>
-                        <TableCell>{b.court.name}</TableCell>
+                        <TableCell>
+                          <span className="flex items-center gap-2">
+                            <CourtColorDot color={b.court.color} />
+                            {b.court.name}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {b.bookingReference ?? (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">
                           {first && last ? (
                             <>

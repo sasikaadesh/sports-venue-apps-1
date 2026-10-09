@@ -305,6 +305,8 @@ export type BookingConfirmationEmailProps = {
   durationHours: number;
   playerCount: number;
   total: string;
+  /** Null only for a booking written before this column existed. */
+  bookingReference: string | null;
   /** Absolute URL — an email has no origin to resolve a relative path against. */
   bookingUrl: string;
 };
@@ -323,9 +325,13 @@ export function BookingConfirmationEmail({
   durationHours,
   playerCount,
   total,
+  bookingReference,
   bookingUrl,
 }: BookingConfirmationEmailProps) {
   const rows: [string, string][] = [
+    ...(bookingReference
+      ? ([["Reference", bookingReference]] as [string, string][])
+      : []),
     ["Court", courtName],
     ["Date", date],
     [

@@ -65,6 +65,7 @@ export default async function BookingPage({
         status: true,
         holdExpiresAt: true,
         userId: true,
+        bookingReference: true,
         court: { select: { id: true, name: true } },
         slots: {
           orderBy: { slot: { startTime: "asc" } },
@@ -154,9 +155,16 @@ export default async function BookingPage({
 
       <div className="mt-10 overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
-          <span className="font-heading text-lg font-bold tracking-tight">
-            {booking.court.name}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-heading text-lg font-bold tracking-tight">
+              {booking.court.name}
+            </span>
+            {booking.bookingReference && (
+              <span className="font-mono text-xs text-muted-foreground">
+                Ref: {booking.bookingReference}
+              </span>
+            )}
+          </div>
           <Badge
             variant={booking.status === "confirmed" ? "default" : "secondary"}
           >

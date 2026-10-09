@@ -116,13 +116,13 @@ Shipped in migration `20260722120000_multi_hour_bookings`, which moved `slotId` 
 
 Every `Court` has a `bookingMode`:
 
-|                             | **exclusive** (default — every court)                   | **shared** (Fitness Center, Swimming Pool)                                 |
-| --------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Bookings per hour           | one                                                     | many, up to `Court.capacity` people (null = unlimited)                     |
-| What guarantees it          | the unique key on `BookingSlot` (DB)                    | a locked re-count in the booking service (`createSharedBooking`)          |
-| A booked hour on the site   | taken — "Booked"                                        | still open — "N places left"; "Full" only at capacity                      |
-| Admin block                 | refused over a booking (unique key)                     | refused over any live booking (checked under the same lock)                |
-| Hold, payment, confirmation | `pending` → PayHere webhook → `confirmed`, expiry sweep | **identical** — same `Booking` row, same code                              |
+|                             | **exclusive** (default — every court)                   | **shared** (Fitness Center, Swimming Pool)                       |
+| --------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------- |
+| Bookings per hour           | one                                                     | many, up to `Court.capacity` people (null = unlimited)           |
+| What guarantees it          | the unique key on `BookingSlot` (DB)                    | a locked re-count in the booking service (`createSharedBooking`) |
+| A booked hour on the site   | taken — "Booked"                                        | still open — "N places left"; "Full" only at capacity            |
+| Admin block                 | refused over a booking (unique key)                     | refused over any live booking (checked under the same lock)      |
+| Hold, payment, confirmation | `pending` → PayHere webhook → `confirmed`, expiry sweep | **identical** — same `Booking` row, same code                    |
 
 **One table, one key, scoped by a derived flag.** Shared bookings still write one `BookingSlot` per hour — so payment, confirmation, the expiry sweep, every release path, emails, reports and all the booking displays work without knowing the difference. What changes is the unique key: `UNIQUE (courtId, bookingDate, slotId, exclusive)`.
 
@@ -139,21 +139,172 @@ Every `Court` has a `bookingMode`:
 
 ### Who can see what
 
-The one table that summarises this doc's access rules. "Owner" means the signed-in user the row is about.
+The one table that summarises this doc's access rules. "Owner" means the signed-in user the row is about. "Security" is a username+PIN login (`SecurityStaff`) — not a `User` row, not a Supabase session; see "Security staff" below.
 
-| Data                                    | Public / signed-out | Owner                                | Admin         | Super admin                         |
-| --------------------------------------- | ------------------- | ------------------------------------ | ------------- | ----------------------------------- |
-| Court, CourtType, SlotTemplate (active) | read                | read                                 | read + write  | read + write                        |
-| Booking / BookingSlot                   | —                   | own only                             | all           | all                                 |
-| Payment                                 | —                   | own only                             | all           | all                                 |
-| ContactMessage                          | write (submit)      | —                                    | read + manage | read + manage                       |
-| SpecialRequest                          | —                   | write (submit, own name only)        | read + status | read + status                       |
-| User — name, phone, address             | —                   | own, editable                        | all, read     | all, read                           |
-| **User.affiliation**                    | **never**           | own, editable                        | all, read     | all, read                           |
-| User.role                               | —                   | own, read-only                       | read          | read + assign (`user`/`admin` only) |
-| **UserRating**                          | **never**           | **never — not even rows about them** | read + add    | read + add                          |
+| Data                                    | Public / signed-out | Owner                                | Admin         | Super admin                           | Security                                                              |
+| --------------------------------------- | ------------------- | ------------------------------------ | ------------- | ------------------------------------- | --------------------------------------------------------------------- |
+| Court, CourtType, SlotTemplate (active) | read                | read                                 | read + write  | read + write                          | —                                                                     |
+| Booking / BookingSlot                   | —                   | own only                             | all           | all                                   | read-only, `/bookings` only                                           |
+| Payment                                 | —                   | own only                             | all           | all                                   | —                                                                     |
+| ContactMessage                          | write (submit)      | —                                    | read + manage | read + manage                         | —                                                                     |
+| SpecialRequest                          | —                   | write (submit, own name only)        | read + status | read + status                         | —                                                                     |
+| User — name, phone, address             | —                   | own, editable                        | all, read     | all, read                             | read-only, as a booking's contact only                                |
+| **User.affiliation**                    | **never**           | own, editable                        | all, read     | all, read                             | never                                                                 |
+| User.role                               | —                   | own, read-only                       | read          | read + assign (`user`/`admin` only)   | n/a — not a `User`                                                    |
+| **UserRating**                          | **never**           | **never — not even rows about them** | read + add    | read + add                            | never                                                                 |
+| **SecurityStaff**                       | **never**           | n/a                                  | never         | create / disable / reset PIN / remove | never — not even its own row (identity comes from the session cookie) |
 
 `UserRating` is the only row in this table where the owner column is empty. Everywhere else in the schema a user may read the rows that name them; conduct notes are the deliberate exception, and the reason it is worth a table of its own is that the exception is easy to undo by accident.
+
+### Court colour (`20261009130000_court_color`)
+
+`Court.color` — a `#rrggbb` hex, `NOT NULL DEFAULT '#0E7A34'` — is what tells courts apart at a glance on the `/bookings` grid and the admin Bookings table: a small dot (`CourtColorDot`) immediately before the court's name.
+
+- **9 named swatches**, `COURT_COLOR_PALETTE` in `lib/court-colors.ts` — distinguishable but dignified (brand skill: no rainbow palette), reading like school house colours rather than a chart palette: Green, Gold, Navy, Burgundy, Teal, Terracotta, Olive, Slate, Walnut. `--green`/`--gold` anchor the set so courts using either still look like they belong to the same identity.
+- **Colour is never the only signal.** Every `CourtColorDot` sits directly beside the court's name, in every view it appears — the dot is `aria-hidden`, decorative only; the name is what actually identifies the court. There is no view where a colour alone stands in for a name.
+- **Backfilled once, by the migration**, cycling through the 9 swatches in `COURT_DISPLAY_ORDER` so adjacent courts in any existing list start out visually distinct rather than all defaulting to the same green.
+- **A new court gets a suggested colour** — the admin "New court" page computes the first palette swatch not already used by an active court (`suggestNextCourtColor`) and offers it as the default in the form's colour picker; the admin can override it to any of the 9, or in principle any valid hex (the schema only requires `#rrggbb`, not palette membership).
+- **The `/bookings` legend** (`CourtLegend`, fed by `getCourtLegend()`) lists every active court with its dot, so the key is available wherever the dots are. It shows the same set regardless of the Today/This week tab, rather than only the courts with a booking in the current view — a legend that changes shape between tabs would be more confusing than a couple of unused entries.
+- **Optional surface, included:** a dot also appears next to the court name on the admin Courts list cards (thumbnails), for the same at-a-glance reason.
+
+### Booking reference (`20261009120000_security_staff_and_booking_reference`)
+
+Every `Booking` carries a readable, stable `bookingReference` — e.g.
+**`BAD-0915-003`**: Badminton, 15 Sep, the 3rd booking made against that court
+on that date.
+
+- **Format:** `{courtPrefix}-{MMDD}-{seq}`, seq zero-padded to 3 digits.
+  `Court.referencePrefix` holds the prefix (`BAD`, `BAS`, `TEN`, `CRA`
+  Cricket Net - Astro, `CRC` Cricket Net - Concrete, `CRD` Cricket Nets -
+  Double, `TT` Table Tennis, `POOL` Swimming Pool, `FIT` Fitness Center);
+  the migration backfills it for every seeded court. A court created later,
+  or renamed since, gets one derived from its name the first time it is ever
+  booked (`ensureCourtReferencePrefix`, `lib/booking-reference.ts`) and
+  persisted — so this only has to happen once per court, not once per
+  booking.
+- **The sequence number is a real counter, not a count.** `BookingSequence`
+  holds one row per `(courtId, bookingDate)`, incremented with
+  `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` inside the same
+  transaction that creates the `Booking` (`nextBookingReference`). It only
+  ever goes up — cancelling or deleting an earlier booking on that court and
+  date does **not** give its number back, which is what makes every
+  reference permanent: `BAD-0915-003` stays `BAD-0915-003` even if bookings
+  1 and 2 that day are later cancelled.
+- **Assigned exactly once, at creation, for every kind of `Booking` row** —
+  an ordinary exclusive booking, a shared-facility booking, and an admin
+  slot block alike (all three write paths in `lib/booking-service.ts` call
+  `nextBookingReference` inside their existing transaction). Never
+  regenerated, never recomputed for display.
+- **Shown everywhere a booking is shown to a human:** the user's booking
+  page (`/bookings/[id]`), the booking-confirmed email
+  (`lib/email/booking.ts`, `BookingConfirmationEmail`), the admin Bookings
+  table, and the security Bookings overview below. One column, one value,
+  read off `Booking.bookingReference` — nothing recomputes it for display.
+- **Nullable only on rows written before this column existed.** Those show
+  no reference; nothing backfills history, same policy as every other
+  additive column in this schema (see "The NIC returns").
+
+### Security staff (`20261009120000_security_staff_and_booking_reference`)
+
+A third kind of signed-in caller, alongside Supabase-authenticated users and
+admins: **security staff**, who sign in with an individual **username +
+PIN** — not an email, not a password, not a Supabase Auth account — and may
+view exactly one page, `/bookings`.
+
+**Why a separate table (`SecurityStaff`) instead of a `Role` value.**
+`User.role` lives on a table that mirrors `auth.users` 1:1: every row is
+created by the `on_auth_user_created` trigger the moment Supabase Auth makes
+a user, and removed by `on_auth_user_deleted` (see "Auth & roles" above). A
+security login has no Supabase session to trigger either side of that, so
+adding `'security'` to the `Role` enum would produce `User` rows with no
+`auth.users` counterpart — breaking the 1:1 invariant every other piece of
+auth code (`getCurrentUser`, the deletion trigger, RLS's `is_admin()`) relies
+on. Keeping it a wholly separate identity means **every existing auth path
+— Supabase sessions, `lib/auth.ts`, RLS, the role ladder — is completely
+untouched** by this feature.
+
+- **Storage.** `SecurityStaff` (`username` unique, `pinHash`, `label`,
+  `isActive`, `failedAttempts`, `lockedUntil`, `createdById` → the super
+  admin who made it, `SET NULL` on removal). PINs are hashed with scrypt
+  (`lib/security-staff/pin.ts`, Node's built-in `node:crypto` — no added
+  dependency), stored as `<saltHex>:<hashHex>`, never in plain text.
+- **No anon-key access at all, by construction.** `SecurityStaff` has RLS
+  enabled with **zero policies** and an explicit `REVOKE ALL FROM anon,
+authenticated` in the migration — Supabase's `ALTER DEFAULT PRIVILEGES`
+  would otherwise hand `anon` `SELECT` on it the instant it was created (the
+  same thing "Conduct ratings" above calls out for `UserRating`). Only
+  `lib/security-staff/*` (server-only, Prisma, which bypasses RLS) ever
+  touches the table. This is also _why_ there is no RLS policy specifically
+  shaped around "a security login may read its own row": a security login
+  never acquires a Supabase/anon-key credential to present to RLS in the
+  first place, so the thing RLS would normally restrict simply has no
+  credential to check — the restriction is the absent grant, not a policy.
+- **Session.** `lib/security-staff/session.ts` issues a small HMAC-signed
+  cookie (`security_session`, 12-hour expiry) on a successful login —
+  entirely separate from `@supabase/ssr`'s cookies and from `proxy.ts`
+  (which only ever touches `sb-*` cookies). `SECURITY_SESSION_SECRET` (env,
+  server-only, required — there is no insecure default) signs it.
+- **Brute-force lockout.** `attemptSecurityLogin` (`lib/security-staff/
+service.ts`) locks an account for 15 minutes after 5 wrong PINs in a row
+  (`MAX_FAILED_ATTEMPTS`, `LOCKOUT_MINUTES`), and resets the counter on a
+  correct one. A nonexistent username still runs a dummy PIN verification
+  (`verifyAgainstDummy`) so the response takes the same time either way,
+  and every failure — unknown username, disabled account, wrong PIN — reads
+  as the same generic "Invalid username or PIN." A lockout gets its own
+  message, since the UI has to explain why a _correct_ PIN is being
+  refused.
+- **Re-checked on every request, not just at login.** `getBookingsViewer`
+  (`lib/security-staff/auth.ts`) re-reads `isActive` from the database on
+  every call to `/bookings` — a super admin disabling an account takes
+  effect on the very next request, not whenever that account's 12-hour
+  cookie happens to expire.
+- **Who manages these accounts.** Super-admin only — `/admin/security-staff`
+  — create, disable/re-enable, reset PIN, remove. Exactly the same ladder
+  rule as admin accounts ("The role ladder" above): a plain admin cannot
+  reach this page (`requireSuperAdmin`).
+
+**Access restriction — `/bookings` and nowhere else.**
+`requireBookingsAccess()` (`lib/security-staff/auth.ts`) is the single gate
+for the whole `app/bookings/*` route, applied once in
+`app/bookings/layout.tsx`, and accepts exactly three callers: `admin`,
+`super_admin`, or a valid, still-active security session. Enforcement is
+layered the same way the rest of the app is (CLAUDE.md: "never rely on
+middleware alone"):
+
+- **Server-side, absolutely.** `/bookings` shares **no layout, no nav
+  component, and no code path** with `/admin/*` — there is no link to any
+  other admin page anywhere in a security login's rendered tree, and even
+  if the URL of an admin page were typed directly, `requireAdmin()` there
+  calls `getCurrentUser()`, which reads a Supabase session; a security
+  login has none, so it is redirected to `/login` exactly like any other
+  signed-out visitor. The security session cookie is never read by any
+  `/admin/*` page.
+- **RLS, by having nothing to restrict.** A security login never completes
+  an anon-key/Supabase sign-in, so it never obtains a JWT RLS could
+  evaluate — not even to read the public court catalogue through the anon
+  key's own policies (it is read through Prisma, server-side, same as
+  every other `/bookings` query). `SecurityStaff` itself is revoked from
+  `anon`/`authenticated` as described above. There is deliberately no
+  "security role" branch inside any existing RLS policy, because a security
+  login is never the subject one of those policies evaluates.
+
+### The `/bookings` overview page
+
+Two tabs — **Today** and **This week** (Monday–Sunday) — both computed at
+the venue's wall clock (`VENUE_TIME_ZONE`, Asia/Colombo), via
+`lib/security-bookings.ts`:
+
+- Columns: Court, Time slot, Booking reference, Name, Contact (phone),
+  Status — sorted by date (This week only) then start time.
+- Shows `pending`, `confirmed`, and `blocked` rows. `cancelled` and
+  `expired` are excluded: they hold no hours and nobody is coming, so
+  they would only be noise on a page whose job is "who is arriving and
+  what has this court closed." `blocked` is kept precisely so the grid also
+  explains an hour with nobody booked against it.
+- Empty states read "No bookings today" / "No bookings this week" per
+  CLAUDE.md.
+- Read-only. Nothing here writes a `Booking` — same rule as
+  `lib/admin-bookings.ts`.
 
 ## Demo data (`prisma/seed.mts`)
 
@@ -347,7 +498,7 @@ The venue asked for the NIC back, alongside an **emergency contact number**. The
 
 - **`nic`** — `UNIQUE` (`User_nic_key`), format `CHECK` (`User_nic_format`: 9 digits + `V`/`X`, or 12 digits), stored with spaces stripped and upper-cased. `nicField` in `lib/validations.ts` also rejects an impossible day-of-year (must be 1–366, or 501–866 for women).
 - **`emergencyContact`** — a phone number, same rules as `phone`, not unique (families share one), and refused if it is the member's own number (`emergencyIsSomeoneElse`, applied to `profileSchema` and `signUpSchema` separately because Zod will not `.extend` a refined object).
-- **Uniqueness, three layers:** the signup action pre-checks and answers "already registered"; `updateProfileAction` translates the `P2002` from the unique index (the real guarantee — a pre-check can race); and `handle_new_user()` regains its `unique_violation` retry, creating the account *without* the NIC on a duplicate rather than failing account creation inside the auth trigger.
+- **Uniqueness, three layers:** the signup action pre-checks and answers "already registered"; `updateProfileAction` translates the `P2002` from the unique index (the real guarantee — a pre-check can race); and `handle_new_user()` regains its `unique_violation` retry, creating the account _without_ the NIC on a duplicate rather than failing account creation inside the auth trigger.
 - **`getCurrentUser`'s fallback upsert never sets `nic`** from metadata: a taken value would make that upsert throw on every request. It stays NULL and `/complete-profile` asks for it.
 - **Both are part of `profileIsComplete()`.** Every existing account (all predate them) is routed once through `/complete-profile` after signing in — logins are unaffected, exactly as with affiliation.
 - Collected on the signup form, the account Details tab and `/complete-profile` (one `ProfileForm`). Listed in the privacy policy's "What we collect". **Not yet shown anywhere in the admin panel** — there is no admin view of a member's contact details to extend.
@@ -463,7 +614,7 @@ Flow, on a successful `submitContactMessage`:
 
 Lives under `/app/admin`, gated by `requireAdmin()` in the layout **and** in every page **and** in every server action — an action is its own HTTP endpoint and never runs the layout that guards the pages.
 
-- **Tabs:** Overview, Court types, Courts, Block slots, Bookings, **Users**, **Messages**, **Special requests**. The header carries the signed-in email (linked to `/account`) and a **Log out** control on a single row.
+- **Tabs:** Overview, Court types, Courts, Block slots, Bookings, **Users**, **Messages**, **Special requests**, **Bookings overview** (links out to `/bookings` — the standalone page security staff also use, see "Security staff"), **Security staff** (super-admin only in effect, `/admin/security-staff`). The header carries the signed-in email (linked to `/account`) and a **Log out** control on a single row.
 - **Users** lists every account and is where the role ladder above is applied. What a row draws (`canManage`, `actorIsSuperAdmin`) is presentation only; the same rules are re-derived from the database inside each action. It also carries the one admin-only field — **Conduct** — plus the affiliation; see "Conduct ratings" above for what may leave this page (nothing).
 
 - **Booking writes** — `/lib/booking-service.ts` is the only module that writes `Booking` or `BookingSlot`. Admin actions (block, unblock, cancel) validate and authorize, then delegate. `blockSlot` rejects a slot that belongs to another court or does not recur on the chosen weekday, and translates the unique-constraint violation (Prisma `P2002`) into "already booked or blocked".

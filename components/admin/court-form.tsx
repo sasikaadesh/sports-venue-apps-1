@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { NativeSelect } from "@/components/admin/native-select";
 import { standardRulesForType } from "@/lib/court-rules";
+import { COURT_COLOR_PALETTE, DEFAULT_COURT_COLOR } from "@/lib/court-colors";
+import { cn } from "@/lib/utils";
 import { courtSchema, type CourtInput } from "@/lib/validations";
 import { MAX_IMAGES_PER_COURT } from "@/lib/storage-constants";
 import { createCourt, updateCourt } from "@/app/admin/courts/actions";
@@ -34,10 +36,17 @@ type CourtFormProps = {
     capacity: number | null;
     isActive: boolean;
     imageCount: number;
+    color: string;
   };
+  /** Creating only: a sensible colour to default to (first swatch not already in use). */
+  suggestedColor?: string;
 };
 
-export function CourtForm({ courtTypes, court }: CourtFormProps) {
+export function CourtForm({
+  courtTypes,
+  court,
+  suggestedColor,
+}: CourtFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [files, setFiles] = useState<File[]>([]);
@@ -60,6 +69,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
       bookingMode: court?.bookingMode ?? "exclusive",
       capacity: court?.capacity != null ? String(court.capacity) : "",
       isActive: court?.isActive ?? true,
+      color: court?.color ?? suggestedColor ?? DEFAULT_COURT_COLOR,
     },
   });
 
@@ -68,6 +78,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
   // useWatch rather than form.watch(), which would defeat React Compiler
   // memoization for this component.
   const isActive = useWatch({ control: form.control, name: "isActive" });
+  const color = useWatch({ control: form.control, name: "color" });
 
   // The blank-rules fallback depends on the court type, so the placeholder
   // follows the type picked above.
@@ -116,6 +127,7 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
       formData.set("bookingMode", values.bookingMode);
       formData.set("capacity", values.capacity ?? "");
       formData.set("isActive", String(values.isActive));
+      formData.set("color", values.color);
       files.forEach((f) => formData.append("images", f));
 
       const result = isEdit
@@ -268,6 +280,43 @@ export function CourtForm({ courtTypes, court }: CourtFormProps) {
           </Field>
         )}
       </div>
+
+      <Field>
+        <FieldLabel className="text-sm font-medium">Colour</FieldLabel>
+        <span className="text-xs text-muted-foreground">
+          Shown as a dot next to this court&apos;s name on the Bookings overview
+          and the admin Bookings table — never the only way it is identified,
+          the name is always alongside it.
+        </span>
+        <div
+          className="flex flex-wrap gap-2 pt-1"
+          role="radiogroup"
+          aria-label="Court colour"
+        >
+          {COURT_COLOR_PALETTE.map((swatch) => {
+            const selected = swatch.hex.toLowerCase() === color?.toLowerCase();
+            return (
+              <button
+                key={swatch.hex}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={swatch.name}
+                title={swatch.name}
+                onClick={() =>
+                  form.setValue("color", swatch.hex, { shouldDirty: true })
+                }
+                className={cn(
+                  "size-8 rounded-button ring-1 ring-black/15 transition-transform hover:scale-105 dark:ring-white/20",
+                  selected &&
+                    "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                )}
+                style={{ backgroundColor: swatch.hex }}
+              />
+            );
+          })}
+        </div>
+      </Field>
 
       <Field
         orientation="horizontal"
