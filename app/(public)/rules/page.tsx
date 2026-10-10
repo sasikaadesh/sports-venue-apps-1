@@ -90,6 +90,7 @@ const SECTIONS: { heading: string; points: React.ReactNode[] }[] = [
       "Sessions end on the hour. Leave the court promptly; the next group may be waiting.",
       "Keep to the courts and facilities you booked. School buildings and classrooms are out of bounds.",
       "Carry your NIC. Staff may ask to see it against the booking.",
+      "During an Under-19 match, vehicle entrance may be restricted. Please be aware of this.",
     ],
   },
   {
@@ -105,6 +106,7 @@ const SECTIONS: { heading: string; points: React.ReactNode[] }[] = [
       "Wear the right footwear and clothing for the sport and the surface.",
       "Report any damage or hazard to staff straight away.",
       "Leave the court as you found it.",
+      "Please contact the Sports Admin/Staff to switch on the floodlights.",
     ],
   },
   {
@@ -131,6 +133,7 @@ const SECTIONS: { heading: string; points: React.ReactNode[] }[] = [
     points: [
       "Only the person who booked, and their group, may use the slot.",
       "Bookings may not be resold or transferred.",
+      "Courts are not available on national and public holidays.",
       <>
         Breaking these rules may end a session early, without a refund, and may
         lead to the account being suspended. See the{" "}
@@ -139,6 +142,21 @@ const SECTIONS: { heading: string; points: React.ReactNode[] }[] = [
         </Link>
         .
       </>,
+    ],
+  },
+  {
+    // Placeholder content — the sports office will supply the exact policy
+    // text; until then this is clearly marked as provisional.
+    heading: "Refunds & cancellations",
+    points: [
+      <span key="placeholder" className="italic">
+        <span className="mr-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground not-italic">
+          Placeholder
+        </span>
+        This section will be replaced with the full refunds and cancellations
+        policy shortly. Please contact the sports office with any questions in
+        the meantime.
+      </span>,
     ],
   },
 ];

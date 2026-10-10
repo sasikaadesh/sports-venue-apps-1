@@ -3,6 +3,7 @@ import { CalendarOff, Home } from "lucide-react";
 import { LinkButton } from "@/components/link-button";
 import { EmptyState, PageHeader } from "@/components/admin/page-header";
 import { BlockPicker } from "@/components/admin/block-picker";
+import { BlockFullDayButton } from "@/components/admin/block-full-day-button";
 import {
   SlotBlockList,
   type BlockableSlot,
@@ -157,12 +158,23 @@ export default async function BlocksPage({
         <BlockPicker courts={courts} courtId={courtId} date={date} />
 
         <div className="flex flex-col gap-4">
-          <h2 className="text-lg">
-            {DAY_NAMES[dayOfWeek]} &middot;{" "}
-            <span className="text-muted-foreground">
-              {formatDate(bookingDate)}
-            </span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg">
+              {DAY_NAMES[dayOfWeek]} &middot;{" "}
+              <span className="text-muted-foreground">
+                {formatDate(bookingDate)}
+              </span>
+            </h2>
+
+            {rows.length > 0 && (
+              <BlockFullDayButton
+                courtId={courtId}
+                courtName={court.name}
+                date={date}
+                dayLabel={`${DAY_NAMES[dayOfWeek]}, ${formatDate(bookingDate)}`}
+              />
+            )}
+          </div>
 
           {rows.length === 0 ? (
             <EmptyState

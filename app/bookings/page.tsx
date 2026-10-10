@@ -28,6 +28,7 @@ export const metadata: Metadata = { title: "Bookings overview" };
 const TABS: { value: BookingsOverviewTab; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "week", label: "This week" },
+  { value: "nextWeek", label: "Next week" },
 ];
 
 function statusVariant(status: string) {
@@ -57,7 +58,8 @@ export default async function BookingsOverviewPage({
   await requireBookingsAccess();
 
   const { tab: tabParam } = await searchParams;
-  const tab: BookingsOverviewTab = tabParam === "week" ? "week" : "today";
+  const tab: BookingsOverviewTab =
+    tabParam === "week" || tabParam === "nextWeek" ? tabParam : "today";
 
   const [{ rows, range }, legendCourts] = await Promise.all([
     getBookingsOverview(tab),
@@ -108,7 +110,11 @@ export default async function BookingsOverviewPage({
             <CalendarDays className="size-5" />
           </span>
           <p className="font-heading text-lg font-bold tracking-tight">
-            {tab === "today" ? "No bookings today" : "No bookings this week"}
+            {tab === "today"
+              ? "No bookings today"
+              : tab === "nextWeek"
+                ? "No bookings next week"
+                : "No bookings this week"}
           </p>
         </div>
       ) : (
@@ -116,7 +122,9 @@ export default async function BookingsOverviewPage({
           <Table>
             <TableHeader>
               <TableRow>
-                {tab === "week" && <TableHead className="pl-5">Date</TableHead>}
+                {tab !== "today" && (
+                  <TableHead className="pl-5">Date</TableHead>
+                )}
                 <TableHead className={tab === "today" ? "pl-5" : undefined}>
                   Court
                 </TableHead>
@@ -130,7 +138,7 @@ export default async function BookingsOverviewPage({
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.id}>
-                  {tab === "week" && (
+                  {tab !== "today" && (
                     <TableCell className="pl-5 whitespace-nowrap">
                       {formatDateOnly(row.bookingDate)}
                     </TableCell>

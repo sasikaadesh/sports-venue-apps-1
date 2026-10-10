@@ -19,7 +19,7 @@ import {
  * `lib/booking-service.ts`.
  */
 
-export type BookingsOverviewTab = "today" | "week";
+export type BookingsOverviewTab = "today" | "week" | "nextWeek";
 
 /**
  * The statuses worth a guard's attention. `cancelled` and `expired` hold no
@@ -63,8 +63,19 @@ export async function getBookingsOverview(
   tab: BookingsOverviewTab
 ): Promise<BookingsOverview> {
   const today = todayString();
+  const thisWeek = weekRangeContaining(today);
   const range =
-    tab === "today" ? { start: today, end: today } : weekRangeContaining(today);
+    tab === "today"
+      ? { start: today, end: today }
+      : tab === "nextWeek"
+        ? { start: addDays(thisWeek.start, 7), end: addDays(thisWeek.end, 7) }
+        : thisWeek;
+
+  // "Next week" only shows confirmed bookings — unlike Today/This week, a
+  // guard checking that far ahead cares who is actually arriving, not a
+  // hold that may still expire or a block that may still change.
+  const statuses: BookingStatus[] =
+    tab === "nextWeek" ? ["confirmed"] : VISIBLE_STATUSES;
 
   const bookings = await prisma.booking.findMany({
     where: {
@@ -72,7 +83,7 @@ export async function getBookingsOverview(
         gte: dateStringToDate(range.start),
         lte: dateStringToDate(range.end),
       },
-      status: { in: VISIBLE_STATUSES },
+      status: { in: statuses },
     },
     select: {
       id: true,
