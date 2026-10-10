@@ -15,8 +15,13 @@ export const metadata = { title: "Bookings" };
  * `app/admin/layout.tsx`. A security login must never be able to reach any
  * other admin page, and the surest way to guarantee that is for this route to
  * share no layout, no nav and no code path with `/admin/*` at all: there is
- * no link here to follow, and `requireBookingsAccess()` is the only gate,
- * covering security, admin and super admin alike.
+ * no link here to follow.
+ *
+ * This call to `requireBookingsAccess()` builds the header (it needs to know
+ * who is signed in), but it is NOT the boundary — exactly like
+ * `app/admin/layout.tsx`'s `requireAdmin()`. `app/bookings/page.tsx` calls it
+ * again itself, which is the check that actually decides whether the page's
+ * data is sent.
  */
 export default async function BookingsLayout({
   children,

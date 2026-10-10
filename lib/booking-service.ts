@@ -84,6 +84,28 @@ function isUniqueViolation(e: unknown): boolean {
   );
 }
 
+/**
+ * A P2002 specifically on `Booking.bookingReference` — the nested write in
+ * `createBooking`/`blockSlot` can violate either that constraint or the
+ * genuine anti-double-booking one, and only the latter means "that slot was
+ * just taken". `lib/booking-reference.ts`'s year-qualified, collision-safe
+ * generation means this should now be unreachable; it is kept as a loud
+ * failure rather than a silently wrong user-facing message in case it ever
+ * is reached (a hand-edited database, a future change to the format, …).
+ */
+function isBookingReferenceCollision(e: unknown): boolean {
+  if (!isUniqueViolation(e)) return false;
+  const target = (e as { meta?: { target?: unknown } }).meta?.target;
+  const fields = Array.isArray(target)
+    ? target
+    : typeof target === "string"
+      ? [target]
+      : [];
+  return fields.some(
+    (f) => typeof f === "string" && f.toLowerCase().includes("bookingreference")
+  );
+}
+
 /** The two statuses that mean "this booking is no longer holding its hours". */
 type ReleasedStatus = Extract<BookingStatus, "cancelled" | "expired">;
 
@@ -694,6 +716,11 @@ export async function createBooking(
       },
     };
   } catch (e) {
+    // A reference collision is not "taken" — see isBookingReferenceCollision.
+    // Rethrown rather than mapped to a user-facing message that would be
+    // actively wrong about what happened.
+    if (isBookingReferenceCollision(e)) throw e;
+
     // The race the pre-check above cannot close: someone else's transaction
     // committed one of these hours in between. This is the guarantee doing its
     // job, not an unexpected failure.
@@ -1158,6 +1185,9 @@ export async function blockSlot(input: {
 
     return { ok: true, data: booking };
   } catch (e) {
+    // See the identical guard in createBooking above.
+    if (isBookingReferenceCollision(e)) throw e;
+
     if (isUniqueViolation(e)) {
       return {
         ok: false,

@@ -175,8 +175,12 @@ model Court {
   /// lib/booking-reference.ts. Null on a court nobody has booked yet; the
   /// first reference generated for it derives one from the name and persists
   /// it here (`ensureCourtReferencePrefix`), so it only ever needs to be
-  /// derived once per court.
-  referencePrefix String?
+  /// derived once per court. UNIQUE (nullable, so many courts may still be
+  /// null at once): two courts whose names derive the same prefix would
+  /// otherwise both start writing e.g. "BAD-260915-001", and a reference's
+  /// uniqueness is only real if the prefix is. `ensureCourtReferencePrefix`
+  /// appends a number (BAD, BAD2, BAD3, …) when the plain derivation collides.
+  referencePrefix String? @unique
   /// This court's colour everywhere it needs to be told apart at a glance —
   /// the /bookings grid, the admin Bookings table — as a `#rrggbb` hex. One
   /// of the 9 named swatches in `lib/court-colors.ts` (`COURT_COLOR_PALETTE`),
@@ -387,6 +391,11 @@ model SecurityStaff {
   /// again until this passes, however many more correct or incorrect PINs
   /// arrive in between.
   lockedUntil    DateTime?
+  /// Bumped on a PIN reset and on disabling the account — included in every
+  /// session cookie (lib/security-staff/session.ts) and compared on every
+  /// request, so a cookie issued before the bump stops working immediately
+  /// rather than surviving up to its own 12-hour expiry.
+  sessionVersion Int       @default(0)
   /// The super admin who created this login. SET NULL on removal — the
   /// account survives as a record, it just stops naming anyone (same pattern
   /// as UserRating.adminId).

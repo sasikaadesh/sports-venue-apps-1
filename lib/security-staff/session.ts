@@ -14,9 +14,15 @@ import { cookies } from "next/headers";
  * `lib/auth.ts` — none of that code path is touched by this feature.
  *
  * Token shape: `base64url(json).hex(hmac)`, where `json` is
- * `{ id, username, exp }`. Nothing here is encrypted — a PIN hash never
+ * `{ id, username, v, exp }`. Nothing here is encrypted — a PIN hash never
  * appears in the token, so there is nothing in it worth hiding, only
  * tampering to prevent, which the HMAC does.
+ *
+ * `v` mirrors `SecurityStaff.sessionVersion` at the moment this token was
+ * issued. A PIN reset or a disable bumps the stored version
+ * (`lib/security-staff/service.ts`); `getBookingsViewer` compares the two on
+ * every request, so a cookie minted under the old PIN stops being accepted
+ * the instant that happens — it does not linger until its own 12-hour `exp`.
  */
 
 export const SECURITY_SESSION_COOKIE = "security_session";
@@ -39,6 +45,7 @@ function secret(): string {
 type SecurityTokenPayload = {
   id: string;
   username: string;
+  v: number;
   exp: number;
 };
 
@@ -69,6 +76,7 @@ function decode(token: string): SecurityTokenPayload | null {
     if (
       typeof payload.id !== "string" ||
       typeof payload.username !== "string" ||
+      typeof payload.v !== "number" ||
       typeof payload.exp !== "number"
     ) {
       return null;
@@ -83,9 +91,15 @@ function decode(token: string): SecurityTokenPayload | null {
 export async function setSecuritySessionCookie(staff: {
   id: string;
   username: string;
+  sessionVersion: number;
 }): Promise<void> {
   const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const token = encode({ id: staff.id, username: staff.username, exp });
+  const token = encode({
+    id: staff.id,
+    username: staff.username,
+    v: staff.sessionVersion,
+    exp,
+  });
 
   const store = await cookies();
   store.set(SECURITY_SESSION_COOKIE, token, {
@@ -114,6 +128,7 @@ export async function clearSecuritySessionCookie(): Promise<void> {
 export async function readSecuritySessionCookie(): Promise<{
   id: string;
   username: string;
+  sessionVersion: number;
 } | null> {
   const store = await cookies();
   const token = store.get(SECURITY_SESSION_COOKIE)?.value;
@@ -123,5 +138,9 @@ export async function readSecuritySessionCookie(): Promise<{
   if (!payload) return null;
   if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
 
-  return { id: payload.id, username: payload.username };
+  return {
+    id: payload.id,
+    username: payload.username,
+    sessionVersion: payload.v,
+  };
 }

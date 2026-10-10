@@ -18,6 +18,7 @@ import {
   getCourtLegend,
   type BookingsOverviewTab,
 } from "@/lib/security-bookings";
+import { requireBookingsAccess } from "@/lib/security-staff/auth";
 import { formatDate, formatDateOnly, dateStringToDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -39,14 +40,22 @@ function statusVariant(status: string) {
  * The one page a security login may reach. Two tabs — Today and This Week
  * (Sri Lanka time, Monday–Sunday) — both read-only, both sorted by time.
  *
- * Gated in `app/bookings/layout.tsx` (`requireBookingsAccess`), not here —
- * every page under this layout shares the same single gate.
+ * `app/bookings/layout.tsx` also calls `requireBookingsAccess()`, but a
+ * layout is not itself a security boundary here any more than
+ * `app/admin/layout.tsx`'s `requireAdmin()` is for the admin panel (see that
+ * file's own comment) — Next can skip re-running a layout on a
+ * client-side navigation that only changes this page's search params, and a
+ * crafted request is not obliged to go through the layout at all. This call
+ * is what actually decides whether the names and phone numbers below are
+ * sent, on every single request for this page.
  */
 export default async function BookingsOverviewPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireBookingsAccess();
+
   const { tab: tabParam } = await searchParams;
   const tab: BookingsOverviewTab = tabParam === "week" ? "week" : "today";
 

@@ -47,12 +47,27 @@ export async function getBookingsViewer(): Promise<BookingsViewer | null> {
 
   const staff = await prisma.securityStaff.findUnique({
     where: { id: session.id },
-    select: { id: true, username: true, isActive: true },
+    select: {
+      id: true,
+      username: true,
+      isActive: true,
+      sessionVersion: true,
+    },
   });
 
   // Re-checked here, not just at login: a disabled account must lose access
-  // on its next request, not twelve hours later when the cookie expires.
-  if (!staff || !staff.isActive || staff.username !== session.username) {
+  // on its next request, not twelve hours later when the cookie expires. The
+  // `sessionVersion` compare is the same idea applied to a PIN reset: it is
+  // bumped by `setSecurityStaffActive(false)` and `resetSecurityStaffPin`
+  // (lib/security-staff/service.ts), so a cookie minted before either of
+  // those stops matching immediately rather than staying valid until its own
+  // 12-hour expiry.
+  if (
+    !staff ||
+    !staff.isActive ||
+    staff.username !== session.username ||
+    staff.sessionVersion !== session.sessionVersion
+  ) {
     return null;
   }
 

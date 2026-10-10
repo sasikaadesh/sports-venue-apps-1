@@ -170,10 +170,10 @@ The one table that summarises this doc's access rules. "Owner" means the signed-
 ### Booking reference (`20261009120000_security_staff_and_booking_reference`)
 
 Every `Booking` carries a readable, stable `bookingReference` — e.g.
-**`BAD-0915-003`**: Badminton, 15 Sep, the 3rd booking made against that court
-on that date.
+**`BAD-260915-003`**: Badminton, 15 Sep 2026, the 3rd booking made against
+that court on that date.
 
-- **Format:** `{courtPrefix}-{MMDD}-{seq}`, seq zero-padded to 3 digits.
+- **Format:** `{courtPrefix}-{YYMMDD}-{seq}`, seq zero-padded to 3 digits.
   `Court.referencePrefix` holds the prefix (`BAD`, `BAS`, `TEN`, `CRA`
   Cricket Net - Astro, `CRC` Cricket Net - Concrete, `CRD` Cricket Nets -
   Double, `TT` Table Tennis, `POOL` Swimming Pool, `FIT` Fitness Center);
@@ -181,15 +181,34 @@ on that date.
   or renamed since, gets one derived from its name the first time it is ever
   booked (`ensureCourtReferencePrefix`, `lib/booking-reference.ts`) and
   persisted — so this only has to happen once per court, not once per
-  booking.
+  booking. **`Court.referencePrefix` is itself `UNIQUE`**: if a later court's
+  name would derive the same prefix as an existing one (a second "Badminton"
+  court, say), `ensureCourtReferencePrefix` tries numbered variants (`BAD2`,
+  `BAD3`, …) until the `UPDATE` actually commits a free one, rather than
+  assuming the first guess is available.
+- **The date segment carries the year.** An earlier version used `MMDD`
+  alone; `BookingSequence`'s counter was always correctly scoped by the
+  _full_ date, but the year-less display string was not, so the same court
+  reaching the same calendar date a year later produced an identical
+  reference. Since `Booking.bookingReference` is globally `@unique`, that
+  collided, rolled the whole booking back — taking the counter with it — and
+  repeated on every retry: the court and date would have stayed permanently
+  unbookable. `YYMMDD` closes this structurally.
 - **The sequence number is a real counter, not a count.** `BookingSequence`
   holds one row per `(courtId, bookingDate)`, incremented with
   `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` inside the same
   transaction that creates the `Booking` (`nextBookingReference`). It only
   ever goes up — cancelling or deleting an earlier booking on that court and
   date does **not** give its number back, which is what makes every
-  reference permanent: `BAD-0915-003` stays `BAD-0915-003` even if bookings
-  1 and 2 that day are later cancelled.
+  reference permanent: `BAD-260915-003` stays `BAD-260915-003` even if
+  bookings 1 and 2 that day are later cancelled.
+- **A reference collision is distinguished from a genuinely taken slot.**
+  `isBookingReferenceCollision` (`lib/booking-service.ts`) checks the P2002's
+  `meta.target` before translating it to "that slot was just taken" — the
+  two write paths that catch unique violations must not mislabel a
+  reference-table bug as ordinary contention. The fixes above should make
+  this case unreachable in practice; it is kept as a loud failure rather
+  than a silently wrong message in case it ever isn't.
 - **Assigned exactly once, at creation, for every kind of `Booking` row** —
   an ordinary exclusive booking, a shared-facility booking, and an admin
   slot block alike (all three write paths in `lib/booking-service.ts` call
@@ -244,32 +263,64 @@ authenticated` in the migration — Supabase's `ALTER DEFAULT PRIVILEGES`
   entirely separate from `@supabase/ssr`'s cookies and from `proxy.ts`
   (which only ever touches `sb-*` cookies). `SECURITY_SESSION_SECRET` (env,
   server-only, required — there is no insecure default) signs it.
-- **Brute-force lockout.** `attemptSecurityLogin` (`lib/security-staff/
-service.ts`) locks an account for 15 minutes after 5 wrong PINs in a row
-  (`MAX_FAILED_ATTEMPTS`, `LOCKOUT_MINUTES`), and resets the counter on a
-  correct one. A nonexistent username still runs a dummy PIN verification
-  (`verifyAgainstDummy`) so the response takes the same time either way,
-  and every failure — unknown username, disabled account, wrong PIN — reads
-  as the same generic "Invalid username or PIN." A lockout gets its own
-  message, since the UI has to explain why a _correct_ PIN is being
-  refused.
-- **Re-checked on every request, not just at login.** `getBookingsViewer`
-  (`lib/security-staff/auth.ts`) re-reads `isActive` from the database on
-  every call to `/bookings` — a super admin disabling an account takes
-  effect on the very next request, not whenever that account's 12-hour
-  cookie happens to expire.
+- **Brute-force lockout, enforced atomically.** `attemptSecurityLogin`
+  (`lib/security-staff/service.ts`) locks an account for 15 minutes after 5
+  wrong PINs in a row (`MAX_FAILED_ATTEMPTS`, `LOCKOUT_MINUTES`). The whole
+  check — read the lock state, verify the PIN, write the new failure count —
+  runs inside one transaction holding a `SELECT ... FOR UPDATE` row lock on
+  the account, not a plain read followed by a separate write: a bare
+  read-then-write would let a burst of concurrent requests all read "not
+  locked yet" before any of their failures landed, so all of them would get
+  to guess. The row lock serialises every concurrent attempt against the
+  same username on Postgres itself, which holds even across separate
+  serverless instances. `failedAttempts` is reset **only by a correct PIN,
+  never by a lockout firing** — resetting it at lock time would hand back a
+  fresh set of attempts every time the lock expired; leaving it means the
+  very next wrong PIN after expiry re-locks immediately. Every failure —
+  unknown username, disabled account, wrong PIN, **and a locked account** —
+  reads as the same generic "Invalid username or PIN.", with no message
+  specific to a lockout: an earlier version gave a lockout its own text,
+  which told an attacker a guessed username exists the moment five wrong
+  PINs against it produced that message instead of the generic one.
+  `verifyAgainstDummy` keeps a nonexistent username from finishing faster
+  than a real one, closing the same leak by timing. A per-IP cap
+  (`checkRateLimit`, `app/(auth)/security-login/actions.ts`, 20 attempts per
+  10 minutes) sits on top of the per-account lockout, because the lockout
+  alone does not stop one guessed PIN being sprayed across many different
+  usernames — each account only ever sees one wrong attempt that way, so
+  none of them lock.
+- **Re-checked on every request, not just at login — and not just by the
+  layout.** `getBookingsViewer` (`lib/security-staff/auth.ts`) re-reads
+  `isActive` and `sessionVersion` from the database on every call. A super
+  admin disabling an account, or resetting its PIN, bumps `sessionVersion`
+  (`lib/security-staff/service.ts`) — carried in the session cookie
+  (`lib/security-staff/session.ts`) — so either one invalidates every
+  existing cookie for that account on its very next request, rather than
+  leaving up to 12 hours (the cookie's own expiry) for an old session to
+  keep working. `app/bookings/layout.tsx` calls `requireBookingsAccess()`
+  to build the header, but — exactly like `app/admin/layout.tsx`'s
+  `requireAdmin()` — that call is not itself the boundary: a layout is not
+  guaranteed to re-run on every request (a client-side navigation that only
+  changes this page's search params can skip it), so
+  `app/bookings/page.tsx` calls `requireBookingsAccess()` again itself. That
+  second call is what actually decides whether the page's data — names and
+  phone numbers — is sent, the same way every `/admin/*` page re-checks
+  independently of its layout.
 - **Who manages these accounts.** Super-admin only — `/admin/security-staff`
   — create, disable/re-enable, reset PIN, remove. Exactly the same ladder
   rule as admin accounts ("The role ladder" above): a plain admin cannot
   reach this page (`requireSuperAdmin`).
 
 **Access restriction — `/bookings` and nowhere else.**
-`requireBookingsAccess()` (`lib/security-staff/auth.ts`) is the single gate
-for the whole `app/bookings/*` route, applied once in
-`app/bookings/layout.tsx`, and accepts exactly three callers: `admin`,
-`super_admin`, or a valid, still-active security session. Enforcement is
-layered the same way the rest of the app is (CLAUDE.md: "never rely on
-middleware alone"):
+`requireBookingsAccess()` (`lib/security-staff/auth.ts`) is the one gate for
+the whole `app/bookings/*` route, and accepts exactly three callers: `admin`,
+`super_admin`, or a valid, still-active security session. It is called in
+**both** `app/bookings/layout.tsx` (to build the header) **and**
+`app/bookings/page.tsx` (to decide whether the page's data is sent) — same
+belt-and-braces pattern as `/admin/*`, where the layout's `requireAdmin()`
+builds the shell and every page calls it again. Enforcement is layered the
+same way the rest of the app is (CLAUDE.md: "never rely on middleware
+alone"):
 
 - **Server-side, absolutely.** `/bookings` shares **no layout, no nav
   component, and no code path** with `/admin/*` — there is no link to any
