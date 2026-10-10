@@ -350,9 +350,10 @@ export async function listAdminBookings({
         playerCount: true,
         durationHours: true,
         totalPrice: true,
+        bookingReference: true,
         status: true,
         createdAt: true,
-        court: { select: { name: true } },
+        court: { select: { name: true, color: true } },
         // The hours this booking holds, in clock order. A released booking
         // (cancelled/expired) has none — it gave its hours back.
         slots: {

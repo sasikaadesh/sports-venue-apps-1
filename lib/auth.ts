@@ -109,25 +109,66 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   const affiliation = fromMetadata("affiliation");
 
-  return prisma.user.upsert({
-    where: { id: user.id },
-    create: {
-      id: user.id,
-      email: user.email!,
-      name: fromMetadata("name") ?? fromMetadata("full_name") ?? null,
-      phone: fromMetadata("phone") ?? null,
-      address: fromMetadata("address") ?? null,
-      emergencyContact: fromMetadata("emergencyContact") ?? null,
-      // NIC deliberately NOT taken from metadata here. It is UNIQUE, so a
-      // value someone else already holds would make this upsert throw on
-      // every request this user makes. Left NULL, the profile is incomplete
-      // and /complete-profile asks for it with a readable error instead.
-      affiliation: isAffiliation(affiliation) ? affiliation : null,
-    },
-    update: {},
-    select: PROFILE_SELECT,
-  });
+  try {
+    return await prisma.user.upsert({
+      where: { id: user.id },
+      create: {
+        id: user.id,
+        email: user.email!,
+        name: fromMetadata("name") ?? fromMetadata("full_name") ?? null,
+        phone: fromMetadata("phone") ?? null,
+        address: fromMetadata("address") ?? null,
+        emergencyContact: fromMetadata("emergencyContact") ?? null,
+        // NIC deliberately NOT taken from metadata here. It is UNIQUE, so a
+        // value someone else already holds would make this upsert throw on
+        // every request this user makes. Left NULL, the profile is incomplete
+        // and /complete-profile asks for it with a readable error instead.
+        affiliation: isAffiliation(affiliation) ? affiliation : null,
+      },
+      update: {},
+      select: PROFILE_SELECT,
+    });
+  } catch (e) {
+    // `where: { id }` found no row, so the CREATE branch ran — and it hit
+    // `User.email`'s own unique constraint, meaning some OTHER row already
+    // holds this email under a different id. That is a genuine data-integrity
+    // drift (this user's `auth.users.id` no longer matches their stored
+    // profile id — e.g. an account recreated outside the normal sign-up path),
+    // not something a retry fixes. Rather than 500 the request — which would
+    // make every page this person visits throw — fall back to the row that
+    // already exists for their email, so they can at least sign in and reach
+    // /account, and log it loudly so the drift gets investigated and the
+    // stored id reconciled.
+    if (isUniqueEmailViolation(e)) {
+      console.error(
+        `[auth] profile id/email drift for ${user.email}: auth.users.id=${user.id} has no matching public."User" row, but another row already holds this email. Falling back to the email match — reconcile the stored id.`
+      );
+
+      const byEmail = await prisma.user.findUnique({
+        where: { email: user.email! },
+        select: PROFILE_SELECT,
+      });
+      if (byEmail) return byEmail;
+    }
+
+    throw e;
+  }
 });
+
+/** Postgres unique-violation (Prisma P2002) on `User.email` specifically. */
+function isUniqueEmailViolation(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: unknown }).code === "P2002" &&
+    "meta" in e &&
+    !!(e as { meta?: { target?: unknown } }).meta?.target &&
+    JSON.stringify(
+      (e as { meta?: { target?: unknown } }).meta?.target
+    ).includes("email")
+  );
+}
 
 /** True when the current request comes from an admin or a super admin. */
 export async function isAdmin(): Promise<boolean> {

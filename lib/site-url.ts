@@ -24,7 +24,8 @@ export async function siteOrigin(): Promise<string> {
   if (!host) return "http://localhost:3000";
 
   const proto =
-    h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+    h.get("x-forwarded-proto") ??
+    (host.startsWith("localhost") ? "http" : "https");
   return `${proto}://${host}`;
 }
 
@@ -71,11 +72,22 @@ export async function authRedirectOrigin(): Promise<string> {
   return siteOrigin();
 }
 
-/** Only relative, single-slash paths — never an attacker-supplied host. */
+/**
+ * Only relative, single-slash paths — never an attacker-supplied host.
+ *
+ * `next.startsWith("//")` alone is not enough: a browser treats a backslash
+ * the same as a forward slash in a URL, so `/\evil.com` is normalised to
+ * `//evil.com` — a protocol-relative URL pointing at `evil.com` — before it
+ * is ever handed to `redirect()`. Checking the second character for EITHER
+ * slash, and rejecting any backslash anywhere in the value (not only at the
+ * start — `/ok/\evil.com` would otherwise slip through this same way one
+ * segment in), closes both the leading and embedded forms of it.
+ */
 export function safeNextPath(
   value: FormDataEntryValue | string | null | undefined,
   fallback = "/account"
 ): string {
   const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+  const isSafe = /^\/(?![/\\])/.test(next) && !/[\x00-\x1f\\]/.test(next);
+  return isSafe ? next : fallback;
 }

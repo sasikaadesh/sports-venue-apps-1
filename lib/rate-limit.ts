@@ -1,8 +1,10 @@
 import "server-only";
 
+import { headers } from "next/headers";
+
 /**
  * A tiny in-memory, fixed-window rate limiter for public, unauthenticated
- * write paths (currently just the contact form).
+ * write paths (the contact form, security-staff login).
  *
  * In-memory means per-instance: on Vercel, a burst spread across multiple
  * serverless instances is not caught, and a redeploy or cold start clears the
@@ -47,4 +49,16 @@ export function checkRateLimit(
 
   entry.count += 1;
   return true;
+}
+
+/**
+ * The calling request's address, for keying `checkRateLimit`. Spoofable,
+ * which is fine — this is a cheap flood brake, not an identity check (see the
+ * module doc above). May carry a comma-separated chain behind a proxy; the
+ * first entry is the original client.
+ */
+export async function clientIp(): Promise<string> {
+  const h = await headers();
+  const forwarded = h.get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || "unknown";
 }

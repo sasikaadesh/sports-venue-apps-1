@@ -107,6 +107,8 @@ model User {
   ratings UserRating[] @relation("RatingTarget")
   /// Conduct notes this user wrote, as an admin.
   ratingsGiven UserRating[] @relation("RatingAuthor")
+  /// Security staff logins this (super admin) user created.
+  securityStaffCreated SecurityStaff[] @relation("SecurityStaffCreatedBy")
 }
 
 /// An admin's private conduct note about a user: 1–5 stars plus a required
@@ -169,6 +171,22 @@ model Court {
   /// = the court type's standard set (standardRulesForType in lib/court-rules.ts).
   rules        String?
   images       String[] // Supabase Storage URLs (Unsplash placeholders for now)
+  /// Short code used in booking references, e.g. "BAD" for Badminton — see
+  /// lib/booking-reference.ts. Null on a court nobody has booked yet; the
+  /// first reference generated for it derives one from the name and persists
+  /// it here (`ensureCourtReferencePrefix`), so it only ever needs to be
+  /// derived once per court. UNIQUE (nullable, so many courts may still be
+  /// null at once): two courts whose names derive the same prefix would
+  /// otherwise both start writing e.g. "BAD-260915-001", and a reference's
+  /// uniqueness is only real if the prefix is. `ensureCourtReferencePrefix`
+  /// appends a number (BAD, BAD2, BAD3, …) when the plain derivation collides.
+  referencePrefix String? @unique
+  /// This court's colour everywhere it needs to be told apart at a glance —
+  /// the /bookings grid, the admin Bookings table — as a `#rrggbb` hex. One
+  /// of the 9 named swatches in `lib/court-colors.ts` (`COURT_COLOR_PALETTE`),
+  /// though any valid hex is stored as-is. Always paired with the court's
+  /// name wherever it is shown — see "Court colour" in ARCHITECTURE.md.
+  color           String  @default("#0E7A34")
   /// Cannot change while the court holds today's or future hours (DB trigger
   /// `court_guard_booking_mode`), because BookingSlot.exclusive is derived from it.
   bookingMode  BookingMode    @default(exclusive)
@@ -184,6 +202,7 @@ model Court {
   bookings     Booking[]
   bookingSlots BookingSlot[]
   specialRequests SpecialRequest[]
+  bookingSequences BookingSequence[]
 
   @@index([courtTypeId])
   @@index([displayOrder])
@@ -252,6 +271,12 @@ model Booking {
   playerCount   Int
   durationHours Int           @default(1) // number of consecutive slots, min 1
   totalPrice    Decimal       @default(0) @db.Decimal(10, 2) // sum of the slots' prices, frozen
+  /// Readable, stable code — e.g. "BAD-0915-003" (court prefix, MMDD, that
+  /// court+date's Nth booking). Assigned ONCE in the same transaction as the
+  /// row itself (lib/booking-reference.ts) and never changed afterward, even
+  /// if earlier bookings on that court/date are later cancelled or deleted.
+  /// Null only on rows written before this column existed.
+  bookingReference String?    @unique
   status        BookingStatus @default(pending)
   holdExpiresAt DateTime? // expiry for a pending hold
   createdAt     DateTime      @default(now())
@@ -321,4 +346,61 @@ model Payment {
   createdAt  DateTime      @default(now())
 
   @@index([bookingId])
+}
+
+/// The counter behind `Booking.bookingReference`'s sequence number — one row
+/// per court + date, incremented atomically (`INSERT ... ON CONFLICT DO
+/// UPDATE ... RETURNING`, see lib/booking-reference.ts) inside the same
+/// transaction that writes the `Booking`. The count only ever goes up: a
+/// cancelled or deleted booking does not give its number back, which is what
+/// keeps every reference stable and unique forever.
+model BookingSequence {
+  id          String   @id @default(uuid()) @db.Uuid
+  courtId     String   @db.Uuid
+  court       Court    @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  bookingDate DateTime @db.Date
+  lastSeq     Int      @default(0)
+
+  @@unique([courtId, bookingDate])
+}
+
+/// A security guard's individual sign-in — NOT a Supabase Auth account.
+/// Deliberately its own table rather than a `Role` value on `User`: that table
+/// mirrors `auth.users` 1:1 (CLAUDE.md, docs/ARCHITECTURE.md → Auth & roles),
+/// and a security login has no email, no password and no Supabase session —
+/// only a username and a PIN, checked entirely server-side against this table
+/// (lib/security-staff/). Keeping it separate means every existing admin/user
+/// auth path is completely unaffected by this feature.
+///
+/// One row per person, for individual accountability — never a shared
+/// username. A super admin creates, disables and removes these; see
+/// docs/ARCHITECTURE.md → "Security staff".
+model SecurityStaff {
+  id             String    @id @default(uuid()) @db.Uuid
+  /// Lower-cased at write time so lookups are case-insensitive without
+  /// needing citext. Short, memorable — not an email.
+  username       String    @unique
+  /// scrypt hash, "<salt>:<hash>" hex — never the plain PIN. See lib/security-staff/pin.ts.
+  pinHash        String
+  /// A name/label for the admin panel — "Gate — night shift", "J. Perera".
+  label          String?
+  isActive       Boolean   @default(true)
+  /// Reset to 0 on a successful login. Checked against SECURITY_PIN_MAX_ATTEMPTS.
+  failedAttempts Int       @default(0)
+  /// Set once failedAttempts reaches the limit; the account cannot log in
+  /// again until this passes, however many more correct or incorrect PINs
+  /// arrive in between.
+  lockedUntil    DateTime?
+  /// Bumped on a PIN reset and on disabling the account — included in every
+  /// session cookie (lib/security-staff/session.ts) and compared on every
+  /// request, so a cookie issued before the bump stops working immediately
+  /// rather than surviving up to its own 12-hour expiry.
+  sessionVersion Int       @default(0)
+  /// The super admin who created this login. SET NULL on removal — the
+  /// account survives as a record, it just stops naming anyone (same pattern
+  /// as UserRating.adminId).
+  createdById    String?   @db.Uuid
+  createdBy      User?     @relation("SecurityStaffCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+  disabledAt     DateTime?
 }

@@ -33,6 +33,7 @@ export default async function EditCourtPage({
         capacity: true,
         isActive: true,
         images: true,
+        color: true,
         courtType: { select: { name: true } },
         slots: {
           orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
@@ -119,6 +120,7 @@ export default async function EditCourtPage({
                 capacity: court.capacity,
                 isActive: court.isActive,
                 imageCount: court.images.length,
+                color: court.color,
               }}
             />
           </div>

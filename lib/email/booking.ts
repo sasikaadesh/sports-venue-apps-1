@@ -42,6 +42,7 @@ export async function sendBookingConfirmationEmail(
         playerCount: true,
         durationHours: true,
         totalPrice: true,
+        bookingReference: true,
         court: { select: { name: true } },
         user: { select: { email: true, name: true } },
         slots: {
@@ -73,6 +74,7 @@ export async function sendBookingConfirmationEmail(
       durationHours: booking.durationHours,
       playerCount: booking.playerCount,
       total: formatPrice(booking.totalPrice.toString()),
+      bookingReference: booking.bookingReference,
       bookingUrl: `${await siteOrigin()}/bookings/${booking.id}`,
     };
 
@@ -109,6 +111,7 @@ function confirmationText(props: {
   durationHours: number;
   playerCount: number;
   total: string;
+  bookingReference: string | null;
   bookingUrl: string;
 }): string {
   return [
@@ -116,6 +119,7 @@ function confirmationText(props: {
     "",
     "Your payment went through and your booking is confirmed.",
     "",
+    ...(props.bookingReference ? [`Reference: ${props.bookingReference}`] : []),
     `Court:   ${props.courtName}`,
     `Date:    ${props.date}`,
     `Time:    ${props.timeRange} (${props.durationHours} ${props.durationHours === 1 ? "hour" : "hours"})`,

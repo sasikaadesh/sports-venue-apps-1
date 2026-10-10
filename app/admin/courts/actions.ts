@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
 import { revalidateCatalogue } from "@/lib/catalogue";
+import { DEFAULT_COURT_COLOR } from "@/lib/court-colors";
 import { prisma } from "@/lib/prisma";
 import {
   deleteAllCourtImages,
@@ -51,6 +52,7 @@ function courtFieldsFrom(formData: FormData) {
     capacity: formData.get("capacity") ?? "",
     // FormData has no booleans — the client sends the string "true"/"false".
     isActive: formData.get("isActive") === "true",
+    color: formData.get("color") ?? DEFAULT_COURT_COLOR,
   };
 }
 
@@ -104,6 +106,7 @@ export async function createCourt(
       bookingMode: parsed.data.bookingMode,
       capacity: capacityFrom(parsed.data),
       isActive: parsed.data.isActive,
+      color: parsed.data.color,
       images: [],
     },
     select: { id: true },
@@ -147,7 +150,10 @@ export async function updateCourt(
   // future bookings. The DB trigger refuses it regardless; this says so kindly.
   if (parsed.data.bookingMode !== existing.bookingMode) {
     const upcoming = await prisma.bookingSlot.count({
-      where: { courtId: id, bookingDate: { gte: dateStringToDate(todayString()) } },
+      where: {
+        courtId: id,
+        bookingDate: { gte: dateStringToDate(todayString()) },
+      },
     });
     if (upcoming > 0) {
       return actionError(
@@ -181,6 +187,7 @@ export async function updateCourt(
       bookingMode: parsed.data.bookingMode,
       capacity: capacityFrom(parsed.data),
       isActive: parsed.data.isActive,
+      color: parsed.data.color,
       images,
     },
   });

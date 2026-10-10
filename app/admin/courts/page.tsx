@@ -5,6 +5,7 @@ import { Home, ImageOff, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/link-button";
 import { EmptyState, PageHeader } from "@/components/admin/page-header";
+import { CourtColorDot } from "@/components/court-color-dot";
 import { requireAdmin } from "@/lib/auth";
 import { COURT_DISPLAY_ORDER } from "@/lib/catalogue";
 import { prisma } from "@/lib/prisma";
@@ -23,6 +24,7 @@ export default async function CourtsPage() {
         name: true,
         images: true,
         isActive: true,
+        color: true,
         courtType: { select: { name: true } },
         _count: { select: { slots: true, bookings: true } },
       },
@@ -103,7 +105,8 @@ export default async function CourtsPage() {
 
                 <div className="flex flex-1 flex-col gap-2 px-4 py-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="leading-tight font-medium">
+                    <span className="flex items-center gap-1.5 leading-tight font-medium">
+                      <CourtColorDot color={court.color} />
                       {court.name}
                     </span>
                     <Badge variant="secondary">{court.courtType.name}</Badge>

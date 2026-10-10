@@ -23,10 +23,7 @@ export const CONTACT_DETAILS = {
    * public address can differ from the inbox that receives them.
    */
   email: "sports@stsebastians.lk",
-  openingHours: [
-    { days: "Monday – Friday", hours: "06:00 – 22:00" },
-    { days: "Saturday & Sunday", hours: "07:00 – 20:00" },
-  ],
+  openingHours: [{ days: "Monday to Friday,", hours: "7:30 AM – 3:00 PM" }],
 } as const;
 
 /** `tel:` needs the number without spaces or punctuation. */
