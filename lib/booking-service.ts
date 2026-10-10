@@ -1200,6 +1200,61 @@ export async function blockSlot(input: {
 }
 
 /**
+ * Block every slot a court runs on a given date, in one action.
+ *
+ * Thin wrapper around `blockSlot`, called once per slot template for that
+ * weekday — so it inherits all of that function's guards (slot ownership,
+ * shared-vs-exclusive handling, the unique-constraint race) rather than
+ * duplicating them. A slot that already has a real booking is left alone,
+ * same as blocking one slot at a time; it is reported back as skipped, not
+ * treated as an error, since "most of the day" is still a useful result.
+ */
+export async function blockFullDay(input: {
+  courtId: string;
+  bookingDate: Date;
+  adminId: string;
+}): Promise<BookingResult<{ blocked: number; skipped: number }>> {
+  const { courtId, bookingDate, adminId } = input;
+
+  const slots = await prisma.slotTemplate.findMany({
+    where: { courtId, dayOfWeek: dayOfWeekForDate(bookingDate) },
+    select: { id: true },
+  });
+
+  if (slots.length === 0) {
+    return {
+      ok: false,
+      error: "This court has no slots on this day.",
+      reason: "invalid",
+    };
+  }
+
+  let blocked = 0;
+  let skipped = 0;
+
+  for (const slot of slots) {
+    const result = await blockSlot({
+      courtId,
+      slotId: slot.id,
+      bookingDate,
+      adminId,
+    });
+    if (result.ok) blocked++;
+    else skipped++;
+  }
+
+  if (blocked === 0) {
+    return {
+      ok: false,
+      error: "Every slot on this day is already booked or blocked.",
+      reason: "taken",
+    };
+  }
+
+  return { ok: true, data: { blocked, skipped } };
+}
+
+/**
  * Remove an admin block, freeing the slot.
  *
  * Scoped to `status: 'blocked'` in the WHERE clause, so this can never delete

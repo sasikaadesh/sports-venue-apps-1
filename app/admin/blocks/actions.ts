@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
-import { blockSlot, unblockSlot } from "@/lib/booking-service";
+import { blockFullDay, blockSlot, unblockSlot } from "@/lib/booking-service";
 import { dateStringToDate } from "@/lib/time";
 import {
   actionError,
+  blockFullDaySchema,
   blockSlotSchema,
   firstIssue,
   type ActionResult,
@@ -31,6 +32,27 @@ export async function blockSlotAction(
   const result = await blockSlot({
     courtId: parsed.data.courtId,
     slotId: parsed.data.slotId,
+    bookingDate: dateStringToDate(parsed.data.bookingDate),
+    adminId: admin.id,
+  });
+
+  if (!result.ok) return actionError(result.error);
+
+  revalidatePath("/admin/blocks");
+  revalidatePath("/admin/bookings");
+  return { ok: true, data: result.data };
+}
+
+export async function blockFullDayAction(
+  input: unknown
+): Promise<ActionResult<{ blocked: number; skipped: number }>> {
+  const admin = await requireAdmin();
+
+  const parsed = blockFullDaySchema.safeParse(input);
+  if (!parsed.success) return actionError(firstIssue(parsed.error));
+
+  const result = await blockFullDay({
+    courtId: parsed.data.courtId,
     bookingDate: dateStringToDate(parsed.data.bookingDate),
     adminId: admin.id,
   });

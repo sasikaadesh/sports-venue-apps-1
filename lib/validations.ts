@@ -504,6 +504,11 @@ export const blockSlotSchema = z.object({
   bookingDate: z.string().regex(DATE_RE, "Pick a date."),
 });
 
+export const blockFullDaySchema = z.object({
+  courtId: z.uuid(),
+  bookingDate: z.string().regex(DATE_RE, "Pick a date."),
+});
+
 /**
  * A booking request.
  *
@@ -551,6 +556,7 @@ export type DayActiveInput = z.infer<typeof dayActiveSchema>;
 export type CopyScheduleInput = z.infer<typeof copyScheduleSchema>;
 export type SlotPriceInput = z.infer<typeof slotPriceSchema>;
 export type BlockSlotInput = z.infer<typeof blockSlotSchema>;
+export type BlockFullDayInput = z.infer<typeof blockFullDaySchema>;
 export type SecurityLoginInput = z.infer<typeof securityLoginSchema>;
 export type CreateSecurityStaffInput = z.infer<
   typeof createSecurityStaffSchema
