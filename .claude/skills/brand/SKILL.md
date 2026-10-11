@@ -46,12 +46,17 @@ Define these as CSS variables / theme tokens and reference them everywhere — n
 
 ## Typography
 
-The serif headings are what make this read as a heritage institution — this is the most important brand signal, do not drop it.
+**DM Sans** (via `next/font/google`) carries headings and body everywhere — this is what the school's own site, stsebastians.lk, actually uses, so matching it is what makes this read as the same institution rather than a lookalike. Section headings, body copy, buttons, form fields, admin: all DM Sans.
 
-- **Headings (display):** an **elegant serif** — e.g. **Playfair Display**, **Lora**, or **Cormorant** (via `next/font/google`). Used for page titles and section headers ("Not just different. Better prepared."). Large, confident, generous line-height.
-- **Body:** a clean, readable sans — **Inter** (via `next/font/google`).
+**One deliberate exception: the home hero's title.** That one heading keeps an elegant serif — **Playfair Display** — as `--font-display`/`font-display`, applied only there (`components/public/hero-carousel.tsx`). It is the single biggest, most atmospheric piece of type on the site, sitting over a full-bleed photo rather than next to admin UI, so it can afford the heritage flourish that the rest of the app traded away for DM Sans. Nothing else uses `font-display` — a second heading reaching for it is a sign something has drifted, not a new rule.
+
+- **Headings (display), everywhere except the hero title:** **DM Sans**, semibold by default. Large, confident, generous line-height; individual headings may go bolder and tighter-tracked (`font-bold tracking-tight`) for extra presence — stat figures, dialog titles — as a per-element choice, not the default.
+- **The hero title only:** **Playfair Display**, via `font-display`. The hero's supporting line beneath it (and everything else in the hero — eyebrow, CTA) stays DM Sans.
+- **Body:** **DM Sans**, regular weight.
 - **Eyebrow labels:** small, **uppercase**, letter-spaced, in `--muted` or `--green` (e.g. "ACADEMICS", "ADMISSIONS 2026") sitting above a heading.
-- Clear hierarchy: large serif headings, comfortable sans body, small uppercase eyebrows.
+- Hierarchy mostly comes from size and weight, not a serif/sans contrast — except at the hero, where the one serif title is itself the contrast, against a DM Sans app around it.
+
+_Previously this skill ran an elegant serif (Lora/Playfair Display/Cormorant) over Inter body throughout the whole app. That was dropped for DM Sans everywhere to match the school's real site — except the hero title, which kept the serif on purpose as the one heritage flourish worth preserving. If a future customer wants the full serif-pairing look back, or wants to drop the hero exception too, both are single edits here — the rest of this skill (colour, layout, signature components) does not depend on which typeface carries it._
 
 ## Layout & feel
 
@@ -63,19 +68,19 @@ The serif headings are what make this read as a heritage institution — this is
 ## Signature components (reuse these — from the school's own site)
 
 **1. Labelled feature card** _(the "Academics that build character" box you liked)._
-A pale-green (`--mint`) card with a `--border` hairline, `rounded-lg`, generous padding (~1.75rem) and **no shadow** — the tint is what lifts it off a white section. Stacked inside, in this order: a small uppercase letter-spaced eyebrow label in `--green`, a serif sub-heading, a short paragraph in `--muted`, and (when the card leads somewhere) a `--green` text link with a small arrow, pinned to the bottom so a row of cards aligns. Use for highlighting a feature or section — not as a generic container.
+A pale-green (`--mint`) card with a `--border` hairline, `rounded-lg`, generous padding (~1.75rem) and **no shadow** — the tint is what lifts it off a white section. Stacked inside, in this order: a small uppercase letter-spaced eyebrow label in `--green`, a heading-face sub-heading, a short paragraph in `--muted`, and (when the card leads somewhere) a `--green` text link with a small arrow, pinned to the bottom so a row of cards aligns. Use for highlighting a feature or section — not as a generic container.
 
 **2. Numbered process row** _(the "Your move, made simple." 01/02/03 section)._
-Large faint serif numbers (`01` `02` `03`) in a light green, each above a serif step title and a short `--muted` description. **Only use real sequences** (steps that genuinely have an order).
+Large faint heading-face numbers (`01` `02` `03`) in a light green, each above a step title in the same face and a short `--muted` description. **Only use real sequences** (steps that genuinely have an order).
 
 **3. Deep-green CTA band** _(the "Best chapter of your story starts here." section)._
-A full-width `--green-deep` background section with white serif heading, short white/muted text, and buttons (one gold `--gold`, one outlined white). Used to anchor an important call to action.
+A full-width `--green-deep` background section with a white heading, short white/muted text, and buttons (one gold `--gold`, one outlined white). Used to anchor an important call to action.
 
 **4. Footer.**
 The school's signature block. Ground it in `--green-deepest` — a deep, slightly muted forest green — and build it as follows.
 
 - **Top rule.** One thin horizontal hairline (~4px) split into **three equal thirds: medium green, white, then `--gold`, each exactly one third of the full width.** This is the school rule and it is the footer's signature — it is _not_ a solid gold bar, and the thirds are even, not a wide green run closed by a short gold tail. Fill the segments (`flex`, each `flex-1`) rather than drawing three borders, so the thirds stay equal at every width.
-- **Identity, top-left.** Crest + school name in the serif, with `<Location> · Est. <Year>` beneath it as a small letter-spaced uppercase line in the muted pale-green.
+- **Identity, top-left.** Crest + school name in the heading face, with `<Location> · Est. <Year>` beneath it as a small letter-spaced uppercase line in the muted pale-green.
 - **Then, in order:** a one-line tagline in off-white, and a pair of actions — a solid `--gold` primary button and a **white-outlined** secondary. This is the only place two buttons sit on a coloured band outside the CTA band itself.
 - **Link columns to the right.** Section labels (EXPLORE / ACCOUNT / CONNECT — or whatever the site's real sections are) in small letter-spaced uppercase **`--gold`**; the links themselves off-white.
 - **Bottom.** A thin divider, then a copyright row in the muted pale-green, with the location pushed to the right on wide screens.
@@ -83,7 +88,7 @@ The school's signature block. Ground it in `--green-deepest` — a deep, slightl
 **Colour roles in the footer:** off-white for the school name, links, tagline and body; `--gold` for the section labels only; a muted pale-**green** (not grey) for the copyright row. Gold appears exactly twice — labels and primary button. Any more and the block tips from institutional into gaudy.
 
 **5. Testimonials band** _(the compact deep-green quotes strip)._
-A short sibling of the CTA band on the same `--green-deep` ground, and deliberately **compact — a closing note, not another full section**: a `--gold` uppercase eyebrow, one white serif line, then two or three quotes in a row. Each quote carries a hairline rule above it in the band's border colour rather than sitting in a card — a bordered box on a coloured band reads as a second surface. Beneath each quote, the attribution: the name in `--gold`, the role ("Parent", "Old Boy", "Coach") as a small letter-spaced uppercase line in the muted band colour. Optionally the crest, bled off one corner at ~7% opacity, as a watermark. Gold appears exactly twice — the eyebrow and the names. Like the CTA band it is the last block on its page and sits flush against the footer.
+A short sibling of the CTA band on the same `--green-deep` ground, and deliberately **compact — a closing note, not another full section**: a `--gold` uppercase eyebrow, one white heading-face line, then two or three quotes in a row. Each quote carries a hairline rule above it in the band's border colour rather than sitting in a card — a bordered box on a coloured band reads as a second surface. Beneath each quote, the attribution: the name in `--gold`, the role ("Parent", "Old Boy", "Coach") as a small letter-spaced uppercase line in the muted band colour. Optionally the crest, bled off one corner at ~7% opacity, as a watermark. Gold appears exactly twice — the eyebrow and the names. Like the CTA band it is the last block on its page and sits flush against the footer.
 
 ## Buttons
 
@@ -111,7 +116,7 @@ Keep the identity in dark mode: deep green (`--green-deepest`) backgrounds, ligh
 - No purple/blue gradients, no rainbow palettes.
 - Don't flood the page with gold — it's a sparing accent (buttons + the footer hairline).
 - No emoji as icons — use a clean line-icon set (lucide).
-- Don't drop the serif headings for a plain sans — the serif _is_ the brand.
+- Don't introduce a second typeface beyond the one sanctioned exception (Playfair Display, hero title only) — DM Sans is the brand's one face everywhere else, matching the school's own site.
 - Theme shadcn/ui with these tokens; never ship default shadcn styling.
 
 ## Reusability note (for future customers)

@@ -1,26 +1,28 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter, Lora } from "next/font/google";
+import { DM_Sans, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { BRAND, TITLE_TEMPLATE } from "@/lib/brand";
 
-// docs/DESIGN.md: an elegant serif for headings, Inter for body.
-//
-// Lora over Playfair Display or Cormorant (the brand skill lists all three as
-// acceptable): this app is not just a marketing site — it has admin tables,
-// dialogs and card headers where h3 lands at 16-18px. Playfair's high stroke
-// contrast thins out and turns fragile at that size, while Lora's sturdier
-// serifs stay crisp. It carries the heritage feel at hero size and survives the
-// small stuff, which the other two do not.
-const lora = Lora({
-  variable: "--font-lora",
+// docs/DESIGN.md: DM Sans for headings and body everywhere — it is what
+// stsebastians.lk itself uses, so the booking app reads as the same
+// institution rather than a separate product with its own type system. One
+// variable font instance covers both `--font-heading` and `--font-sans` (see
+// app/globals.css), so there is nothing to keep in sync between the two.
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
   display: "swap",
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+// The one deliberate exception: the home hero's title, which keeps the
+// elegant-serif display face from this app's earlier type system
+// (`--font-display`, applied only to that one heading — see
+// components/public/hero-carousel.tsx). Everything else, hero included, is
+// DM Sans.
+const playfairDisplay = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
   display: "swap",
 });
@@ -83,7 +85,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${lora.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${playfairDisplay.variable} ${geistMono.variable} h-full scroll-smooth antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <ThemeProvider

@@ -155,44 +155,60 @@ brand lives on screen, the report lives on paper.
 
 ## Typography
 
-The serif headings are **the single strongest brand signal**. Do not drop them
-for a plain sans; the serif _is_ the brand.
+**DM Sans**, headings and body alike, almost everywhere — this is what
+stsebastians.lk itself uses, so the booking app reads as the same institution
+rather than a separate product with its own type system. (This app previously
+ran an elegant-serif/sans pairing — Lora over Inter — as its own distinct
+heritage signal; that was dropped in favour of matching the school's real
+site.)
 
-- **Headings:** **Lora** via `next/font/google`, exposed as `--font-heading`
-  (and `--font-serif`). The brand skill accepts Playfair Display, Lora or
-  Cormorant; Lora is the one that ships because this app is not only a marketing
-  site — it has admin tables, dialogs and card headers where `h3` lands at
-  16–18px. Playfair's high stroke contrast thins out and turns fragile at that
-  size; Lora's sturdier serifs stay crisp, while still carrying the heritage
-  feel at hero size.
-- **Body:** **Inter** via `next/font/google`.
-- **Headings are `font-semibold tracking-normal`, never `font-bold
-tracking-tight`.** A serif at heavy weight and negative tracking turns muddy.
-  Semibold, normal tracking and a 1.2 line-height are what give it the
-  dignified, unhurried feel. This is set once in the `@layer base` block.
+**One exception: the home hero's `<h1>`.** It keeps an elegant serif —
+**Playfair Display**, exposed as `--font-display`/`font-display` and applied
+only to that one element in `components/public/hero-carousel.tsx`. It is the
+largest, most atmospheric piece of type on the site — full-bleed photo behind
+it, nothing else nearby — so it is allowed the heritage flourish the rest of
+the app traded away. No other heading uses `font-display`.
+
+- **Headings and body, except the hero title:** **DM Sans** via
+  `next/font/google`, one font instance exposed as both `--font-sans` and
+  `--font-heading`. There is no separate body face to keep in sync with it.
+- **The hero title:** **Playfair Display** via `next/font/google`, its own
+  `--font-playfair` instance exposed as `--font-display`. The hero's
+  supporting line, eyebrow and CTA all stay DM Sans — only the `<h1>` itself
+  switches.
+- **Headings are `font-semibold tracking-normal`, line-height 1.2** by default
+  (set once in the `@layer base` block) — individual headings still reach for
+  `font-bold tracking-tight` where more presence is wanted (stat figures,
+  dialog titles, card headers), but that is a per-element choice, not the base
+  rule. `font-display` only swaps the family; it rides on top of that same
+  base weight/tracking/line-height (the hero `<h1>` adds its own
+  `leading-[1.1]` override, same as before the typeface changed).
 - **Eyebrow labels:** small, uppercase, letter-spaced (`0.18em`), sitting above
-  a heading — `components/brand/eyebrow.tsx`. The eyebrow/serif-heading pair is
-  what gives a section its institutional rhythm.
-- **Emails** fall back to Georgia: a webfont in an inbox is a coin flip, and
-  Georgia is the closest thing to Lora that clients reliably have.
+  a heading — `components/brand/eyebrow.tsx`. The eyebrow/heading pair is what
+  gives a section its institutional rhythm.
+- **Emails** use a system sans stack
+  (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`)
+  throughout, masthead included: a webfont in an inbox is a coin flip, and
+  that stack is the closest a system font gets to DM Sans's own grotesque feel.
 
 ## Signature components
 
 Four components carry the brand. Reuse them rather than re-inventing the look.
 
 1. **Labelled feature card** — `components/brand/feature-card.tsx`. A mint card
-   with a hairline border: green eyebrow, serif sub-heading, muted paragraph,
-   green text link. For highlighting a feature or section — _not_ as a generic
-   container (that is `components/ui/card.tsx`).
+   with a hairline border: green eyebrow, heading-face sub-heading, muted
+   paragraph, green text link. For highlighting a feature or section — _not_
+   as a generic container (that is `components/ui/card.tsx`).
 2. **Numbered process row** — `components/brand/process-steps.tsx`. Large faint
-   serif numerals (01 / 02 / 03) above a serif step title and muted description.
-   **Only for genuine sequences.** Numbering unordered items tells the reader to
-   do them in order, which is a lie the design cannot walk back; if there is no
-   order, use feature cards. Rendered as an `<ol>` so the sequence is in the
-   markup, with the numerals `aria-hidden` — the list already conveys order, and
-   "zero one" read aloud before every heading is noise.
+   heading-face numerals (01 / 02 / 03) above a step title in the same face and
+   a muted description. **Only for genuine sequences.** Numbering unordered
+   items tells the reader to do them in order, which is a lie the design cannot
+   walk back; if there is no order, use feature cards. Rendered as an `<ol>` so
+   the sequence is in the markup, with the numerals `aria-hidden` — the list
+   already conveys order, and "zero one" read aloud before every heading is
+   noise.
 3. **Deep-green CTA band** — `components/brand/cta-band.tsx`. A full-width
-   `--band` section: white serif heading, short muted line, one gold button and
+   `--band` section: white heading, short muted line, one gold button and
    one outlined. Anchors the important call to action at the foot of a page. It
    sets `data-flush-footer`, which the site layouts use to drop the gap above
    the footer — two deep-green blocks separated by a strip of white would read
@@ -207,7 +223,7 @@ Four components carry the brand. Reuse them rather than re-inventing the look.
    rule's third segment.
 5. **Testimonials band** — `components/brand/testimonials-band.tsx`. A compact
    `--band` strip (py-12/14, well under the CTA band) closing the home page: a
-   gold eyebrow, one serif line, and two or three quotes in a row, each under a
+   gold eyebrow, one heading-face line, and two or three quotes in a row, each under a
    `--band-border` hairline, attributed to a gold name and a small uppercase
    role. The crest sits bled off the bottom-right at 7% opacity as a watermark
    (md and up only). Like the CTA band it sets `data-flush-footer`, so it meets
@@ -238,7 +254,15 @@ admin forms. Cards, inputs and images keep their radius; only buttons are sharp.
 - Generous whitespace; calm, spacious sections. Alternate white and mint
   backgrounds for rhythm.
 - **Low, simple hero** — a clean band, not a full-screen takeover. The booking
-  bar lives directly beneath it.
+  bar lives directly beneath it. The headline alternates between two short
+  copy sets across the carousel's four photos (A/B/A/B), each paired with a
+  per-slide CTA (`components/public/hero-carousel.tsx`) — booking a court
+  (gold), rules & info, and contact, cycling independently of the copy pairing.
+  Both copy sets are mounted at once, stacked in the same CSS grid cell
+  (`col-start-1 row-start-1`, the hidden one `invisible` rather than
+  unmounted) so the row auto-sizes to whichever set wraps to more lines —
+  the band's height stays constant as the carousel rotates, at every
+  viewport width, with no guessed pixel height to maintain.
 - Cards: white or mint, `--border` hairline, `rounded-lg`, very soft shadow.
   Restrained, not flashy — the court cards, their skeletons and the court
   gallery all sit at `rounded-lg`, a step tighter than the old `rounded-xl`, so
@@ -306,7 +330,7 @@ The three exceptions, and why each is legitimate:
 
 ## Quick anti-generic checklist
 
-- [ ] Elegant serif headings (Lora), semibold and normally tracked — not a sans
+- [ ] DM Sans throughout (headings semibold, normally tracked by default), except the hero `<h1>`, which stays Playfair Display
 - [ ] Green as the identity; gold used **sparingly** (one button, one hairline)
 - [ ] Uppercase eyebrow above section headings
 - [ ] Deep-green bands grounding the page; mint sections for rhythm

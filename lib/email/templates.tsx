@@ -64,7 +64,8 @@ const container = {
 /** School name above the gold rule — the masthead, as on printed letterhead. */
 const masthead = {
   color: GREEN_DEEPEST,
-  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontFamily:
+    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   fontSize: "15px",
   fontWeight: 700,
   letterSpacing: "0.02em",
@@ -81,10 +82,11 @@ const goldRule = {
 
 const heading = {
   color: INK,
-  // Georgia is the closest thing to the site's Lora that an inbox reliably
-  // has — a webfont in email is a coin flip, so this falls back gracefully
-  // while still reading as a serif for the great majority of recipients.
-  fontFamily: "Georgia, 'Times New Roman', serif",
+  // Same system sans stack as the body: a webfont in email is a coin flip,
+  // and the site itself is DM Sans — a clean grotesque — so a plain system
+  // sans is the closer match now, not a serif fallback.
+  fontFamily:
+    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   fontSize: "22px",
   fontWeight: 600,
   lineHeight: "30px",

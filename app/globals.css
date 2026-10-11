@@ -7,11 +7,17 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-dm-sans);
   --font-mono: var(--font-geist-mono);
-  /* The serif IS the brand — see `.claude/skills/brand`. */
-  --font-heading: var(--font-lora);
-  --font-serif: var(--font-lora);
+  /* One typeface for headings and body — see `.claude/skills/brand`. Kept as
+     its own token (rather than just relying on `font-sans`) so a heading can
+     still be targeted independently of body text, as `font-heading` is used
+     throughout the app. */
+  --font-heading: var(--font-dm-sans);
+  /* The one exception: the home hero's title only, via the `font-display`
+     utility. Not used by `font-heading` — every other heading in the app
+     stays DM Sans. */
+  --font-display: var(--font-playfair);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -453,11 +459,12 @@ select option {
   html {
     @apply font-sans;
   }
-  /* Elegant serif headings — the single strongest brand signal, and the thing
-     that makes this read as a 170-year-old institution rather than a startup.
-     Deliberately NOT `font-bold tracking-tight`: a serif at heavy weight and
-     negative tracking turns muddy. Semibold with normal tracking and a
-     generous line-height is what gives it the dignified, unhurried feel. */
+  /* DM Sans headings, matching stsebastians.lk. Semibold with normal
+     tracking and a generous line-height keeps the dignified, unhurried feel
+     the serif used to carry — individual headings still reach for
+     `font-bold tracking-tight` where more presence is wanted (stat figures,
+     dialog titles), but that is an explicit per-element choice, not the
+     default. */
   h1,
   h2,
   h3 {
