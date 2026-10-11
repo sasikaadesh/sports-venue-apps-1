@@ -16,13 +16,13 @@ export const CONTACT_DETAILS = {
     "Moratuwa 10400",
     "Sri Lanka",
   ],
-  phone: "076 567 4350, 077 786 7766",
+  phone: "Bookings: 076 567 4350 | Technical: 077 786 7766",
   /**
    * The address shown to visitors. Purely display — where contact-form
    * notifications are actually delivered is `ADMIN_CONTACT_EMAIL`, so the
    * public address can differ from the inbox that receives them.
    */
-  email: "sports@stsebastians.lk",
+  email: "sebsvenues@gmail.com",
   openingHours: [{ days: "Monday to Friday,", hours: "7:30 AM – 3:00 PM" }],
 } as const;
 
