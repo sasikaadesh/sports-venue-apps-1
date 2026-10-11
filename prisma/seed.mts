@@ -45,6 +45,18 @@ type CourtSeed = {
   type: { name: string; playerOptions: number[] };
   description: string;
   images: string[];
+  /** Court-specific rules, one per line. Omitted = the court type's standard
+   * set (lib/court-rules.ts). Written on both create and update, same as
+   * `description`/`images` below — so re-running the seed keeps a court's
+   * rules in sync with this file rather than freezing them at creation. */
+  rules?: string;
+  /**
+   * Position among every court list (COURT_DISPLAY_ORDER), only written on
+   * create. Omitted = the generic `displayOrderFor` lookup below; given
+   * explicitly for a court that needs to land between two existing values
+   * rather than at the next round multiple of ten.
+   */
+  displayOrder?: number;
   /** Operating range, whole hours, expanded into 1-hour templates. */
   schedule: {
     days: number[];
@@ -134,8 +146,11 @@ const COURTS: CourtSeed[] = [
     schedule: { ...EVENING, price: 1400 },
   },
   {
-    name: "Tennis",
-    aliases: ["Centre Court"],
+    // Split into Main + Mini (two separate courts) — previously one "Tennis"
+    // court; that row is matched by the "Tennis" alias below and renamed in
+    // place, keeping its id, rate, slots and booking history untouched.
+    name: "Tennis - Main",
+    aliases: ["Centre Court", "Tennis"],
     type: { name: "Tennis", playerOptions: [2, 4] },
     description:
       "Floodlit hard court for singles or doubles, with a full-height net and courtside seating.",
@@ -144,6 +159,29 @@ const COURTS: CourtSeed[] = [
       "/images/courts/tennis_2.jpg",
     ],
     schedule: { ...EVENING, price: 1200 },
+  },
+  {
+    // The junior/learning tennis court, new alongside Main — same Tennis
+    // court type (so it shares its player-count options), its own rate and
+    // rules.
+    name: "Tennis - Mini",
+    type: { name: "Tennis", playerOptions: [2, 4] },
+    description:
+      "Smaller-scale court for junior and beginner players, built for the Red, Orange and Green ball coaching stages before a junior moves up to the full-size Main court.",
+    images: ["/images/courts/tennis_2.jpg"],
+    rules: [
+      "Designed for junior and beginner players — ideal for Red, Orange and Green ball stage coaching.",
+      "Adult or coach supervision is recommended for young children.",
+      "Use age-appropriate balls for the stage being coached (Red, Orange or Green).",
+      "Non-marking sports shoes only — no outdoor footwear on the court.",
+      "Bring your own rackets, balls and other equipment.",
+      "Do not damage the court, nets or fittings. Damage is charged to the booking holder.",
+    ].join("\n"),
+    // Sits between Main (30) and Cricket Nets - Double (40) — see
+    // DISPLAY_ORDER below; a plain array-index lookup would land on 40 and
+    // tie with Cricket Nets - Double's own existing value.
+    displayOrder: 35,
+    schedule: { ...EVENING, price: 1000 },
   },
 
   // --- Shared facilities ----------------------------------------------------
@@ -185,7 +223,8 @@ const COURTS: CourtSeed[] = [
 const DISPLAY_ORDER = [
   "Badminton",
   "Basketball",
-  "Tennis",
+  "Tennis - Main",
+  "Tennis - Mini",
   "Cricket Nets - Double",
   "Table Tennis",
   "Swimming Pool",
@@ -253,6 +292,12 @@ for (const seed of COURTS) {
     ? { bookingMode: "shared" as const, capacity: seed.shared.capacity }
     : {};
 
+  // Rules are written only for a seed entry that actually specifies them —
+  // every other court's `rules` (set by an admin, or left blank for the
+  // court type's standard set) is left exactly as it is, rather than being
+  // reset to null on every reseed.
+  const rules = seed.rules !== undefined ? { rules: seed.rules } : {};
+
   const court = existing
     ? await prisma.court.update({
         where: { id: existing.id },
@@ -263,14 +308,16 @@ for (const seed of COURTS) {
           images: seed.images,
           isActive: true,
           ...mode,
+          ...rules,
         },
       })
     : await prisma.court.create({
         data: {
           name: seed.name,
-          displayOrder: displayOrderFor(seed.name),
+          displayOrder: seed.displayOrder ?? displayOrderFor(seed.name),
           courtTypeId: courtType.id,
           description: seed.description,
+          rules: seed.rules ?? null,
           images: seed.images,
           isActive: true,
           ...mode,

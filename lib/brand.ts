@@ -20,7 +20,7 @@ export const BRAND = {
   /** Where the full name will not fit: narrow headers, the PDF masthead. */
   shortName: "SSC Sports Booking",
   /** What the app does, for meta descriptions and email preheaders. */
-  tagline: "Court booking for students, staff and old boys",
+  tagline: "Court and facility booking, open to all.",
 
   established: 1854,
 

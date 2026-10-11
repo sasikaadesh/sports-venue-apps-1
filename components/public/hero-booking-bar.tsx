@@ -158,20 +158,35 @@ export function HeroBookingBar({
     router.push(`/book?${params.toString()}`);
   }
 
+  // Small uppercase, letter-spaced label — the same treatment the brand's
+  // "eyebrow" uses above a heading, scaled down for a form field, so the row
+  // reads as designed rather than a stock browser form.
+  const labelClass =
+    "text-xs font-semibold tracking-wide text-muted-foreground uppercase";
+  const fieldClass = "h-11";
+
   return (
     <form
       onSubmit={submit}
-      className="flex flex-col gap-5 rounded-xl border bg-card p-5 shadow-sm"
+      className="relative flex flex-col gap-6 overflow-hidden rounded-xl border border-border/70 bg-card p-6 shadow-lg shadow-black/5 sm:p-7 dark:shadow-black/20"
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* The one gold touch on this panel, echoing the footer's own rule —
+          thin, top-of-card, green-to-gold. A signature, not decoration. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary via-primary to-gold"
+      />
+
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
         <Field>
-          <FieldLabel htmlFor="hero-court" className="text-sm font-medium">
+          <FieldLabel htmlFor="hero-court" className={labelClass}>
             Court
           </FieldLabel>
           <NativeSelect
             id="hero-court"
             value={courtId}
             onChange={(e) => setCourtId(e.target.value)}
+            className={fieldClass}
           >
             {courts.map((c) => (
               <option key={c.id} value={c.id}>
@@ -182,7 +197,7 @@ export function HeroBookingBar({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="hero-date" className="text-sm font-medium">
+          <FieldLabel htmlFor="hero-date" className={labelClass}>
             Date
           </FieldLabel>
           <Input
@@ -192,12 +207,12 @@ export function HeroBookingBar({
             min={today}
             max={maxDate}
             onChange={(e) => setDate(e.target.value)}
-            className="h-10"
+            className={fieldClass}
           />
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="hero-start" className="text-sm font-medium">
+          <FieldLabel htmlFor="hero-start" className={labelClass}>
             Start
           </FieldLabel>
           <NativeSelect
@@ -205,6 +220,7 @@ export function HeroBookingBar({
             value={selected?.slotId ?? ""}
             disabled={loading || openSlots.length === 0}
             onChange={(e) => pickStart(e.target.value)}
+            className={fieldClass}
           >
             {openSlots.length === 0 ? (
               <option value="">{loading ? "Loading…" : "None free"}</option>
@@ -219,7 +235,7 @@ export function HeroBookingBar({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="hero-end" className="text-sm font-medium">
+          <FieldLabel htmlFor="hero-end" className={labelClass}>
             End
           </FieldLabel>
           <NativeSelect
@@ -227,6 +243,7 @@ export function HeroBookingBar({
             value={String(duration)}
             disabled={!selected}
             onChange={(e) => setWantedDuration(Number(e.target.value))}
+            className={fieldClass}
           >
             {/* Only end hours that keep every hour in between free and contiguous. */}
             {endOptions.map((opt) => (
@@ -238,7 +255,7 @@ export function HeroBookingBar({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="hero-players" className="text-sm font-medium">
+          <FieldLabel htmlFor="hero-players" className={labelClass}>
             Players
           </FieldLabel>
           <NativeSelect
@@ -246,6 +263,7 @@ export function HeroBookingBar({
             value={players === null ? "" : String(players)}
             disabled={playerOptions.length === 0}
             onChange={(e) => setWantedPlayers(Number(e.target.value))}
+            className={fieldClass}
           >
             {playerOptions.length === 0 ? (
               <option value="">—</option>
@@ -261,43 +279,53 @@ export function HeroBookingBar({
         </Field>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-4">
-        <p className="text-sm text-muted-foreground" aria-live="polite">
+      <div className="flex flex-col gap-4 border-t border-border/70 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div aria-live="polite" className="min-w-0">
           {loading ? (
-            <span className="flex items-center gap-2">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" />
               Checking availability…
-            </span>
+            </p>
           ) : failed ? (
-            "Could not load availability. Try again."
+            <p className="text-sm text-muted-foreground">
+              Could not load availability. Try again.
+            </p>
           ) : slots.length === 0 ? (
-            "This court has no slots on that day."
+            <p className="text-sm text-muted-foreground">
+              This court has no slots on that day.
+            </p>
           ) : !selected && data?.closedMessage ? (
-            data.closedMessage
+            <p className="text-sm text-muted-foreground">
+              {data.closedMessage}
+            </p>
           ) : !selected ? (
-            "Fully booked that day — try another date."
+            <p className="text-sm text-muted-foreground">
+              Fully booked that day — try another date.
+            </p>
           ) : (
-            <>
-              <span className="font-mono text-foreground">
+            // Hierarchy: the time/duration line is supporting detail, kept
+            // small and muted; the price is the number people actually came
+            // for, so it gets the serif-adjacent weight and the brand green.
+            <div className="flex flex-col gap-0.5">
+              <p className="font-mono text-sm text-muted-foreground">
                 {selected.startTime} – {endsAt ?? selected.endTime}
-              </span>
-              {" · "}
-              <span className="text-foreground">
+                {" · "}
                 {duration} {duration === 1 ? "hour" : "hours"}
-              </span>
-              {" · "}
-              <span className="font-medium text-foreground">
+              </p>
+              <p className="text-2xl font-semibold text-primary">
                 {formatPrice(total)}
-              </span>{" "}
-              total
-            </>
+                <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+                  total
+                </span>
+              </p>
+            </div>
           )}
-        </p>
+        </div>
 
         <Button
           type="submit"
           size="lg"
-          className="h-10 px-5"
+          className="h-11 w-full px-6 shadow-sm transition-shadow hover:shadow-md sm:w-auto"
           disabled={!canBook}
         >
           Continue

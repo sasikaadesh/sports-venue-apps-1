@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+  Mail,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,6 +113,55 @@ export function AuthForm({
   const otherHref = `${isSignup ? "/login" : "/signup"}${
     next ? `?next=${encodeURIComponent(next)}` : ""
   }`;
+
+  // Signup with "Confirm email" ON returns a notice instead of a session —
+  // the account exists but isn't usable until the link is clicked. That
+  // instruction must not be missable: the signup form is long (eight fields),
+  // so someone who just clicked "Create account" is scrolled to the bottom,
+  // right where the notice used to render was at the top of the page, out of
+  // view. Replacing the whole form area with a persistent panel — and
+  // scrolling it into view — means they see "check your email" wherever they
+  // were, and it stays on screen rather than a toast they could miss.
+  const pendingEmailConfirmation = isSignup && !!state.notice;
+  const confirmationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (pendingEmailConfirmation) {
+      confirmationRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [pendingEmailConfirmation]);
+
+  if (pendingEmailConfirmation) {
+    return (
+      <div
+        ref={confirmationRef}
+        role="status"
+        className="flex flex-col items-start gap-4 rounded-lg border border-primary/40 bg-primary/10 px-6 py-8"
+      >
+        <span className="grid size-12 place-items-center rounded-lg bg-primary text-primary-foreground">
+          <Mail className="size-6" />
+        </span>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-2xl">Thanks for signing up!</h2>
+          <p className="max-w-prose text-muted-foreground">
+            Please check your email to confirm your account and finish setup.
+          </p>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            {state.notice}
+          </p>
+        </div>
+        <Link
+          href="/login"
+          className="font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 hover:text-primary"
+        >
+          Already confirmed? Log in
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

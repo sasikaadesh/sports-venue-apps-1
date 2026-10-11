@@ -10,7 +10,7 @@ const LINK_COLUMNS = [
     heading: "Explore",
     links: [
       { href: "/courts", label: "Browse courts" },
-      { href: "/book", label: "Check availability" },
+      // { href: "/book", label: "Check availability" },
       { href: "/rules", label: "Rules & regulations" },
       { href: "/contact", label: "Contact us" },
     ],
@@ -87,19 +87,6 @@ export function SiteFooter() {
                 className="px-5"
               >
                 Book a court
-              </LinkButton>
-              {/* White-outlined secondary. The stock `outline` variant paints
-                  itself with page-surface tokens (a white slab here); `on-band`
-                  reads band tokens, which this footer no longer uses — so the
-                  border and text are pinned to the footer's own foreground,
-                  which is correct in both themes. */}
-              <LinkButton
-                href="/contact"
-                variant="on-band"
-                size="lg"
-                className="border-footer-foreground/55 px-5 text-footer-foreground hover:bg-footer-foreground/10 focus-visible:ring-footer-foreground/40"
-              >
-                Contact us
               </LinkButton>
             </div>
           </div>

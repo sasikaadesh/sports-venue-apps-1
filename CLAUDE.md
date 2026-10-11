@@ -80,7 +80,7 @@ Prisma uses the **pooled** connection for `DATABASE_URL` (runtime) and the **dir
 Follow the **`brand` skill** (`.claude/skills/brand/SKILL.md`) for the visual identity and `docs/DESIGN.md` for how it is applied here. Direction: **St. Sebastian's College — traditional/institutional, green & gold**.
 
 - **Never hardcode a colour.** Every colour in the app resolves from the palette block at the top of `app/globals.css`; that block, `public/logo.png` and `lib/brand.ts` are the entire rebrand surface. The only sanctioned exceptions are `lib/email/templates.tsx` (an inbox cannot resolve a CSS variable) and `lib/reports/bookings-pdf.tsx` (paper), both of which mirror the palette and say so.
-- Elegant serif headings (Lora) over Inter body — the serif _is_ the brand, do not swap it for a sans.
+- **DM Sans** everywhere, headings and body alike, matching stsebastians.lk itself — except the home hero's `<h1>` (`font-display`), which keeps the elegant-serif Playfair Display as the one deliberate exception. Don't introduce a third face, and don't let `font-display` spread beyond that one element.
 - Gold is a _rare_ accent: buttons for the single most important action, and the footer hairline. Do not flood the page with it.
 - Theme shadcn/ui with the project's tokens — do not ship default shadcn styling. No purple/blue gradients, no emoji icons, no everything-centered layouts.
 

@@ -9,7 +9,6 @@ import {
 import { CourtCard } from "@/components/public/court-card";
 import { HeroBookingBar } from "@/components/public/hero-booking-bar";
 import { HeroCarousel } from "@/components/public/hero-carousel";
-import { BRAND } from "@/lib/brand";
 import { BOOKING_WINDOW_DAYS } from "@/lib/booking-service";
 import { getActiveCourts } from "@/lib/catalogue";
 import { addDays, todayString } from "@/lib/time";
@@ -58,33 +57,17 @@ export default async function HomePage() {
     <>
       {/* Low, simple hero — a clean band, not a full-screen takeover. */}
       <section className="border-b">
-        {/* Headline band: photo carousel behind, white text over a dark overlay.
-            The white here is intentionally literal and identical in both
-            themes — it sits on photography, not on a themed surface. */}
-        <div className="relative isolate overflow-hidden">
-          <HeroCarousel />
-          <div className="mx-auto w-full max-w-6xl px-6 py-20 sm:px-8 lg:py-28">
-            <div className="flex max-w-2xl flex-col items-start gap-5">
-              {/* Fixed light-on-photo, as with the headline below it. */}
-              <p className="text-xs font-semibold tracking-[0.18em] text-white/75 uppercase">
-                {BRAND.name} &middot; Established {BRAND.established}
-              </p>
-              <h1 className="text-5xl leading-[1.1] text-white sm:text-6xl">
-                The courts are
-                <br />
-                <span className="text-photo-gold italic">open to you.</span>
-              </h1>
-              <p className="max-w-lg text-lg leading-relaxed text-white/80">
-                Cricket nets, tennis, table tennis and more. Check what is free,
-                reserve your slot, and pay online — no phone calls, no
-                clipboard.
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Headline band: photo carousel behind, white text over a dark
+            overlay. HeroCarousel owns the whole band — background, headline
+            copy (alternating between two short sets as the slides advance),
+            per-slide CTA and dots — since the copy and the CTA both depend on
+            which slide is showing. */}
+        <HeroCarousel />
 
-        {/* Booking bar band: solid surface, kept clear of the carousel. */}
-        <div className="bg-tint">
+        {/* Booking bar band: solid surface, kept clear of the carousel.
+            `id="book"` is the hero carousel's "Book a Court" CTA target —
+            scroll-smooth on <html> makes the jump glide rather than snap. */}
+        <div id="book" className="bg-tint">
           <div className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8">
             {courts.length > 0 ? (
               <HeroBookingBar
