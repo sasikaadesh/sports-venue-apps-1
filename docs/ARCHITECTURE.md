@@ -593,6 +593,16 @@ Verified end-to-end against the database, not reasoned about: with a rating seed
 - `siteOrigin()` (`lib/site-url.ts`) prefers `NEXT_PUBLIC_BASE_URL` and falls back to the forwarded host so previews work unconfigured. That fallback is not a security boundary: Supabase only honours a `redirectTo` matching its own Redirect URLs allow list, which is what actually stops a spoofed host header redirecting the callback elsewhere. Keep that list tight.
 - **Setup lives outside the codebase** — Google Cloud OAuth client + Supabase provider config. The authorized redirect URI is Supabase's own callback (`https://<project-ref>.supabase.co/auth/v1/callback`), _not_ an app URL; the app URL goes in Supabase's Site URL / Redirect URLs instead.
 
+### Email confirmation
+
+`signUp` → email → Supabase `/auth/v1/verify` → **`/auth/callback?code=…&next=…`** → `next` (or `/complete-profile`).
+
+- **Supabase confirms the address at `/verify`, before it redirects.** The `?code=` that reaches the callback only turns the confirmation into a _session_, and that exchange needs the PKCE code verifier, which `signUp` left as a cookie in the browser that filled in the form.
+- **Opened in any other browser** (a phone, Gmail's in-app browser, a second browser) the exchange fails with `pkce_code_verifier_not_found`, on an account that is already confirmed. This used to be reported as "That sign-in link is invalid or has expired" — the false expiry. The verifier cannot be recreated, so the callback now asks `isConfirmedSignupCode()` (`lib/auth-confirmation.ts`), which reads `auth.flow_state` + `auth.users`: an `email/signup` flow whose user is confirmed sends them to `/login?confirmed=1&next=…` ("Your email address is confirmed. Log in to continue."), with `next` kept.
+- **"Invalid or expired" is still shown when it is true**: a link already used (Supabase's `/verify` answers `error_code=otp_expired`, handled by the provider-error branch), a code already exchanged (its flow row is gone), or a code Supabase never issued.
+- **To sign people in on any device**, the Supabase "Confirm signup" template can link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&next=/account` instead of `{{ .ConfirmationURL }}`; the callback's `verifyOtp` branch already handles it. That is dashboard configuration, not code.
+- `http://localhost:3000/**` is not in the Redirect URLs allow list, so a signup made in local dev emails a link that lands on the production Site URL root (`https://sebsvenues.com?code=…`). Add it to the allow list to test this flow locally.
+
 ### Password reset
 
 `/forgot-password` → email → **`/reset-password`** → `/login?reset=1`.

@@ -12,9 +12,14 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string; reset?: string }>;
+  searchParams: Promise<{
+    next?: string;
+    error?: string;
+    reset?: string;
+    confirmed?: string;
+  }>;
 }) {
-  const { next, error, reset } = await searchParams;
+  const { next, error, reset, confirmed } = await searchParams;
 
   if (await getCurrentUser()) {
     redirect(next?.startsWith("/") ? next : "/account");
@@ -36,10 +41,15 @@ export default async function LoginPage({
         initialError={error}
         // Set by the reset page after a successful password change, which
         // signs every session out — so this is the first thing they see.
+        // `confirmed` is set by /auth/callback when a confirmation link worked
+        // but was opened in a different browser from the one that signed up,
+        // so there was no session to hand over — the account is confirmed.
         initialNotice={
           reset === "1"
             ? "Password updated. Log in with your new password."
-            : undefined
+            : confirmed === "1"
+              ? "Your email address is confirmed. Log in to continue."
+              : undefined
         }
       />
     </div>

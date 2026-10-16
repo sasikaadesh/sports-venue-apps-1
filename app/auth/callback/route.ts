@@ -3,6 +3,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, profileIsComplete } from "@/lib/auth";
+import { isConfirmedSignupCode } from "@/lib/auth-confirmation";
 import { RESET_PASSWORD_PATH, safeNextPath } from "@/lib/site-url";
 
 /**
@@ -52,8 +53,21 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     signedIn = !error;
+
+    // A confirmation link opened in a different browser from the one that
+    // signed up: Supabase has already confirmed the address, but there is no
+    // code verifier here to finish signing in with. That is a success to
+    // report, not an expired link — see `isConfirmedSignupCode`.
+    if (error && !isRecovery && (await isConfirmedSignupCode(code))) {
+      return NextResponse.redirect(
+        `${origin}/login?confirmed=1&next=${encodeURIComponent(next)}`
+      );
+    }
   } else if (tokenHash && type) {
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+    const { error } = await supabase.auth.verifyOtp({
+      type,
+      token_hash: tokenHash,
+    });
     signedIn = !error;
   }
 
