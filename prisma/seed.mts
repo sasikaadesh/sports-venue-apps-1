@@ -123,14 +123,33 @@ const COURTS: CourtSeed[] = [
     schedule: { ...EVENING, price: 2200 },
   },
   {
-    name: "Table Tennis",
+    // Split into Arena 1 + Arena 2 — previously one "Table Tennis" court; that
+    // row is matched by the alias below and renamed in place, keeping its id,
+    // rate, slots and booking history. table_tennis_3.jpg is shared by both.
+    name: "Table Tennis - Arena 1",
+    aliases: ["Table Tennis"],
     type: { name: "Table Tennis", playerOptions: [2, 4] },
     description:
       "Air-conditioned hall with competition tables. Bats and balls available at the desk — singles or doubles.",
     images: [
-      "https://images.unsplash.com/photo-1609710228159-0fa9bd7c0827?auto=format&fit=crop&w=1600&q=80",
-      "https://images.unsplash.com/photo-1534158914592-062992fbe900?auto=format&fit=crop&w=1600&q=80",
+      "/images/courts/table_tennis_1.jpg",
+      "/images/courts/table_tennis_3.jpg",
     ],
+    schedule: { ...EVENING, price: 1000 },
+  },
+  {
+    // The second table, new alongside Arena 1 — same court type, rate,
+    // schedule and (standard) rules.
+    name: "Table Tennis - Arena 2",
+    type: { name: "Table Tennis", playerOptions: [2, 4] },
+    description:
+      "Air-conditioned hall with competition tables. Bats and balls available at the desk — singles or doubles.",
+    images: [
+      "/images/courts/table_tennis_2.jpg",
+      "/images/courts/table_tennis_3.jpg",
+    ],
+    // Sits between Arena 1 (50) and Swimming Pool (60) — see DISPLAY_ORDER.
+    displayOrder: 55,
     schedule: { ...EVENING, price: 1000 },
   },
   {
@@ -226,7 +245,7 @@ const DISPLAY_ORDER = [
   "Tennis - Main",
   "Tennis - Mini",
   "Cricket Nets - Double",
-  "Table Tennis",
+  "Table Tennis - Arena 1",
   "Swimming Pool",
   "Fitness Center",
   "Cricket Net - Astro",
