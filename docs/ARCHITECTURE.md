@@ -176,7 +176,8 @@ that court on that date.
 - **Format:** `{courtPrefix}-{YYMMDD}-{seq}`, seq zero-padded to 3 digits.
   `Court.referencePrefix` holds the prefix (`BAD`, `BAS`, `TEN`, `CRA`
   Cricket Net - Astro, `CRC` Cricket Net - Concrete, `CRD` Cricket Nets -
-  Double, `TT` Table Tennis, `POOL` Swimming Pool, `FIT` Fitness Center);
+  Double, `TT` Table Tennis - Arena 1, `TT2` Table Tennis - Arena 2, `POOL`
+  Swimming Pool, `FIT` Fitness Center);
   the migration backfills it for every seeded court. A court created later,
   or renamed since, gets one derived from its name the first time it is ever
   booked (`ensureCourtReferencePrefix`, `lib/booking-reference.ts`) and
@@ -359,7 +360,7 @@ the venue's wall clock (`VENUE_TIME_ZONE`, Asia/Colombo), via
 
 ## Demo data (`prisma/seed.mts`)
 
-`npm run db:seed` (or `npx prisma db seed`) populates court types, courts and their hourly schedules — Cricket Net - Astro, Cricket Net - Concrete, Cricket Nets - Double, Basketball, Table Tennis, Badminton and Tennis (exclusive), plus two **shared** facilities: **Fitness Center** (LKR 700/hour, capacity 20) and **Swimming Pool** (LKR 1,200/hour, capacity 30) — every one 18:00–21:00 daily, all with Unsplash placeholder images. The shared facilities' types offer one person per booking, so their rate is per person and capacity counts heads.
+`npm run db:seed` (or `npx prisma db seed`) populates court types, courts and their hourly schedules — Cricket Net - Astro, Cricket Net - Concrete, Cricket Nets - Double, Basketball, Table Tennis - Arena 1 and Arena 2, Badminton, Tennis - Main and Tennis - Mini (exclusive), plus two **shared** facilities: **Fitness Center** (LKR 700/hour, capacity 20) and **Swimming Pool** (LKR 1,200/hour, capacity 30) — every one 18:00–21:00 daily, all with Unsplash placeholder images. The shared facilities' types offer one person per booking, so their rate is per person and capacity counts heads.
 
 On a database that predates them, the shared facilities are added by `npm run db:add-shared-facilities` (`prisma/add-shared-facilities.mts`), which touches nothing else — the seed would also rewrite every existing court's name, description and images. The three cricket nets and a Rs.200 rise on every rate arrived as a data migration, `20261001120000_cricket_nets_and_rate_rise`, so the rise can only ever apply once; it **deactivated** the old single "Cricket Nets" court rather than renaming or deleting it, so its bookings, payments and special requests still read "Cricket Nets". Rate changes never touch existing bookings: a booking's price is frozen on `BookingSlot.price` / `Booking.totalPrice`, and `Booking.totalPrice` is what PayHere is charged.
 

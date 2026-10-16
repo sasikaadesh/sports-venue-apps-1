@@ -19,8 +19,8 @@ export const CONTACT_DETAILS = {
   phone: "Bookings: 076 567 4350 | Technical: 077 786 7766",
   /** The same numbers, one per line, each with its own `tel:` link. */
   phones: [
-    { label: "Bookings", display: "076 567 4350", href: "tel:+94765674350" },
-    { label: "Technical", display: "077 786 7766", href: "tel:+94777867766" },
+    { label: "Bookings", display: "076 567 4350", href: "tel:0765674350" },
+    { label: "Technical", display: "077 786 7766", href: "tel:0777867766" },
   ],
   /**
    * The address shown to visitors. Purely display — where contact-form

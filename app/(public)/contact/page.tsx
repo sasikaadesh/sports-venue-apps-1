@@ -3,7 +3,7 @@ import { Clock, Mail, MapPin, Phone } from "lucide-react";
 
 import { ContactForm } from "@/components/public/contact-form";
 import { getCurrentUser } from "@/lib/auth";
-import { CONTACT_DETAILS, CONTACT_PHONE_HREF } from "@/lib/contact-details";
+import { CONTACT_DETAILS } from "@/lib/contact-details";
 
 export const metadata: Metadata = {
   title: "Contact us",
@@ -49,12 +49,21 @@ export default async function ContactPage() {
             </Detail>
 
             <Detail icon={<Phone className="size-4" />} label="Phone">
-              <a
-                href={CONTACT_PHONE_HREF}
-                className="underline decoration-primary decoration-2 underline-offset-4 transition-colors hover:text-primary"
-              >
-                {CONTACT_DETAILS.phone}
-              </a>
+              {/* One link per number: the label stays plain text, and each
+                  tel: dials only its own number. */}
+              <ul className="flex flex-col gap-0.5">
+                {CONTACT_DETAILS.phones.map((p) => (
+                  <li key={p.href}>
+                    {p.label}:{" "}
+                    <a
+                      href={p.href}
+                      className="underline decoration-primary decoration-2 underline-offset-4 transition-colors hover:text-primary"
+                    >
+                      {p.display}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </Detail>
 
             <Detail icon={<Mail className="size-4" />} label="Email">

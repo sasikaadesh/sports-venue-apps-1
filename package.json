@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "make-admin": "node scripts/make-admin.mjs",
     "db:seed": "tsx prisma/seed.mts",
-    "db:add-shared-facilities": "tsx prisma/add-shared-facilities.mts"
+    "db:add-shared-facilities": "tsx prisma/add-shared-facilities.mts",
+    "db:add-table-tennis-arena-2": "tsx prisma/add-table-tennis-arena-2.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
