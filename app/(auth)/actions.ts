@@ -42,6 +42,27 @@ async function destinationAfterAuth(next: string): Promise<string> {
   return next;
 }
 
+/**
+ * Supabase's signUp errors, as something a member can act on.
+ *
+ * The confirmation email is sent inside the signUp call, and a failed send
+ * rolls the new account back — so an email-delivery problem (SMTP settings,
+ * the built-in sender's team-only restriction, its hourly limit) surfaces here
+ * as a failed signup even though nothing is wrong with what was typed. Those
+ * are the venue's problem to fix in the Supabase dashboard, not the member's.
+ */
+function signUpErrorMessage(error: { code?: string; message: string }): string {
+  const emailDelivery =
+    error.code === "email_address_not_authorized" ||
+    error.code === "over_email_send_rate_limit" ||
+    /sending (confirmation )?email|email rate limit/i.test(error.message);
+
+  if (emailDelivery) {
+    return "We couldn't send your confirmation email just now, so the account was not created. Please try again in a few minutes, or continue with Google.";
+  }
+  return error.message;
+}
+
 export async function signUp(
   _prev: AuthFormState,
   formData: FormData
@@ -109,7 +130,14 @@ export async function signUp(
   });
 
   if (error) {
-    return { error: error.message };
+    // Logged in full so the real cause reaches the Vercel runtime log — the
+    // form only ever shows the message below.
+    console.error("[signUp] Supabase signUp failed", {
+      status: error.status,
+      code: error.code,
+      message: error.message,
+    });
+    return { error: signUpErrorMessage(error) };
   }
 
   // With "Confirm email" ON, Supabase returns a user but no session.

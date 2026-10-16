@@ -120,17 +120,16 @@ export function AuthForm({
   // so someone who just clicked "Create account" is scrolled to the bottom,
   // right where the notice used to render was at the top of the page, out of
   // view. Replacing the whole form area with a persistent panel — and
-  // scrolling it into view — means they see "check your email" wherever they
-  // were, and it stays on screen rather than a toast they could miss.
+  // scrolling to the top of the page — means they see "check your email"
+  // wherever they were, and it stays on screen rather than a toast they could
+  // miss. Focus moves to the panel too, so a screen reader announces it.
   const pendingEmailConfirmation = isSignup && !!state.notice;
   const confirmationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (pendingEmailConfirmation) {
-      confirmationRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      confirmationRef.current?.focus({ preventScroll: true });
     }
   }, [pendingEmailConfirmation]);
 
@@ -139,7 +138,8 @@ export function AuthForm({
       <div
         ref={confirmationRef}
         role="status"
-        className="flex flex-col items-start gap-4 rounded-lg border border-primary/40 bg-primary/10 px-6 py-8"
+        tabIndex={-1}
+        className="flex flex-col items-start gap-4 rounded-lg border border-primary/40 bg-primary/10 px-6 py-8 outline-none"
       >
         <span className="grid size-12 place-items-center rounded-lg bg-primary text-primary-foreground">
           <Mail className="size-6" />
