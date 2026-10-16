@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Crest } from "@/components/brand/crest";
 import { LinkButton } from "@/components/link-button";
 import { BRAND } from "@/lib/brand";
-import { CONTACT_DETAILS, CONTACT_PHONE_HREF } from "@/lib/contact-details";
+import { CONTACT_DETAILS } from "@/lib/contact-details";
 
 const LINK_COLUMNS = [
   {
@@ -124,12 +124,20 @@ export function SiteFooter() {
                   </span>
                 ))}
               </address>
-              <a
-                href={CONTACT_PHONE_HREF}
-                className="text-sm transition-colors hover:text-gold"
-              >
-                {CONTACT_DETAILS.phone}
-              </a>
+              <p className="text-sm">
+                {CONTACT_DETAILS.phones.map((p, i) => (
+                  <span key={p.href}>
+                    {i > 0 && " | "}
+                    {p.label}:{" "}
+                    <a
+                      href={p.href}
+                      className="transition-colors hover:text-gold"
+                    >
+                      {p.display}
+                    </a>
+                  </span>
+                ))}
+              </p>
             </div>
           </div>
         </div>
