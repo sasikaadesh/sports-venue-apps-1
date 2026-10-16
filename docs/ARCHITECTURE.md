@@ -657,9 +657,9 @@ Flow, on a successful `submitContactMessage`:
 - **The two sends are sequential.** Resend's free tier allows 2 requests/second; firing both at once sits exactly on the limit. The admin notification goes first — if only one gets through, it should be the one carrying information nobody else has.
 - **Server-only by construction.** `lib/email/client.ts` carries `import "server-only"`, so `RESEND_API_KEY` cannot reach a client bundle — importing it from a client component is a build error, not a runtime leak.
 - **Templates** live in `lib/email/templates.tsx`: inline style objects, single column, and the brand palette (`#14231A` ink, `#088020` green, `#E0AB2E` gold) written out literally — email clients strip `<style>` blocks and understand nothing of Tailwind or CSS custom properties. Those constants mirror the `--p-*` palette in `app/globals.css` and are one of the three sanctioned places in the codebase that may hold a colour literal (see `docs/DESIGN.md` → Auditing it). Every message opens with the school masthead: name, motto, gold rule. Each email also ships a plain-text alternative, which text-only clients render and which lowers the spam score.
-- **Sender: `EMAIL_FROM`, one address for every message the app sends.** `sportsvenuebookings.com` is verified in Resend, so the deployed default is `noreply@sportsvenuebookings.com`. Per customer: add their domain in Resend → Domains, publish the DKIM/SPF (and, once trusted, DMARC) records it prints, then point `EMAIL_FROM` at an address on that domain. The value may be a bare address or a full `Name <address>` mailbox; a bare address is wrapped in `BRAND.shortName` by `fromAddress()`. `CONTACT_FROM_EMAIL` is the old name and is still read as a fallback. With neither set, mail falls back to Resend's shared test sender (`onboarding@resend.dev`), which needs no DNS but **only delivers to the address that owns the Resend account** — dev only.
+- **Sender: `EMAIL_FROM`, one address for every message the app sends.** `sebsvenues.com` is the sending domain in Resend, so the deployed default is `noreply@sebsvenues.com`. Per customer: add their domain in Resend → Domains, publish the DKIM/SPF (and, once trusted, DMARC) records it prints, then point `EMAIL_FROM` at an address on that domain. The value may be a bare address or a full `Name <address>` mailbox; a bare address is wrapped in `BRAND.shortName` by `fromAddress()`. `CONTACT_FROM_EMAIL` is the old name and is still read as a fallback. With neither set, mail falls back to Resend's shared test sender (`onboarding@resend.dev`), which needs no DNS but **only delivers to the address that owns the Resend account** — dev only.
 - **Env vars** (all server-only, none `NEXT_PUBLIC_`): `RESEND_API_KEY`, `ADMIN_CONTACT_EMAIL`, `EMAIL_FROM`.
-- **Password-reset email is not sent through Resend.** It is issued by Supabase Auth (`supabase.auth.resetPasswordForEmail`), so its From address comes from Supabase → Authentication → Emails/SMTP, **not** from `EMAIL_FROM`. To send it from the same domain, configure Resend as the custom SMTP provider in the Supabase dashboard.
+- **Password-reset email is not sent through Resend.** It is issued by Supabase Auth (`supabase.auth.resetPasswordForEmail`), so its From address comes from Supabase → Authentication → Emails/SMTP, **not** from `EMAIL_FROM`. The same applies to the signup confirmation email. To send both from the same domain, configure Resend as the custom SMTP provider in the Supabase dashboard with sender `noreply@sebsvenues.com`. The domain must show **Verified** in Resend → Domains: if it does not, Supabase cannot send the confirmation email and every email signup fails with "Error sending confirmation email".
 
 ## Admin panel (Phase 5)
 
@@ -715,7 +715,7 @@ is strict JSON and cannot carry comments, hence this note.
 Check the region of a deployed response with:
 
 ```bash
-curl -sI https://www.sportsvenuebookings.com/ | grep -i x-vercel-id
+curl -sI https://www.sebsvenues.com/ | grep -i x-vercel-id
 # sin1::bom1::…   ← edge PoP :: function region
 ```
 

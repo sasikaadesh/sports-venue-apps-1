@@ -17,6 +17,11 @@ export const CONTACT_DETAILS = {
     "Sri Lanka",
   ],
   phone: "Bookings: 076 567 4350 | Technical: 077 786 7766",
+  /** The same numbers, one per line, each with its own `tel:` link. */
+  phones: [
+    { label: "Bookings", display: "076 567 4350", href: "tel:+94765674350" },
+    { label: "Technical", display: "077 786 7766", href: "tel:+94777867766" },
+  ],
   /**
    * The address shown to visitors. Purely display — where contact-form
    * notifications are actually delivered is `ADMIN_CONTACT_EMAIL`, so the
