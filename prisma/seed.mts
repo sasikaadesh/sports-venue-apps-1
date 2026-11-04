@@ -28,6 +28,7 @@
 import { config } from "dotenv";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { DAY_NAMES, timeStringToDate } from "../lib/time";
+import { COURT_RULES_2026_11 } from "./court-rules-2026-11";
 
 config({ path: ".env.local" });
 
@@ -135,7 +136,7 @@ const COURTS: CourtSeed[] = [
       "/images/courts/table_tennis_1.jpg",
       "/images/courts/table_tennis_3.jpg",
     ],
-    schedule: { ...EVENING, price: 1000 },
+    schedule: { ...EVENING, price: 1200 },
   },
   {
     // The second table, new alongside Arena 1 — same court type, rate,
@@ -150,7 +151,7 @@ const COURTS: CourtSeed[] = [
     ],
     // Sits between Arena 1 (50) and Swimming Pool (60) — see DISPLAY_ORDER.
     displayOrder: 55,
-    schedule: { ...EVENING, price: 1000 },
+    schedule: { ...EVENING, price: 1200 },
   },
   {
     name: "Badminton",
@@ -162,7 +163,7 @@ const COURTS: CourtSeed[] = [
       "/images/courts/badminton_1.jpg",
       "/images/courts/badminton_2.jpg",
     ],
-    schedule: { ...EVENING, price: 1400 },
+    schedule: { ...EVENING, price: 1700 },
   },
   {
     // Split into Main + Mini (two separate courts) — previously one "Tennis"
@@ -177,7 +178,7 @@ const COURTS: CourtSeed[] = [
       "/images/courts/tennis_1.png",
       "/images/courts/tennis_2.jpg",
     ],
-    schedule: { ...EVENING, price: 1200 },
+    schedule: { ...EVENING, price: 1700 },
   },
   {
     // The junior/learning tennis court, new alongside Main — same Tennis
@@ -188,19 +189,11 @@ const COURTS: CourtSeed[] = [
     description:
       "Smaller-scale court for junior and beginner players, built for the Red, Orange and Green ball coaching stages before a junior moves up to the full-size Main court.",
     images: ["/images/courts/tennis_2.jpg"],
-    rules: [
-      "Designed for junior and beginner players — ideal for Red, Orange and Green ball stage coaching.",
-      "Adult or coach supervision is recommended for young children.",
-      "Use age-appropriate balls for the stage being coached (Red, Orange or Green).",
-      "Non-marking sports shoes only — no outdoor footwear on the court.",
-      "Bring your own rackets, balls and other equipment.",
-      "Do not damage the court, nets or fittings. Damage is charged to the booking holder.",
-    ].join("\n"),
     // Sits between Main (30) and Cricket Nets - Double (40) — see
     // DISPLAY_ORDER below; a plain array-index lookup would land on 40 and
     // tie with Cricket Nets - Double's own existing value.
     displayOrder: 35,
-    schedule: { ...EVENING, price: 1000 },
+    schedule: { ...EVENING, price: 1200 },
   },
 
   // --- Shared facilities ----------------------------------------------------
@@ -311,11 +304,13 @@ for (const seed of COURTS) {
     ? { bookingMode: "shared" as const, capacity: seed.shared.capacity }
     : {};
 
-  // Rules are written only for a seed entry that actually specifies them —
-  // every other court's `rules` (set by an admin, or left blank for the
-  // court type's standard set) is left exactly as it is, rather than being
-  // reset to null on every reseed.
-  const rules = seed.rules !== undefined ? { rules: seed.rules } : {};
+  // Rules are written only for a court that has a set — the November 2026
+  // rules (prisma/court-rules-2026-11.ts) or its own `rules` here. Any other
+  // court's `rules` (set by an admin, or left blank for the court type's
+  // standard set) is left exactly as it is, rather than being reset to null
+  // on every reseed.
+  const ruleSet = COURT_RULES_2026_11[seed.name]?.join("\n") ?? seed.rules;
+  const rules = ruleSet !== undefined ? { rules: ruleSet } : {};
 
   const court = existing
     ? await prisma.court.update({
@@ -336,7 +331,7 @@ for (const seed of COURTS) {
           displayOrder: seed.displayOrder ?? displayOrderFor(seed.name),
           courtTypeId: courtType.id,
           description: seed.description,
-          rules: seed.rules ?? null,
+          rules: ruleSet ?? null,
           images: seed.images,
           isActive: true,
           ...mode,
